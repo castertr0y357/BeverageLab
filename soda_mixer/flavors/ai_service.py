@@ -24,14 +24,32 @@ class AIAssistant:
     Context:
     - You have access to a user's current inventory and their high-rated recipes.
     - Users will send you their "Current Compound" (selected ingredients).
-    - You should suggest a 3rd or 4th ingredient to "Bridge" or "Stabilize" the mix.
+    - You should suggest additional reagents to "Bridge" or "Stabilize" the mix (usually 1-3 more items).
+    - Suggest specific ml/g or "parts" ratios. Some mixes benefit from a 1:1 parity, while others need small "flavor notes" to add complexity without overpowering.
     - Explain the flavor science: why does the acidity of Lemon balance the bitterness of Espresso?
 
     Guidelines:
     - Keep responses concise (2-3 short paragraphs).
-    - Suggest specific ml/g or "parts" ratios.
     - Be supportive of "Experimental Mode" requests.
     """
+    
+    SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "amount": 25.0, "reason": "Acidity balances sweetness", "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}}]'
+    
+    SURPRISE_MIX_FORMAT = """{
+    "design_intent": "Brief overall reasoning...",
+    "selection": [
+        { "name": "Ingredient Name", "amount": 50.0, "role": "Specific role in mix" },
+        ...
+    ]
+}"""
+
+    FLAVOR_PROFILE_FORMAT = """{
+    "intensity": float,
+    "sweetness": float,
+    "acidity": float,
+    "bitterness": float,
+    "complexity": float
+}"""
 
     @classmethod
     def get_default_provider(cls):
@@ -210,25 +228,38 @@ class AIAssistant:
         exclude_context = f" Exclude these previously suggested items: {', '.join(exclude)}." if exclude else ""
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
-        prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE] [NO THINKING PROCESS].{retry_context}
+        prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
 
 Current Compound: {', '.join(ingredients)}
 Lab Mode: {tone}{exclude_context}
 
-Task: Identify EXACTLY 3 ingredients from the Inventory Registry below that pair well with the current compound.
+Task: Identify 3 to 5 ingredients from the Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
 
 Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
-2. Each item needs a short reason (max 8 words) grounded in flavor science.
-3. MANDATORY: For each ingredient, synthesize a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5, specifically fine-tuned for this mix.
-4. OUTPUT MUST BE A RAW JSON ARRAY. [NO MARKDOWN] [NO BACKTICKS] [NO PREAMBLE] [NO EXPLANATION].
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' (ml for Soda/Slushie, g for Coffee) based on holistic balance.
+4. For new suggestions, provide a specific 'amount' and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
 
-EXACT FORMAT EXAMPLE (DO NOT COPY DATA, ONLY THE STRUCTURE):
-[{{ "name": "Lemon Syrup", "reason": "Acidity balances sweetness", "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2 }} }}]
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Existing Ingredient Name": 100.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the balance strategy"
+}}
 
 Inventory Registry for Selection:
 """
-        return cls.chat(prompt, context=inventory)
+        response = cls.chat(prompt, context=inventory)
+        return cls._extract_json(response)
 
     @classmethod
     def synthesize_surprise_mix(cls, inventory=None, mode='standard', drink_type='SODA'):
@@ -240,7 +271,7 @@ Inventory Registry for Selection:
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
         drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
         
-        count_limit = "EXACTLY 3" if drink_type != 'COFFEE' else "BETWEEN 3 and 5"
+        count_limit = "BETWEEN 2 and 4" if drink_type != 'COFFEE' else "BETWEEN 3 and 5"
         extra_rules = ""
         if drink_type == 'COFFEE':
             extra_rules = "5. MANDATORY: For Coffee Lab synthesis, include exactly one 'Additive' or 'Creamer' as a final stabilizer."
@@ -253,18 +284,13 @@ Lab Mode: {tone}
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
 2. Select a base (e.g. coffee/syrup) and complementary reagents.
-3. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
-4. For each ingredient, provide a specific 'role' (max 8 words).
+3. Provide a suggested 'amount' (ml or g) for each. Use 1:1 ratios for balance or small amounts for "flavor notes".
+4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
+5. For each ingredient, provide a specific 'role' (max 8 words).
 {extra_rules}
 
 OUTPUT FORMAT: A raw JSON object.
-{{
-    "design_intent": "Brief overall reasoning...",
-    "selection": [
-        {{ "name": "Ingredient Name", "role": "Specific role in mix" }},
-        ...
-    ]
-}}
+{cls.SURPRISE_MIX_FORMAT}
 
 Inventory Registry for Selection:
 """
@@ -300,13 +326,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         Description: {description}
 
         Return ONLY a JSON object with values from 1.0 to 5.0 for these metrics:
-        {{
-            "intensity": float,
-            "sweetness": float,
-            "acidity": float,
-            "bitterness": float,
-            "complexity": float
-        }}
+        {cls.FLAVOR_PROFILE_FORMAT}
         Base your analysis on chemical flavor profiles.
         """
         response = cls.chat(prompt)
@@ -566,6 +586,30 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                         if data_json.get('type') == 'content_block_delta':
                             delta = data_json.get('delta', {})
                             if delta.get('type') == 'text_delta':
+                                # JSON structure:
+                                # {
+                                #     "suggestions": [
+                                #         {
+                                #             "name": "Ingredient Name",
+                                #             "reason": "Short reason why this pairs well with the current mix",
+                                #             "resonance": 85,
+                                #             "amount": 50
+                                #         },
+                                #         ... (3-5 options)
+                                #     ],
+                                #     "seal_recommended": true/false,
+                                #     "rebalancing": {
+                                #         "Current Ingredient A": 100,
+                                #         "Current Ingredient B": 80
+                                #     },
+                                #     "reasoning": "Brief overview of the holistic balance strategy"
+                                # }
+                                #
+                                # Guidelines:
+                                # - "rebalancing": Map EVERY ingredient already in the mixture to a recommended volume (ml for Soda/Slushie, g for Coffee). 
+                                # - "seal_recommended": Set to true if the current mix is already a classic or perfect pairing (e.g. Strawberry + Kiwi).
+                                # - Use molecular logic: strong bases (Lemon) get more volume (~100ml), intense accents (Mint/Pepper) get less (~10-25ml). 
+                                # - Do not exceed 250ml total syrup for Soda.
                                 yield f"data: {json.dumps({'chunk': delta.get('text', '')})}\n\n"
                     except json.JSONDecodeError: pass
 

@@ -29,8 +29,6 @@ from .ai_service import AIAssistant
 def home(request):
     """Home page with ingredient mixer and Hall of Fame stats."""
     ingredients = Ingredient.objects.filter(is_in_inventory=True)
-    # Optimized Archive Fetch
-    recipes = Recipe.objects.prefetch_related('categories', 'recipe_ingredients__ingredient').order_by('-updated_at')[:50]
 
     # Hall of Fame stats by theme
     stats_by_theme = {}
@@ -67,7 +65,6 @@ def home(request):
 
     return render(request, 'flavors/home.html', {
         'ingredients': ingredients,
-        'recipes': recipes,
         'velocity': kitchen_velocity,
         'stats_json': json.dumps(stats_by_theme),
     })
@@ -602,6 +599,10 @@ def get_recommendations_api(request):
                     'name': r['ingredient'].name,
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
+                    'sweetness': r['ingredient'].sweetness,
+                    'acidity': r['ingredient'].acidity,
+                    'bitterness': r['ingredient'].bitterness,
+                    'complexity': r['ingredient'].complexity,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': 'suggestions'
@@ -615,6 +616,10 @@ def get_recommendations_api(request):
                     'name': r['ingredient'].name,
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
+                    'sweetness': r['ingredient'].sweetness,
+                    'acidity': r['ingredient'].acidity,
+                    'bitterness': r['ingredient'].bitterness,
+                    'complexity': r['ingredient'].complexity,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'secondary')
@@ -628,6 +633,10 @@ def get_recommendations_api(request):
                     'name': r['ingredient'].name,
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
+                    'sweetness': r['ingredient'].sweetness,
+                    'acidity': r['ingredient'].acidity,
+                    'bitterness': r['ingredient'].bitterness,
+                    'complexity': r['ingredient'].complexity,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'tertiary')
@@ -1199,7 +1208,7 @@ def ai_suggest_api(request):
         exclude = data.get('exclude', []) # For more options
         
         if not ingredients:
-            return JsonResponse({'error': 'No ingredients provided.'}, status=400)
+            ingredients = ["NONE - Initial Synthesis"]
             
         # Get full inventory registry for AI context
         all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
@@ -1223,15 +1232,29 @@ def ai_suggest_api(request):
                 retry_note=retry_note
             )
             
-            # Use the resilient JSON extractor
-            suggested_data = AIAssistant._extract_json(raw_suggestion)
+            # The autonomous engine now returns pre-extracted JSON data
+            suggested_data = raw_suggestion
             
-            if suggested_data and isinstance(suggested_data, list):
+            if suggested_data:
+                # Extract suggestions array or root object
+                if isinstance(suggested_data, dict):
+                    suggestions_list = suggested_data.get('suggestions', [])
+                    rebalancing = suggested_data.get('rebalancing', {})
+                    seal_recommended = suggested_data.get('seal_recommended', False)
+                    seal_resonance = suggested_data.get('seal_resonance', 0)
+                    reasoning = suggested_data.get('reasoning', '')
+                else:
+                    suggestions_list = suggested_data
+                    rebalancing = {}
+                    seal_recommended = False
+                    seal_resonance = 0
+                    reasoning = ''
+
                 # Molecular Resonance: Multi-tier fuzzy lookup
                 enriched = []
                 inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
                 
-                for item in suggested_data:
+                for item in suggestions_list:
                     ing_name = item.get('name', '').strip().lower()
                     if not ing_name: continue
                     
@@ -1242,17 +1265,14 @@ def ai_suggest_api(request):
                             target_obj = inv
                             break
                     
-                    # Tier 2: Partial/Contains Match
+                    # Tier 2: Partial Match
                     if not target_obj:
                         for inv in inventory_items:
-                            inv_lower = inv.name.lower()
-                            if ing_name in inv_lower or inv_lower in ing_name:
+                            if ing_name in inv.name.lower() or inv.name.lower() in ing_name:
                                 target_obj = inv
                                 break
                                 
                     if target_obj:
-                        # Calculate Molecular Resonance Level
-                        import random
                         intensity_delta = 0
                         if ingredients:
                             baseline_name = ingredients[0].strip().lower()
@@ -1270,14 +1290,26 @@ def ai_suggest_api(request):
                             'name': target_obj.name,
                             'category': target_obj.category,
                             'intensity': target_obj.intensity,
+                            'sweetness': target_obj.sweetness,
+                            'acidity': target_obj.acidity,
+                            'bitterness': target_obj.bitterness,
+                            'complexity': target_obj.complexity,
                             'resonance': round(min(resonance, 99.8), 1),
                             'reason': item.get('reason', 'Molecular Affinity Match'),
+                            'amount': item.get('amount'), # Carry over AI-suggested amount
                             'profile': item.get('profile', None)  # Pass synthesized overrides if present
                         })
                 
                 if enriched:
                     # SUCCESS: Resonance established
-                    return JsonResponse({'status': 'success', 'suggestions': enriched})
+                    return JsonResponse({
+                        'status': 'success', 
+                        'suggestions': enriched,
+                        'rebalancing': rebalancing,
+                        'seal_recommended': seal_recommended,
+                        'seal_resonance': seal_resonance,
+                        'reasoning': reasoning
+                    })
             
             # Incrementally improve prompt if we failed
             retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
@@ -1434,11 +1466,14 @@ def random_pairing_api(request):
                         # Fuzzy check
                         match = next((i for i in all_compatible if name in i.name.lower() or i.name.lower() in name), None)
                     
-                    if match and match not in selection:
-                        selection.append(match)
+                    if match and match not in [s['obj'] for s in selection]:
+                        selection.append({
+                            'obj': match,
+                            'amount': item.get('amount')
+                        })
         
-        # 3. Fallback to Programmatic Randomizer if AI failed or provided less than 3 valid items
-        target_count = 3 if drink_type != 'COFFEE' else random.randint(3, 5)
+        # 3. Fallback to Programmatic Randomizer if AI failed or provided fewer than required valid items
+        target_count = random.randint(2, 4) if drink_type != 'COFFEE' else random.randint(3, 5)
         
         if len(selection) < target_count:
             selection = [] # Clear any partial AI selection
@@ -1449,45 +1484,64 @@ def random_pairing_api(request):
             potential_bases = all_compatible.filter(ingredient_type__in=base_types)
             
             if potential_bases.exists():
-                selection.append(random.choice(list(potential_bases)))
+                selection.append({'obj': random.choice(list(potential_bases)), 'amount': None})
             
             # For Coffee, we want to ensure an additive is included if we are doing a longer mix
             if drink_type == 'COFFEE' and target_count >= 3:
                 # Reserve the last slot for an ADDITIVE if possible
-                additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i.id for i in selection])
+                additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i['obj'].id for i in selection])
                 if additives.exists():
                     target_additive = random.choice(list(additives))
                     # We'll add this at the end, so we fill up to (target_count - 1) first
                     
-                    remaining_reagents = list(all_compatible.exclude(id__in=[i.id for i in selection]).exclude(id=target_additive.id))
+                    remaining_reagents = list(all_compatible.exclude(id__in=[i['obj'].id for i in selection]).exclude(id=target_additive.id))
                     random.shuffle(remaining_reagents)
                     
                     while len(selection) < (target_count - 1) and remaining_reagents:
-                        selection.append(remaining_reagents.pop())
+                        selection.append({'obj': remaining_reagents.pop(), 'amount': None})
                     
-                    selection.append(target_additive)
+                    selection.append({'obj': target_additive, 'amount': None})
                 else:
                     # No additives, just fill normally
-                    remaining_reagents = list(all_compatible.exclude(id__in=[i.id for i in selection]))
+                    remaining_reagents = list(all_compatible.exclude(id__in=[i['obj'].id for i in selection]))
                     random.shuffle(remaining_reagents)
                     while len(selection) < target_count and remaining_reagents:
-                        selection.append(remaining_reagents.pop())
+                        selection.append({'obj': remaining_reagents.pop(), 'amount': None})
             else:
-                remaining_reagents = list(all_compatible.exclude(id__in=[i.id for i in selection]))
+                remaining_reagents = list(all_compatible.exclude(id__in=[i['obj'].id for i in selection]))
                 random.shuffle(remaining_reagents)
                 
                 while len(selection) < target_count and remaining_reagents:
-                    selection.append(remaining_reagents.pop())
+                    selection.append({'obj': remaining_reagents.pop(), 'amount': None})
+
+            # Apply Randomized Ratio Profile for programmatic fallback
+            ratio_profile = random.choice(['parity', 'tiered', 'nuanced'])
+            for idx, item in enumerate(selection):
+                if item['amount'] is not None: continue # Keep AI amount if present
+                
+                if ratio_profile == 'parity':
+                    # 1:1 ratio (roughly, normalized later in frontend or here)
+                    item['amount'] = 100.0 if drink_type != 'COFFEE' else 15.0
+                elif ratio_profile == 'tiered':
+                    # Standard tiered 100/50/25
+                    item['amount'] = [100.0, 50.0, 25.0, 15.0][min(idx, 3)] if drink_type != 'COFFEE' else [18.0, 5.0, 2.0, 2.0, 2.0][min(idx, 4)]
+                else:
+                    # Nuanced: Randomly weighted
+                    item['amount'] = random.choice([100.0, 75.0, 50.0, 25.0, 10.0]) if drink_type != 'COFFEE' else random.choice([18.0, 10.0, 5.0, 2.0])
             
-        # 4. Format for response
         result = []
-        for ing in selection:
+        for item in selection:
+            ing = item['obj']
             result.append({
                 'id': ing.id,
                 'name': ing.name,
                 'category': ing.category,
                 'intensity': ing.intensity,
-                'complexity': ing.complexity
+                'sweetness': ing.sweetness,
+                'acidity': ing.acidity,
+                'bitterness': ing.bitterness,
+                'complexity': ing.complexity,
+                'amount': item['amount']
             })
             
         return JsonResponse({

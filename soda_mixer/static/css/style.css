@@ -522,6 +522,22 @@ h1, h2, h3, h4, h5, h6 {
     border-color: rgba(255, 0, 255, 0.8) !important;
 }
 
+/* 🧠 Neural AI Styling */
+.text-neural { 
+    color: var(--fizz-cyan) !important; 
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+}
+.border-neural { 
+    border: 2px solid rgba(0, 255, 255, 0.4) !important; 
+}
+.glow-neural {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.25);
+}
+.glow-neural:hover {
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    border-color: rgba(0, 255, 255, 0.8) !important;
+}
+
 .glow-text {
     text-shadow: 0 0 8px currentColor;
 }

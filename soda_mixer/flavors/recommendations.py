@@ -256,6 +256,7 @@ def get_tiered_recommendation(base_id, secondary_id=None, drink_type='SODA', exp
                 avg_rating=Avg('ingredient_usage__recipe__rating')
             ).exclude(id=base_id)
         else:
+            compat_cats = CATEGORY_COMPATIBILITY.get(base_ingredient.category, [])
             candidates = Ingredient.objects.filter(
                 category__in=compat_cats, 
                 is_in_inventory=True
