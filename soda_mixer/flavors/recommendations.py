@@ -1,6 +1,7 @@
 """Recommendation engine for Soda Mixer."""
 
-from django.db.models import Avg
+from typing import List, Dict, Any, Optional, Set, Union
+from django.db.models import Avg, QuerySet
 from .models import Ingredient, Recipe, RecipeIngredient
 
 
@@ -69,7 +70,7 @@ _FINISHERS = {
 }
 
 
-def generate_recipe_name(ingredient_ids, drink_type='SODA'):
+def generate_recipe_name(ingredient_ids: Union[List[int], Set[int]], drink_type: str = 'SODA') -> str:
     """
     Generate a creative, deterministic recipe name from a list of ingredient IDs.
     Returns a string name.
@@ -133,7 +134,7 @@ _INGREDIENT_CATEGORY_RULES = {
 }
 
 
-def suggest_categories(ingredient_ids):
+def suggest_categories(ingredient_ids: Union[List[int], Set[int]]) -> List[str]:
     """
     Return a list of suggested category name strings based on the ingredients chosen.
     """
@@ -167,7 +168,7 @@ def suggest_categories(ingredient_ids):
 
 
 # pairing suggestions with intensity rules
-def get_recommendation(ingredient_ids, drink_type='SODA', experimental=False, force_type=None):
+def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Get ingredient recommendations based on selected ingredients.
     """
@@ -239,7 +240,7 @@ def get_recommendation(ingredient_ids, drink_type='SODA', experimental=False, fo
         'suggestions': list(selected_ingredients)
     }
 
-def get_tiered_recommendation(base_id, secondary_id=None, drink_type='SODA', experimental=False, force_type=None):
+def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Get tiered recommendations (Secondary or Tertiary) based on selected base and optional secondary.
     """
@@ -326,7 +327,7 @@ def get_tiered_recommendation(base_id, secondary_id=None, drink_type='SODA', exp
     return {'recommended': recommendations[:5]}
 
 
-def _calculate_compatibility_score(i1, i2, experimental=False, avg_rating=0):
+def _calculate_compatibility_score(i1: Ingredient, i2: Ingredient, experimental: bool = False, avg_rating: Optional[float] = 0) -> Dict[str, Any]:
     """
     Calculate compatibility score between two ingredients.
     Returns a dict with 'score', 'reason', and optional 'bridge'.
@@ -396,7 +397,7 @@ def _calculate_compatibility_score(i1, i2, experimental=False, avg_rating=0):
     return {'score': score, 'reason': reason, 'bridge': bridge}
 
 
-def _calculate_profile_balance(i1, i2, cand):
+def _calculate_profile_balance(i1: Ingredient, i2: Ingredient, cand: Ingredient) -> int:
     """Reward candidates that provide missing profile elements."""
     score = 0
     avg_sweet = (i1.sweetness + i2.sweetness) / 2.0
@@ -410,7 +411,7 @@ def _calculate_profile_balance(i1, i2, cand):
     return score
 
 
-def calculate_recipe_stats(recipe_ingredients):
+def calculate_recipe_stats(recipe_ingredients: Union[List[RecipeIngredient], QuerySet]) -> Dict[str, float]:
     """
     Calculate weighted stats for a given mix of RecipeIngredients.
     """
@@ -429,7 +430,7 @@ def calculate_recipe_stats(recipe_ingredients):
     }
 
 
-def _get_top_recommendations(drink_type='SODA'):
+def _get_top_recommendations(drink_type: str = 'SODA') -> List[Dict[str, Any]]:
     """Get top recommended base ingredients to start a mix."""
     recommendations = []
     
@@ -451,7 +452,7 @@ def _get_top_recommendations(drink_type='SODA'):
     return recommendations
 
 
-def _find_similar_recipes(selected_ingredients):
+def _find_similar_recipes(selected_ingredients: Union[List[Ingredient], QuerySet]) -> List[Dict[str, Any]]:
     """Find recipes that use the selected ingredients."""
     ingredient_ids = [i.id for i in selected_ingredients]
     matching_recipe_ingredients = RecipeIngredient.objects.filter(ingredient_id__in=ingredient_ids)

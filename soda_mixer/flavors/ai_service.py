@@ -1,8 +1,16 @@
+"""Service for interacting with various LLM providers."""
+
 import requests
 import json
 import re
 import time
+import logging
+from typing import List, Dict, Any, Optional, Union, Generator
+
 from .models import LLMProvider, SystemConfiguration
+
+logger = logging.getLogger(__name__)
+
 
 class AIAssistant:
     """Service for interacting with various LLM providers."""
@@ -52,7 +60,8 @@ class AIAssistant:
 }"""
 
     @classmethod
-    def get_default_provider(cls):
+    def get_default_provider(cls) -> Optional[LLMProvider]:
+        """Get the default LLM provider configured in the system."""
         config = SystemConfiguration.get_config()
         if config.default_llm_provider and config.default_llm_provider.is_enabled:
             return config.default_llm_provider
@@ -61,7 +70,7 @@ class AIAssistant:
         return LLMProvider.objects.filter(is_enabled=True).first()
 
     @classmethod
-    def chat(cls, user_prompt, history=None, provider=None, context=None):
+    def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> str:
         """
         Send a prompt to the configured LLM provider.
         history: List of previous messages for context.
@@ -82,13 +91,11 @@ class AIAssistant:
             messages.extend(history)
         messages.append({"role": "user", "content": user_prompt})
 
-        # 🧪 AI SYNTHESIS REQUEST LOGGING
-        print("-" * 50)
-        print(f"🔬 BEVERAGE LABORATORY: Synthesis Request to {provider.name}")
-        print(f"   Model: {provider.default_model}")
-        print(f"   System Instructions: {len(system_content)} chars")
-        print(f"   Payload: {user_prompt[:250]}{'...' if len(user_prompt) > 250 else ''}")
-        print("-" * 50)
+        logger.info(
+            f"AISynthesis - Info - Synthesis Request to {provider.name} | "
+            f"Model: {provider.default_model} | System Instructions: {len(system_content)} chars | "
+            f"Payload: {user_prompt[:250]}{'...' if len(user_prompt) > 250 else ''}"
+        )
 
         try:
             if provider.provider_type == 'OPENAI':
@@ -103,11 +110,12 @@ class AIAssistant:
                 # Generic OpenAI-compatible
                 return cls._call_openai(provider, messages)
         except Exception as e:
-            print(f"DEBUG: Laboratory AI Communication Failure ({provider.name}): {e}")
+            logger.error(f"AICommunication - Error - Laboratory AI Communication Failure ({provider.name}): {e}")
             return f"Laboratory Error: Failed to reach the assistant ({str(e)})."
 
     @classmethod
-    def chat_stream(cls, user_prompt, history=None, provider=None, context=None):
+    def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> Generator[str, None, None]:
+        """Stream a prompt response from the configured LLM provider."""
         if not provider:
             provider = cls.get_default_provider()
         
@@ -137,12 +145,12 @@ class AIAssistant:
             else:
                 yield from cls._call_openai_stream(provider, messages)
         except Exception as e:
-            print(f"DEBUG: Laboratory AI Communication Failure ({provider.name}): {e}")
+            logger.error(f"AICommunication - Error - Laboratory AI Communication Failure ({provider.name}): {e}")
             error_chunk = json.dumps({'chunk': f"Laboratory Error: Failed to reach the assistant ({str(e)})."})
             yield f"data: {error_chunk}\n\n"
 
     @classmethod
-    def keep_warm(cls):
+    def keep_warm(cls) -> bool:
         """
         Send a lightweight keep-alive pulse to local models to keep them in VRAM.
         Uses Ollama's /api/show endpoint — returns model metadata instantly with
@@ -169,11 +177,11 @@ class AIAssistant:
                 cls.chat("ping", history=[], provider=provider)
                 return True
         except Exception as e:
-            print(f"DEBUG: Laboratory Wakeup Failure for {provider.name}: {e}")
+            logger.error(f"AIKeepWarm - Error - Laboratory Wakeup Failure for {provider.name}: {e}")
             return False
 
     @classmethod
-    def check_status(cls):
+    def check_status(cls) -> str:
         """
         Actively check if the configured AI provider is reachable and responsive.
         Returns: 'synchronized', 'dormant', or 'no_provider'
@@ -199,11 +207,11 @@ class AIAssistant:
             else:
                 return 'dormant'
         except Exception as e:
-            print(f"DEBUG: Laboratory Status Pulse Failure: {e}")
+            logger.error(f"AIStatusCheck - Error - Laboratory Status Pulse Failure: {e}")
             return 'dormant'
 
     @classmethod
-    def list_models(cls, provider):
+    def list_models(cls, provider: LLMProvider) -> List[str]:
         """Fetch available models from the provider's API."""
         try:
             if provider.provider_type in ['OPENAI', 'CLAUDE', 'CUSTOM', 'ANYTHINGLLM']:
@@ -215,11 +223,11 @@ class AIAssistant:
             else:
                 return []
         except Exception as e:
-            print(f"Error fetching models: {e}")
+            logger.error(f"AIModelsFetch - Error - Error fetching models: {e}")
             return []
 
     @classmethod
-    def suggest_autonomous(cls, ingredients, mode='standard', inventory=None, exclude=None, retry_note=None):
+    def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """
         Generate multiple proactive suggestions as a structured JSON array.
         Returns 3 specific ingredient recommendations from the inventory.
@@ -262,7 +270,7 @@ Inventory Registry for Selection:
         return cls._extract_json(response)
 
     @classmethod
-    def synthesize_surprise_mix(cls, inventory=None, mode='standard', drink_type='SODA'):
+    def synthesize_surprise_mix(cls, inventory: Optional[str] = None, mode: str = 'standard', drink_type: str = 'SODA') -> Optional[Dict[str, Any]]:
         """
         Autonomous Synthesis: Select a cohesive set of ingredients from the inventory.
         Soda/Slushie: 3 ingredients.
@@ -298,7 +306,7 @@ Inventory Registry for Selection:
         return cls._extract_json(response)
 
     @classmethod
-    def synthesize_flavor_summary(cls, ingredients, drink_type='SODA'):
+    def synthesize_flavor_summary(cls, ingredients: List[Dict[str, Any]], drink_type: str = 'SODA') -> str:
         """
         Given a finalized set of selected ingredients, produce a brief
         synthesis report: why they work together and what to expect. Plain text, no JSON.
@@ -318,7 +326,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         return cls.chat(prompt)
 
     @classmethod
-    def analyze_flavor_profile(cls, name, description):
+    def analyze_flavor_profile(cls, name: str, description: str) -> Optional[Dict[str, float]]:
         """Analyze a flavor and return its chemical profile as JSON."""
         prompt = f"""
         Analyze this ingredient:
@@ -334,7 +342,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         return cls._extract_json(response)
 
     @classmethod
-    def bulk_analyze_flavor_profiles(cls, ingredients_data):
+    def bulk_analyze_flavor_profiles(cls, ingredients_data: List[Dict[str, str]]) -> Optional[List[Dict[str, Any]]]:
         """
         Analyze a list of ingredients in a single batch.
         ingredients_data: List of {'name': str, 'description': str}
@@ -361,7 +369,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         return cls._extract_json(response)
 
     @staticmethod
-    def _extract_json(text):
+    def _extract_json(text: str) -> Optional[Any]:
         """Resiliently extract the first JSON object or array from a string."""
         if not text:
             return None
@@ -376,7 +384,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             return None
 
     @staticmethod
-    def _safe_request(method, url, attempts=3, timeout=30, **kwargs):
+    def _safe_request(method: str, url: str, attempts: int = 3, timeout: int = 30, **kwargs: Any) -> requests.Response:
         """Execute a request with automated retry logic and exponential backoff."""
         last_error = None
         for i in range(attempts):
@@ -397,7 +405,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         raise last_error
 
     @classmethod
-    def _list_openai_models(cls, provider):
+    def _list_openai_models(cls, provider: LLMProvider) -> List[str]:
         url = (provider.base_url or "https://api.openai.com/v1").rstrip('/') + "/models"
         headers = {"Authorization": f"Bearer {provider.api_key}"} if provider.api_key else {}
         if provider.provider_type == 'CLAUDE':
@@ -411,14 +419,14 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         return [m['id'] for m in data.get('data', [])]
 
     @classmethod
-    def _list_ollama_models(cls, provider):
+    def _list_ollama_models(cls, provider: LLMProvider) -> List[str]:
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/tags"
         response = cls._safe_request('GET', url, timeout=10)
         data = response.json()
         return [m['name'] for m in data.get('models', [])]
 
     @classmethod
-    def _list_gemini_models(cls, provider):
+    def _list_gemini_models(cls, provider: LLMProvider) -> List[str]:
         api_key = provider.api_key
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         response = cls._safe_request('GET', url, timeout=10)
@@ -428,7 +436,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                 if 'generateContent' in m.get('supportedGenerationMethods', [])]
 
     @classmethod
-    def _call_openai(cls, provider, messages):
+    def _call_openai(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         url = provider.base_url or "https://api.openai.com/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {provider.api_key}",
@@ -444,15 +452,14 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         
         content = result['choices'][0]['message']['content'] if 'choices' in result else ""
         
-        # 📡 RAW LLM SIGNAL RECEIVED
-        print(f"📡 RAW LLM SIGNAL ({provider.name}): {len(content)} tokens received.")
+        logger.info(f"AISynthesis - Info - Raw LLM Signal ({provider.name}): {len(content)} characters received.")
         if not content.strip():
-             print(f"⚠️  WARNING: Empty signal from {provider.name}! Full response: {result}")
+             logger.warning(f"AISynthesis - Warning - Empty signal from {provider.name}! Full response: {result}")
              
         return content
 
     @classmethod
-    def _call_ollama(cls, provider, messages):
+    def _call_ollama(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         # Ollama /api/chat — native format.
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
         data = {
@@ -460,7 +467,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "messages": messages,
             "stream": False,
             "options": {
-                "num_predict": 2048  # High headroom for CoT models (Thinking Process)
+                "num_predict": 2048
             }
         }
         response = cls._safe_request('POST', url, json=data, timeout=120)
@@ -468,23 +475,20 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         
         content = result.get('message', {}).get('content', "")
         
-        # 📡 RAW LLM SIGNAL RECEIVED
-        print(f"📡 RAW LLM SIGNAL (OLLAMA): {len(content)} tokens received.")
+        logger.info(f"AISynthesis - Info - Raw LLM Signal (Ollama): {len(content)} characters received.")
         if not content.strip():
-             print(f"⚠️  WARNING: Empty signal from Ollama! Full Response: {result}")
+             logger.warning(f"AISynthesis - Warning - Empty signal from Ollama! Full Response: {result}")
              
         return content
 
     @classmethod
-    def _call_claude(cls, provider, messages):
-        # Very simplified Claude API call
+    def _call_claude(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         url = "https://api.anthropic.com/v1/messages"
         headers = {
             "x-api-key": provider.api_key,
             "anthropic-version": "2023-06-01",
             "content-type": "application/json"
         }
-        # Claude expects system prompt separately or as a specific message structure
         system = messages[0]['content']
         actual_messages = messages[1:]
         
@@ -498,8 +502,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         return response.json()['content'][0]['text']
 
     @classmethod
-    def _call_gemini(cls, provider, messages):
-        # Simplified Gemini API call
+    def _call_gemini(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         api_key = provider.api_key
         model = provider.default_model or "gemini-1.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -507,13 +510,12 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         system_text = messages[0]['content'] if messages and messages[0]['role'] == 'system' else ""
         actual_messages = messages[1:] if system_text else messages
         
-        # Format messages for Gemini
         contents = []
         for m in actual_messages:
             role = "user" if m['role'] == 'user' else "model"
             contents.append({"role": role, "parts": [{"text": m['content']}]})
             
-        data = {"contents": contents}
+        data: Dict[str, Any] = {"contents": contents}
         if system_text:
             data["system_instruction"] = {"parts": [{"text": system_text}]}
             
@@ -525,15 +527,14 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         except (KeyError, IndexError):
             content = ""
             
-        # 📡 RAW LLM SIGNAL RECEIVED
-        print(f"📡 RAW LLM SIGNAL (GEMINI): {len(content)} tokens received.")
+        logger.info(f"AISynthesis - Info - Raw LLM Signal (Gemini): {len(content)} characters received.")
         if not content.strip():
-             print(f"⚠️  WARNING: Empty signal from Gemini! Full Response: {result}")
+             logger.warning(f"AISynthesis - Warning - Empty signal from Gemini! Full Response: {result}")
              
         return content
 
     @classmethod
-    def _call_openai_stream(cls, provider, messages):
+    def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = provider.base_url or "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"}
         data = {"model": provider.default_model or "gpt-3.5-turbo", "messages": messages, "temperature": 0.7, "stream": True}
@@ -541,9 +542,9 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         response.raise_for_status()
         for line in response.iter_lines():
             if line:
-                line = line.decode('utf-8')
-                if line.startswith('data: '):
-                    data_str = line[6:]
+                line_str = line.decode('utf-8')
+                if line_str.startswith('data: '):
+                    data_str = line_str[6:]
                     if data_str == '[DONE]': break
                     try:
                         data_json = json.loads(data_str)
@@ -554,7 +555,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                     except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_ollama_stream(cls, provider, messages):
+    def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
         data = {"model": provider.default_model or "mistral", "messages": messages, "stream": True, "options": {"num_predict": 2048}}
         response = requests.post(url, json=data, stream=True, timeout=120)
@@ -568,7 +569,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                 except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_claude_stream(cls, provider, messages):
+    def _call_claude_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = "https://api.anthropic.com/v1/messages"
         headers = {"x-api-key": provider.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
         system = messages[0]['content']
@@ -578,43 +579,19 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         response.raise_for_status()
         for line in response.iter_lines():
             if line:
-                line = line.decode('utf-8')
-                if line.startswith('data: '):
-                    data_str = line[6:]
+                line_str = line.decode('utf-8')
+                if line_str.startswith('data: '):
+                    data_str = line_str[6:]
                     try:
                         data_json = json.loads(data_str)
                         if data_json.get('type') == 'content_block_delta':
                             delta = data_json.get('delta', {})
                             if delta.get('type') == 'text_delta':
-                                # JSON structure:
-                                # {
-                                #     "suggestions": [
-                                #         {
-                                #             "name": "Ingredient Name",
-                                #             "reason": "Short reason why this pairs well with the current mix",
-                                #             "resonance": 85,
-                                #             "amount": 50
-                                #         },
-                                #         ... (3-5 options)
-                                #     ],
-                                #     "seal_recommended": true/false,
-                                #     "rebalancing": {
-                                #         "Current Ingredient A": 100,
-                                #         "Current Ingredient B": 80
-                                #     },
-                                #     "reasoning": "Brief overview of the holistic balance strategy"
-                                # }
-                                #
-                                # Guidelines:
-                                # - "rebalancing": Map EVERY ingredient already in the mixture to a recommended volume (ml for Soda/Slushie, g for Coffee). 
-                                # - "seal_recommended": Set to true if the current mix is already a classic or perfect pairing (e.g. Strawberry + Kiwi).
-                                # - Use molecular logic: strong bases (Lemon) get more volume (~100ml), intense accents (Mint/Pepper) get less (~10-25ml). 
-                                # - Do not exceed 250ml total syrup for Soda.
                                 yield f"data: {json.dumps({'chunk': delta.get('text', '')})}\n\n"
                     except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_gemini_stream(cls, provider, messages):
+    def _call_gemini_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         api_key = provider.api_key
         model = provider.default_model or "gemini-1.5-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
@@ -627,9 +604,9 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         response.raise_for_status()
         for line in response.iter_lines():
             if line:
-                line = line.decode('utf-8')
-                if line.startswith('data: '):
-                    data_str = line[6:]
+                line_str = line.decode('utf-8')
+                if line_str.startswith('data: '):
+                    data_str = line_str[6:]
                     try:
                         data_json = json.loads(data_str)
                         if 'candidates' in data_json and len(data_json['candidates']) > 0:
@@ -637,4 +614,3 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                             if parts:
                                 yield f"data: {json.dumps({'chunk': parts[0].get('text', '')})}\n\n"
                     except json.JSONDecodeError: pass
-
