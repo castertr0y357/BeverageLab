@@ -12,10 +12,11 @@
 - [x] Created `.env.example` to prevent configuration drift
 - [x] Implemented a test suite with 27 unit and integration tests covering models, recommendations, settings, view endpoints, and mocked AI endpoints
 - [x] Configured Django settings to parse `CSRF_TRUSTED_ORIGINS` from environment variables, preventing origin-checking CSRF failures in production, and updated env configuration files
+- [x] Removed host port mapping for the PostgreSQL database container, isolating it to the internal Docker network to prevent host port conflicts
 
 ## 🏗️ Architectural Notes
 - Containerized Django 5.0 application.
-- PostgreSQL database backing model data.
+- PostgreSQL database isolated within the internal Docker network, backing model data.
 - Gunicorn web server configured with gevent async workers.
 - Modular Views Package under `soda_mixer/flavors/views/` containing `main.py`, `ingredients.py`, `recipes.py`, `ai.py`, `auth.py`, and `settings.py`.
 - Configurable `CSRF_TRUSTED_ORIGINS` via environment variables to allow flexible hosting configurations.
