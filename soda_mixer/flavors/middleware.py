@@ -63,5 +63,13 @@ class LaboratoryCsrfMiddleware(CsrfViewMiddleware):
             if origin_host and request_host and origin_host == request_host:
                 return True
 
+            # Diagnostic print for production troubleshooting
+            from django.conf import settings
+            try:
+                gh = request.get_host()
+            except Exception as ex:
+                gh = f"Error: {ex}"
+            print(f"🔬 CSRF Reject Debug - Origin Host: '{origin_host}', Request Host: '{request_host}', get_host(): '{gh}', HTTP_HOST: '{request.META.get('HTTP_HOST', 'N/A')}', X-Forwarded-Host: '{request.META.get('HTTP_X_FORWARDED_HOST', 'N/A')}', CSRF_TRUSTED_ORIGINS: {settings.CSRF_TRUSTED_ORIGINS}", flush=True)
+
         return False
 
