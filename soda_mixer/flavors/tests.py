@@ -176,9 +176,21 @@ class BeverageLabViewsTest(TestCase):
 
     def test_ingredient_list_view(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
+        # Create additional ingredients to test alphabetical sorting across categories
+        ing_apple = Ingredient.objects.create(
+            name="Apple Juice", ingredient_type="OTHER", category="sweet", intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1
+        )
+        ing_lemon = Ingredient.objects.create(
+            name="Zesty Lemon", ingredient_type="OTHER", category="citrus", intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1
+        )
+        
         response = self.client.get(reverse('ingredient_list'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Club Soda")
+        
+        # Verify alphabetical ordering by name across all categories
+        names = [ing.name for ing in response.context['ingredients']]
+        self.assertEqual(names, sorted(names))
 
     def test_add_ingredient_post(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")

@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Sorted the compounds in the reagent registry alphabetically across all types and profiles (ordered by name instead of category and name)
 - [x] Detected local environment (Django + PostgreSQL in Docker Compose)
 - [x] Set project verification command `docker compose run --rm web python manage.py test`
 - [x] Restructured views layer into a modular package (`soda_mixer/flavors/views/`)

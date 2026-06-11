@@ -64,7 +64,7 @@ def home(request: HttpRequest) -> HttpResponse:
 def ingredient_list(request: HttpRequest) -> HttpResponse:
     """List all available ingredients."""
     category = request.GET.get('category')
-    ingredients = Ingredient.objects.all().order_by('category', 'name')
+    ingredients = Ingredient.objects.all().order_by('name')
     
     if category:
         ingredients = ingredients.filter(category=category)
