@@ -27,8 +27,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_HOST: db
       DATABASE_PORT: 5432
-      DEBUG: "True"
+      DEBUG: ${DEBUG:-True}
       SECRET_KEY: ${SECRET_KEY:-django-insecure-sodamixer-k+^*c1*gx3ladold+7umgx_xz$!+bdncu3x%@^9x*))7%_n&d0}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
     depends_on:
       db:
         condition: service_healthy

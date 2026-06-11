@@ -11,7 +11,7 @@
 - [x] Configured Python standard logging with formatted operational messages across the views and AI services
 - [x] Created `.env.example` to prevent configuration drift
 - [x] Implemented a test suite with 27 unit and integration tests covering models, recommendations, settings, view endpoints, and mocked AI endpoints
-- [x] Configured Django settings to parse `CSRF_TRUSTED_ORIGINS` from environment variables, preventing origin-checking CSRF failures in production, and updated env configuration files
+- [x] Configured Django settings to parse `CSRF_TRUSTED_ORIGINS` from environment variables, preventing origin-checking CSRF failures in production, updated env configuration files, and mapped them in `docker-compose.yml` to propagate them to the web container
 - [x] Removed host port mapping for the PostgreSQL database container, isolating it to the internal Docker network to prevent host port conflicts
 
 ## 🏗️ Architectural Notes
