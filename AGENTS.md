@@ -65,6 +65,12 @@ All generated code must be clean, maintainable, and production-ready.
 10. **Conventional Commits**:
     - Write git commit messages using the Conventional Commits specification (e.g., `feat:`, `fix:`, `test:`, `refactor:`, `chore:`, `docs:`) with descriptive subject lines under 50 characters.
 
+11. **Production Docker Compose & Coolify Volumes**:
+    - Place all local development volume mounts (such as mounting the source code `- .:/app`) exclusively in `docker-compose.override.yml`. The primary `docker-compose.yml` file must never contain runtime volume mounts for application source code, as Coolify builds the image with the latest code but overwrites it at runtime if a volume mount is defined in the base compose file.
+
+12. **CSRF & Reverse Proxy SSL Termination**:
+    - When deploying behind a reverse proxy (such as Coolify's Traefik setup), configure `CSRF_TRUSTED_ORIGINS` via environment variables to include the HTTPS and HTTP schemas for the production domain. Use the custom `LaboratoryCsrfMiddleware` to match the HTTP origin hostname with the requested Host header to prevent origin-checking CSRF failures caused by proxy SSL termination.
+
 ## 💡 Token & Quota Conservation Rules
 To maintain high speed and prevent burning through API limits:
 
