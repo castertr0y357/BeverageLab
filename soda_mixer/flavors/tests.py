@@ -329,3 +329,16 @@ class BeverageLabAIAssistantTest(TestCase):
         res = AIAssistant.suggest_autonomous(["Club Soda"], mode="standard")
         self.assertIsNotNone(res)
         self.assertEqual(res['suggestions'][0]['name'], "Lime")
+
+
+class BeverageLabSettingsTest(TestCase):
+    """Test case for settings and environment variable bindings."""
+
+    def test_csrf_trusted_origins_loaded(self) -> None:
+        import os
+        from django.conf import settings
+        expected = [
+            origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
+        ]
+        self.assertEqual(settings.CSRF_TRUSTED_ORIGINS, expected)
+
