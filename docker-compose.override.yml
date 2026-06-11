@@ -1,0 +1,6 @@
+# Local development overrides - NOT used in production (Coolify).
+# This file is automatically loaded by `docker compose` when present.
+services:
+  web:
+    volumes:
+      - .:/app:delegated
