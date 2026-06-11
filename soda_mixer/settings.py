@@ -57,10 +57,6 @@ for host in ALLOWED_HOSTS:
 # De-duplicate the list
 CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS))
 
-# Diagnostic logging for container environment verification
-print(f"🔬 [Startup] CSRF_TRUSTED_ORIGINS resolved to: {CSRF_TRUSTED_ORIGINS}", flush=True)
-print(f"🔬 [Startup] ALLOWED_HOSTS resolved to: {ALLOWED_HOSTS}", flush=True)
-
 
 
 
