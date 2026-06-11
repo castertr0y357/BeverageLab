@@ -45,4 +45,18 @@ EOF
 echo "------------------------------------------------"
 echo "🚀 INITIATING LABORATORY SERVER"
 echo "------------------------------------------------"
+
+# Deployment verification - confirm which middleware and settings are active
+echo "Step 4: Deployment verification..."
+python -c "
+from django.conf import settings
+import django
+django.setup()
+csrf_mw = [m for m in settings.MIDDLEWARE if 'csrf' in m.lower() or 'Csrf' in m]
+print(f'CSRF Middleware: {csrf_mw}')
+print(f'CSRF_TRUSTED_ORIGINS: {settings.CSRF_TRUSTED_ORIGINS}')
+print(f'SECURE_PROXY_SSL_HEADER: {getattr(settings, \"SECURE_PROXY_SSL_HEADER\", \"NOT SET\")}')
+print(f'USE_X_FORWARDED_HOST: {getattr(settings, \"USE_X_FORWARDED_HOST\", \"NOT SET\")}')
+"
+
 exec "$@"
