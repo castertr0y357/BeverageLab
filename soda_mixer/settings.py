@@ -15,9 +15,48 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
-]
+# Reverse proxy support
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+# Build CSRF_TRUSTED_ORIGINS list from environment config and fallbacks
+CSRF_TRUSTED_ORIGINS = []
+
+# 1. Direct environment configuration
+raw_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if raw_csrf:
+    for origin in raw_csrf.split(','):
+        origin = origin.strip()
+        if origin:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+# 2. Derive from SERVICE_URL_WEB
+service_url = os.environ.get('SERVICE_URL_WEB', '').strip()
+if service_url:
+    CSRF_TRUSTED_ORIGINS.append(service_url)
+    if service_url.startswith('http://'):
+        CSRF_TRUSTED_ORIGINS.append(service_url.replace('http://', 'https://'))
+    elif service_url.startswith('https://'):
+        CSRF_TRUSTED_ORIGINS.append(service_url.replace('https://', 'http://'))
+
+# 3. Derive from SERVICE_FQDN_WEB
+service_fqdn = os.environ.get('SERVICE_FQDN_WEB', '').strip()
+if service_fqdn:
+    CSRF_TRUSTED_ORIGINS.append(f"http://{service_fqdn}")
+    CSRF_TRUSTED_ORIGINS.append(f"https://{service_fqdn}")
+
+# 4. Derive from ALLOWED_HOSTS
+for host in ALLOWED_HOSTS:
+    host = host.strip()
+    if host and host != '*':
+        if host.startswith('.'):
+            host = host[1:]
+        CSRF_TRUSTED_ORIGINS.append(f"http://{host}")
+        CSRF_TRUSTED_ORIGINS.append(f"https://{host}")
+
+# De-duplicate the list
+CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS))
+
 
 
 

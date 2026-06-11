@@ -337,8 +337,37 @@ class BeverageLabSettingsTest(TestCase):
     def test_csrf_trusted_origins_loaded(self) -> None:
         import os
         from django.conf import settings
-        expected = [
-            origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
-        ]
-        self.assertEqual(settings.CSRF_TRUSTED_ORIGINS, expected)
+        expected = []
+
+        raw_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+        if raw_csrf:
+            for origin in raw_csrf.split(','):
+                origin = origin.strip()
+                if origin:
+                    expected.append(origin)
+
+        service_url = os.environ.get('SERVICE_URL_WEB', '').strip()
+        if service_url:
+            expected.append(service_url)
+            if service_url.startswith('http://'):
+                expected.append(service_url.replace('http://', 'https://'))
+            elif service_url.startswith('https://'):
+                expected.append(service_url.replace('https://', 'http://'))
+
+        service_fqdn = os.environ.get('SERVICE_FQDN_WEB', '').strip()
+        if service_fqdn:
+            expected.append(f"http://{service_fqdn}")
+            expected.append(f"https://{service_fqdn}")
+
+        for host in os.environ.get('ALLOWED_HOSTS', '*').split(','):
+            host = host.strip()
+            if host and host != '*':
+                if host.startswith('.'):
+                    host = host[1:]
+                expected.append(f"http://{host}")
+                expected.append(f"https://{host}")
+
+        expected = list(set(expected))
+        self.assertCountEqual(settings.CSRF_TRUSTED_ORIGINS, expected)
+
 
