@@ -33,3 +33,35 @@ class LaboratoryAccessMiddleware:
 
         response = self.get_response(request)
         return response
+
+
+from django.middleware.csrf import CsrfViewMiddleware
+import urllib.parse
+
+class LaboratoryCsrfMiddleware(CsrfViewMiddleware):
+    """
+    Custom CSRF middleware that matches the request host header against the origin hostname
+    to support reverse proxy setups with SSL termination where the scheme might mismatch.
+    """
+    def _origin_verified(self, request: HttpRequest) -> bool:
+        if super()._origin_verified(request):
+            return True
+
+        if "HTTP_ORIGIN" in request.META:
+            try:
+                parsed_origin = urllib.parse.urlsplit(request.META["HTTP_ORIGIN"])
+            except ValueError:
+                return False
+
+            try:
+                request_host = request.get_host().split(':')[0]
+            except Exception:
+                request_host = request.META.get('HTTP_HOST', '').split(':')[0]
+
+            origin_host = parsed_origin.netloc.split(':')[0]
+
+            if origin_host and request_host and origin_host == request_host:
+                return True
+
+        return False
+

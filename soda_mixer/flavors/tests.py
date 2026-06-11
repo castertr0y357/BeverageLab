@@ -370,4 +370,20 @@ class BeverageLabSettingsTest(TestCase):
         expected = list(set(expected))
         self.assertCountEqual(settings.CSRF_TRUSTED_ORIGINS, expected)
 
+    def test_custom_csrf_middleware_trusts_same_host_mismatched_scheme(self) -> None:
+        from django.test import RequestFactory
+        from soda_mixer.flavors.middleware import LaboratoryCsrfMiddleware
+
+        factory = RequestFactory()
+        # Browser sends secure Origin header matching host (mismatched scheme)
+        request = factory.post('/', HTTP_HOST='beveragelab.castertr0y357.net', HTTP_ORIGIN='https://beveragelab.castertr0y357.net')
+        middleware = LaboratoryCsrfMiddleware(lambda r: None)
+        self.assertTrue(middleware._origin_verified(request))
+
+        # Browser sends Origin header with different host
+        request_attacker = factory.post('/', HTTP_HOST='beveragelab.castertr0y357.net', HTTP_ORIGIN='https://attacker.com')
+        self.assertFalse(middleware._origin_verified(request_attacker))
+
+
+
 
