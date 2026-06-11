@@ -68,11 +68,13 @@ class LaboratoryCsrfMiddleware(CsrfViewMiddleware):
 
             # Diagnostic log for production troubleshooting
             from django.conf import settings
+            import sys
             try:
                 gh = request.get_host()
             except Exception as ex:
                 gh = f"Error: {ex}"
-            logger.warning(f"🔬 CSRF Reject Debug - Origin Host: '{origin_host}', Request Host: '{request_host}', get_host(): '{gh}', HTTP_HOST: '{request.META.get('HTTP_HOST', 'N/A')}', X-Forwarded-Host: '{request.META.get('HTTP_X_FORWARDED_HOST', 'N/A')}', CSRF_TRUSTED_ORIGINS: {settings.CSRF_TRUSTED_ORIGINS}")
+            sys.stderr.write(f"🔬 CSRF Reject Debug - Origin Host: '{origin_host}', Request Host: '{request_host}', get_host(): '{gh}', HTTP_HOST: '{request.META.get('HTTP_HOST', 'N/A')}', X-Forwarded-Host: '{request.META.get('HTTP_X_FORWARDED_HOST', 'N/A')}', CSRF_TRUSTED_ORIGINS: {settings.CSRF_TRUSTED_ORIGINS}\n")
+            sys.stderr.flush()
 
         return False
 
