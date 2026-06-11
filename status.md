@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Fixed component list filtering when swapping between lab modes (Soda, Coffee, Cryo) on the home page. Added default coffee bean ingredients and adjusted compatible systems in the database, and restricted Step 1 library display to valid base components.
 - [x] Sorted the compounds in the reagent registry alphabetically across all types and profiles (ordered by name instead of category and name)
 - [x] Detected local environment (Django + PostgreSQL in Docker Compose)
 - [x] Set project verification command `docker compose run --rm web python manage.py test`

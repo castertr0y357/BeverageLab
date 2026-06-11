@@ -318,12 +318,11 @@
             
             let isTypeMatch = false;
             if (mode === 'SODA') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'ADDITIVE' || type === 'OTHER');
+                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER');
             } else if (mode === 'COFFEE') {
-                // Allow Soda Syrups (like Vanilla/Caramel) if they are tagged for Coffee
-                isTypeMatch = (type === 'COFFEE_BEAN' || type === 'ADDITIVE' || type === 'OTHER' || type === 'SODA_SYRUP');
+                isTypeMatch = (type === 'COFFEE_BEAN');
             } else if (mode === 'SLUSHIE') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'ADDITIVE' || type === 'OTHER');
+                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER');
             }
             
             const isSystemMatch = systemList.map(s => s.trim()).includes(mode);
