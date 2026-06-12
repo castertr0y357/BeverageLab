@@ -179,9 +179,14 @@ def save_llm_provider_api(request: HttpRequest) -> JsonResponse:
         provider.api_key = data.get('api_key', '').strip()
         provider.base_url = data.get('base_url', '').strip()
         provider.default_model = data.get('default_model', '').strip()
-        provider.is_enabled = data.get('is_enabled', False)
-        provider.enable_thinking = data.get('enable_thinking', True)
-        provider.thinking_effort = data.get('thinking_effort', 'medium').strip().lower()
+        provider.is_enabled = bool(data.get('is_enabled', False))
+        
+        enable_thinking = data.get('enable_thinking')
+        provider.enable_thinking = True if enable_thinking is None else bool(enable_thinking)
+        
+        thinking_effort = data.get('thinking_effort')
+        provider.thinking_effort = 'medium' if not thinking_effort else str(thinking_effort).strip().lower()
+        
         provider.save()
         
         # If this is set as default
