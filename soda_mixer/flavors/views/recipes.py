@@ -385,6 +385,12 @@ def delete_history_api(request: HttpRequest, pk: int) -> JsonResponse:
 def export_recipe_to_mealie_api(request: HttpRequest, pk: int) -> JsonResponse:
     """Push a local recipe to a configured Mealie instance."""
     recipe = get_object_or_404(Recipe, pk=pk)
+    
+    import os
+    if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
+        logger.info("MealieExport - Info - MOCK_MODE active. Returning mock success response.")
+        return JsonResponse({'status': 'success', 'message': 'Recipe successfully pushed and enriched in Mealie! (MOCK_MODE)'})
+
     config = SystemConfiguration.get_config()
 
     if not config.mealie_url or not config.mealie_api_key:

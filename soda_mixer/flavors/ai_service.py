@@ -1,5 +1,6 @@
 """Service for interacting with various LLM providers."""
 
+import os
 import requests
 import json
 import re
@@ -70,12 +71,90 @@ class AIAssistant:
         return LLMProvider.objects.filter(is_enabled=True).first()
 
     @classmethod
+    def _mock_chat(cls, user_prompt: str, context: Optional[str] = None) -> str:
+        """Return realistic JSON/text payloads in MOCK_MODE."""
+        if "[STRUCTURED DATA REQUEST]" in user_prompt:
+            return json.dumps({
+                "suggestions": [
+                    {
+                        "name": "Lemon Syrup",
+                        "reason": "Acidity balances sweetness",
+                        "resonance": 85,
+                        "amount": 25.0,
+                        "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}
+                    },
+                    {
+                        "name": "Club Soda",
+                        "reason": "Effervescence provides clean background",
+                        "resonance": 90,
+                        "amount": 120.0,
+                        "profile": {"intensity": 1, "sweetness": 1, "acidity": 2, "bitterness": 1, "complexity": 1}
+                    }
+                ],
+                "rebalancing": {},
+                "seal_recommended": False,
+                "seal_resonance": 75,
+                "reasoning": "Standard laboratory carbonation enhancement (MOCK_MODE)."
+            })
+        elif "[AUTONOMOUS SYNTHESIS REQUEST]" in user_prompt:
+            return json.dumps({
+                "design_intent": "A refreshing carbonated citrus blend (MOCK_MODE).",
+                "selection": [
+                    { "name": "Lemon Syrup", "amount": 50.0, "role": "Base sweetener" },
+                    { "name": "Club Soda", "amount": 150.0, "role": "Carbonation baseline" }
+                ]
+            })
+        elif "FLAVOR SYNTHESIS REPORT" in user_prompt:
+            return (
+                "The selected ingredients combine to form a highly balanced, refreshing flavor profile (MOCK_MODE). "
+                "The acidity of the citrus elements cuts through the sweetness of the syrup base, creating a pleasant and bright flavor synergy.\n\n"
+                "Expect a clean opening with a burst of citrus notes, followed by a sweet and textured body. "
+                "The finish is crisp and leaves a lingering lime zest aroma on the palate."
+            )
+        elif "[BATCH CHEMICAL ANALYSIS]" in user_prompt:
+            names = re.findall(r'- Name:\s*([^,\n]+)', user_prompt)
+            results = []
+            for n in names:
+                results.append({
+                    "name": n.strip(),
+                    "intensity": 3.0,
+                    "sweetness": 3.0,
+                    "acidity": 3.0,
+                    "bitterness": 1.0,
+                    "complexity": 3.0
+                })
+            if not results:
+                results.append({
+                    "name": "Default Ingredient",
+                    "intensity": 3.0,
+                    "sweetness": 3.0,
+                    "acidity": 3.0,
+                    "bitterness": 1.0,
+                    "complexity": 3.0
+                })
+            return json.dumps(results)
+        elif "Analyze this ingredient" in user_prompt:
+            return json.dumps({
+                "intensity": 3.0,
+                "sweetness": 3.0,
+                "acidity": 3.0,
+                "bitterness": 1.0,
+                "complexity": 3.0
+            })
+        else:
+            return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
+
+    @classmethod
     def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> str:
         """
         Send a prompt to the configured LLM provider.
         history: List of previous messages for context.
         context: Optional additional context (e.g. inventory registry).
         """
+        if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
+            logger.info("AISynthesis - Info - MOCK_MODE active. Returning mock response.")
+            return cls._mock_chat(user_prompt, context)
+
         if not provider:
             provider = cls.get_default_provider()
         
@@ -116,6 +195,11 @@ class AIAssistant:
     @classmethod
     def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> Generator[str, None, None]:
         """Stream a prompt response from the configured LLM provider."""
+        if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
+            text = cls.chat(user_prompt, history, provider, context)
+            yield f"data: {json.dumps({'chunk': text})}\n\n"
+            return
+
         if not provider:
             provider = cls.get_default_provider()
         

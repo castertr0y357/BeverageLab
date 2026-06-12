@@ -18,6 +18,12 @@
 - [x] Configured Django settings to parse `CSRF_TRUSTED_ORIGINS` from environment variables, preventing origin-checking CSRF failures in production, updated env configuration files, and mapped them in `docker-compose.yml` to propagate them to the web container
 - [x] Removed host port mapping for the PostgreSQL database container, isolating it to the internal Docker network to prevent host port conflicts
 - [x] Separated local development volume mount into `docker-compose.override.yml` to prevent Coolify production container code from being overwritten by stale/empty host volumes
+- [x] Audited project and implemented startup configuration validation checks in `settings.py` for all required environment variables
+- [x] Implemented `MOCK_MODE` offline mode support across the AI synthesis service and Mealie recipe export views
+- [x] Created `doctor.py` diagnostic system to verify migrations, environment variables, LLM provider states, and integrations
+- [x] Created `backup.py` utility to automate compressed SQL database backup and recovery operations
+- [x] Updated `README.md` with Quick Start instructions, default admin credentials, and backup/restore documentation
+
 
 ## 🏗️ Architectural Notes
 - Containerized Django 5.0 application.

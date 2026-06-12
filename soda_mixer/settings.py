@@ -11,8 +11,24 @@ sys.stderr.flush()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# Startup configuration validation
+REQUIRED_ENV_VARS = [
+    'SECRET_KEY',
+    'POSTGRES_DB',
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD',
+    'DATABASE_HOST',
+    'DATABASE_PORT',
+]
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+if missing_vars:
+    sys.stderr.write(f"❌ [Startup] - Config Error - Missing required environment variables: {', '.join(missing_vars)}\n")
+    sys.stderr.write("Please check your configuration files and ensure they are populated.\n")
+    sys.stderr.flush()
+    sys.exit(1)
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-sodamixer-k+^*c1*gx3ladold+7umgx_xz$!+bdncu3x%@^9x*))7%_n&d0'
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 't')

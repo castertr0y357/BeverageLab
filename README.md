@@ -141,6 +141,34 @@ graph TD
 
 The laboratory terminal will be accessible at `http://localhost:8000`.
 
+### ⚡ Quick Start (Recommended)
+To start the application container stack immediately:
+```bash
+docker compose up -d --build
+```
+
+### 🔑 Default Credentials
+- **Username**: `admin`
+- **Password**: `adminpass123` (loaded via `.env`)
+
+### 💾 Database Backup & Recovery
+The system includes a cross-platform backup and restore utility that executes database operations against the running container.
+
+#### 1. Database Backup
+To generate a compressed database dump:
+```bash
+python backup.py --backup
+```
+Backups are compressed and saved in the `backups/` directory (e.g., `backups/backup_20260612_181534.sql.gz`).
+
+#### 2. Database Restore
+To restore database state from a compressed backup file:
+```bash
+python backup.py --restore backups/backup_YYYYMMDD_HHMMSS.sql.gz
+```
+*Note: This command will cleanly rebuild the schemas and load all data.*
+
+
 ### 🛡️ Ubuntu 24.04 (Noble Numbat) Production Note
 If deploying on Ubuntu 24.04, **do not use the Snap version of Docker**. The Snap sandbox interferes with the `nftables` bridge routing required for inter-container communication (specifically between `web` and `db`).
 
