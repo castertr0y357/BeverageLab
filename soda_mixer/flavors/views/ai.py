@@ -180,6 +180,7 @@ def save_llm_provider_api(request: HttpRequest) -> JsonResponse:
         provider.base_url = data.get('base_url', '').strip()
         provider.default_model = data.get('default_model', '').strip()
         provider.is_enabled = data.get('is_enabled', False)
+        provider.enable_thinking = data.get('enable_thinking', True)
         provider.save()
         
         # If this is set as default

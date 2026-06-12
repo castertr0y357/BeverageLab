@@ -291,6 +291,10 @@ class LLMProvider(models.Model):
     base_url = models.URLField(blank=True, null=True, help_text="e.g., http://localhost:11434")
     default_model = models.CharField(max_length=100, blank=True, null=True, help_text="e.g., gpt-4o or mistral")
     is_enabled = models.BooleanField(default=False)
+    enable_thinking = models.BooleanField(
+        default=True,
+        help_text="Enable internal model thinking/reasoning if supported by the provider/model."
+    )
     
     def __str__(self):
         return f"{self.name} ({self.get_provider_type_display()})"

@@ -149,6 +149,7 @@
                                             data-url="{{ provider.base_url }}"
                                             data-model="{{ provider.default_model }}"
                                             data-enabled="{{ provider.is_enabled|yesno:'true,false' }}"
+                                            data-thinking="{{ provider.enable_thinking|yesno:'true,false' }}"
                                             data-default="{% if config.default_llm_provider_id == provider.id %}true{% else %}false{% endif %}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -246,7 +247,7 @@
                             <div class="form-text text-dim" id="modelHelpText">Specify the model identifier or synchronize with the substrate.</div>
                         </div>
                         
-                        <div class="col-md-4 d-flex align-items-end gap-2">
+                        <div class="col-md-8 d-flex align-items-end gap-2 flex-wrap">
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="pEnabled">
                                 <label class="text-white small ms-2">Enabled</label>
@@ -254,6 +255,10 @@
                             <div class="form-check form-switch mb-2 ms-3">
                                 <input class="form-check-input" type="checkbox" id="pDefault">
                                 <label class="text-white small ms-2">Global Default</label>
+                            </div>
+                            <div class="form-check form-switch mb-2 ms-3">
+                                <input class="form-check-input" type="checkbox" id="pThinking" checked>
+                                <label class="text-white small ms-2">Enable Thinking</label>
                             </div>
                         </div>
                     </div>
@@ -385,11 +390,12 @@ function openProviderModal() {
     document.getElementById('providerId').value = '';
     document.getElementById('providerForm').reset();
     document.getElementById('pEnabled').checked = true;
+    document.getElementById('pThinking').checked = true;
     toggleApiFields();
     providerModal.show();
 }
 
-function editProvider(id, name, type, key, url, model, enabled, isDefault) {
+function editProvider(id, name, type, key, url, model, enabled, isDefault, enableThinking) {
     document.getElementById('providerId').value = id;
     document.getElementById('pName').value = name;
     document.getElementById('pType').value = type;
@@ -403,6 +409,7 @@ function editProvider(id, name, type, key, url, model, enabled, isDefault) {
     
     document.getElementById('pEnabled').checked = enabled === true || enabled === 'true';
     document.getElementById('pDefault').checked = isDefault === true || isDefault === 'true';
+    document.getElementById('pThinking').checked = enableThinking === true || enableThinking === 'true';
     toggleApiFields();
     providerModal.show();
 }
@@ -418,7 +425,8 @@ document.addEventListener('click', function(e) {
             btn.dataset.url,
             btn.dataset.model,
             btn.dataset.enabled,
-            btn.dataset.default
+            btn.dataset.default,
+            btn.dataset.thinking
         );
     }
 });
@@ -469,7 +477,8 @@ document.getElementById('providerForm').addEventListener('submit', function(e) {
         base_url: document.getElementById('pUrl').value,
         default_model: modelValue,
         is_enabled: document.getElementById('pEnabled').checked,
-        set_default: document.getElementById('pDefault').checked
+        set_default: document.getElementById('pDefault').checked,
+        enable_thinking: document.getElementById('pThinking').checked
     };
 
     fetch('{% url "save_llm_provider_api" %}', {

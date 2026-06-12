@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Implemented a toggle in the database schema and UI configurations to enable or disable the model's internal thinking/reasoning process (specifically passing the 'think' option to Ollama for local models like Gemma/DeepSeek-R1)
 - [x] Fixed component list filtering when swapping between lab modes (Soda, Coffee, Cryo) on the home page. Added default coffee bean ingredients and adjusted compatible systems in the database, and restricted Step 1 library display to valid base components.
 - [x] Sorted the compounds in the reagent registry alphabetically across all types and profiles (ordered by name instead of category and name)
 - [x] Detected local environment (Django + PostgreSQL in Docker Compose)

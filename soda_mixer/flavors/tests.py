@@ -288,6 +288,26 @@ class BeverageLabViewsTest(TestCase):
         recipe_id = response_promote.json()['recipe_id']
         self.assertTrue(Recipe.objects.filter(id=recipe_id).exists())
 
+    def test_save_llm_provider_api_thinking(self) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        url = reverse('save_llm_provider_api')
+        payload = {
+            'name': 'New Ollama Substrate',
+            'provider_type': 'OLLAMA',
+            'base_url': 'http://localhost:11434',
+            'default_model': 'gemma4:12b',
+            'is_enabled': True,
+            'enable_thinking': False
+        }
+        response = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        
+        provider = LLMProvider.objects.get(id=data['id'])
+        self.assertEqual(provider.name, 'New Ollama Substrate')
+        self.assertEqual(provider.enable_thinking, False)
+
 
 class BeverageLabAIAssistantTest(TestCase):
     """Test case for the AIAssistant integrations via Mocking."""
@@ -341,6 +361,54 @@ class BeverageLabAIAssistantTest(TestCase):
         res = AIAssistant.suggest_autonomous(["Club Soda"], mode="standard")
         self.assertIsNotNone(res)
         self.assertEqual(res['suggestions'][0]['name'], "Lime")
+
+    @patch('requests.request')
+    def test_ollama_thinking_parameter_true(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"message": {"content": "Molecular compound balanced."}}
+        mock_request.return_value = mock_response
+
+        # Setup Ollama provider with think enabled (default is True)
+        provider = LLMProvider.objects.create(
+            name="Mock Ollama",
+            provider_type="OLLAMA",
+            base_url="http://localhost:11434",
+            default_model="gemma4:12b",
+            is_enabled=True,
+            enable_thinking=True
+        )
+
+        response = AIAssistant.chat("Create a soda mix suggestion", provider=provider)
+        self.assertEqual(response, "Molecular compound balanced.")
+        
+        # Verify request payload contains think: True
+        args, kwargs = mock_request.call_args
+        self.assertEqual(kwargs['json']['think'], True)
+
+    @patch('requests.request')
+    def test_ollama_thinking_parameter_false(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"message": {"content": "Molecular compound balanced."}}
+        mock_request.return_value = mock_response
+
+        # Setup Ollama provider with think disabled
+        provider = LLMProvider.objects.create(
+            name="Mock Ollama",
+            provider_type="OLLAMA",
+            base_url="http://localhost:11434",
+            default_model="gemma4:12b",
+            is_enabled=True,
+            enable_thinking=False
+        )
+
+        response = AIAssistant.chat("Create a soda mix suggestion", provider=provider)
+        self.assertEqual(response, "Molecular compound balanced.")
+        
+        # Verify request payload contains think: False
+        args, kwargs = mock_request.call_args
+        self.assertEqual(kwargs['json']['think'], False)
 
 
 class BeverageLabSettingsTest(TestCase):

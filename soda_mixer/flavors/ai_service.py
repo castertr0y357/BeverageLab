@@ -466,6 +466,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "model": provider.default_model or "mistral",
             "messages": messages,
             "stream": False,
+            "think": getattr(provider, 'enable_thinking', True),
             "options": {
                 "num_predict": 2048
             }
@@ -557,7 +558,15 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     @classmethod
     def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
-        data = {"model": provider.default_model or "mistral", "messages": messages, "stream": True, "options": {"num_predict": 2048}}
+        data = {
+            "model": provider.default_model or "mistral",
+            "messages": messages,
+            "stream": True,
+            "think": getattr(provider, 'enable_thinking', True),
+            "options": {
+                "num_predict": 2048
+            }
+        }
         response = requests.post(url, json=data, stream=True, timeout=120)
         response.raise_for_status()
         for line in response.iter_lines():
