@@ -150,6 +150,7 @@
                                             data-model="{{ provider.default_model }}"
                                             data-enabled="{{ provider.is_enabled|yesno:'true,false' }}"
                                             data-thinking="{{ provider.enable_thinking|yesno:'true,false' }}"
+                                            data-effort="{{ provider.thinking_effort }}"
                                             data-default="{% if config.default_llm_provider_id == provider.id %}true{% else %}false{% endif %}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -260,6 +261,14 @@
                                 <input class="form-check-input" type="checkbox" id="pThinking" checked>
                                 <label class="text-white small ms-2">Enable Thinking</label>
                             </div>
+                        </div>
+                        <div class="col-md-4" id="thinkingEffortContainer">
+                            <label class="readout-label mb-2 d-block">Thinking Effort</label>
+                            <select id="pThinkingEffort" class="form-select bg-dark border-white border-opacity-10 text-white">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -382,8 +391,24 @@ document.getElementById('settingsForm').addEventListener('submit', function(e) {
 
 // AI Provider Logic
 let providerModal;
+function toggleThinkingEffort() {
+    const thinkingEnabled = document.getElementById('pThinking').checked;
+    const container = document.getElementById('thinkingEffortContainer');
+    if (container) {
+        if (thinkingEnabled) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     providerModal = new bootstrap.Modal(document.getElementById('providerModal'));
+    const thinkingCheck = document.getElementById('pThinking');
+    if (thinkingCheck) {
+        thinkingCheck.addEventListener('change', toggleThinkingEffort);
+    }
 });
 
 function openProviderModal() {
@@ -391,11 +416,13 @@ function openProviderModal() {
     document.getElementById('providerForm').reset();
     document.getElementById('pEnabled').checked = true;
     document.getElementById('pThinking').checked = true;
+    document.getElementById('pThinkingEffort').value = 'medium';
     toggleApiFields();
+    toggleThinkingEffort();
     providerModal.show();
 }
 
-function editProvider(id, name, type, key, url, model, enabled, isDefault, enableThinking) {
+function editProvider(id, name, type, key, url, model, enabled, isDefault, enableThinking, thinkingEffort) {
     document.getElementById('providerId').value = id;
     document.getElementById('pName').value = name;
     document.getElementById('pType').value = type;
@@ -410,7 +437,9 @@ function editProvider(id, name, type, key, url, model, enabled, isDefault, enabl
     document.getElementById('pEnabled').checked = enabled === true || enabled === 'true';
     document.getElementById('pDefault').checked = isDefault === true || isDefault === 'true';
     document.getElementById('pThinking').checked = enableThinking === true || enableThinking === 'true';
+    document.getElementById('pThinkingEffort').value = thinkingEffort || 'medium';
     toggleApiFields();
+    toggleThinkingEffort();
     providerModal.show();
 }
 
@@ -426,7 +455,8 @@ document.addEventListener('click', function(e) {
             btn.dataset.model,
             btn.dataset.enabled,
             btn.dataset.default,
-            btn.dataset.thinking
+            btn.dataset.thinking,
+            btn.dataset.effort
         );
     }
 });
@@ -478,7 +508,8 @@ document.getElementById('providerForm').addEventListener('submit', function(e) {
         default_model: modelValue,
         is_enabled: document.getElementById('pEnabled').checked,
         set_default: document.getElementById('pDefault').checked,
-        enable_thinking: document.getElementById('pThinking').checked
+        enable_thinking: document.getElementById('pThinking').checked,
+        thinking_effort: document.getElementById('pThinkingEffort').value
     };
 
     fetch('{% url "save_llm_provider_api" %}', {

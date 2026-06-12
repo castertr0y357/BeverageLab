@@ -442,11 +442,17 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "Authorization": f"Bearer {provider.api_key}",
             "Content-Type": "application/json"
         }
+        model_name = provider.default_model or "gpt-3.5-turbo"
         data = {
-            "model": provider.default_model or "gpt-3.5-turbo",
+            "model": model_name,
             "messages": messages,
             "temperature": 0.7
         }
+        if model_name.startswith('o1') or model_name.startswith('o3'):
+            if getattr(provider, 'enable_thinking', True):
+                data["reasoning_effort"] = getattr(provider, 'thinking_effort', 'medium')
+            else:
+                data["reasoning_effort"] = "low"
         response = cls._safe_request('POST', url, headers=headers, json=data, timeout=30)
         result = response.json()
         
@@ -462,11 +468,20 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     def _call_ollama(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         # Ollama /api/chat — native format.
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
+        model_name = provider.default_model or "mistral"
+        if getattr(provider, 'enable_thinking', True):
+            if "gpt-oss" in model_name.lower():
+                think_val = getattr(provider, 'thinking_effort', 'medium')
+            else:
+                think_val = True
+        else:
+            think_val = False
+
         data = {
-            "model": provider.default_model or "mistral",
+            "model": model_name,
             "messages": messages,
             "stream": False,
-            "think": getattr(provider, 'enable_thinking', True),
+            "think": think_val,
             "options": {
                 "num_predict": 2048
             }
@@ -536,9 +551,13 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
-        url = provider.base_url or "https://api.openai.com/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"}
-        data = {"model": provider.default_model or "gpt-3.5-turbo", "messages": messages, "temperature": 0.7, "stream": True}
+        model_name = provider.default_model or "gpt-3.5-turbo"
+        data = {"model": model_name, "messages": messages, "temperature": 0.7, "stream": True}
+        if model_name.startswith('o1') or model_name.startswith('o3'):
+            if getattr(provider, 'enable_thinking', True):
+                data["reasoning_effort"] = getattr(provider, 'thinking_effort', 'medium')
+            else:
+                data["reasoning_effort"] = "low"
         response = requests.post(url, headers=headers, json=data, stream=True, timeout=60)
         response.raise_for_status()
         for line in response.iter_lines():
@@ -558,11 +577,20 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     @classmethod
     def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
+        model_name = provider.default_model or "mistral"
+        if getattr(provider, 'enable_thinking', True):
+            if "gpt-oss" in model_name.lower():
+                think_val = getattr(provider, 'thinking_effort', 'medium')
+            else:
+                think_val = True
+        else:
+            think_val = False
+
         data = {
-            "model": provider.default_model or "mistral",
+            "model": model_name,
             "messages": messages,
             "stream": True,
-            "think": getattr(provider, 'enable_thinking', True),
+            "think": think_val,
             "options": {
                 "num_predict": 2048
             }

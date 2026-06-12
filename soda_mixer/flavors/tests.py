@@ -297,7 +297,8 @@ class BeverageLabViewsTest(TestCase):
             'base_url': 'http://localhost:11434',
             'default_model': 'gemma4:12b',
             'is_enabled': True,
-            'enable_thinking': False
+            'enable_thinking': False,
+            'thinking_effort': 'low'
         }
         response = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -307,6 +308,7 @@ class BeverageLabViewsTest(TestCase):
         provider = LLMProvider.objects.get(id=data['id'])
         self.assertEqual(provider.name, 'New Ollama Substrate')
         self.assertEqual(provider.enable_thinking, False)
+        self.assertEqual(provider.thinking_effort, 'low')
 
 
 class BeverageLabAIAssistantTest(TestCase):
@@ -409,6 +411,58 @@ class BeverageLabAIAssistantTest(TestCase):
         # Verify request payload contains think: False
         args, kwargs = mock_request.call_args
         self.assertEqual(kwargs['json']['think'], False)
+
+    @patch('requests.request')
+    def test_ollama_thinking_effort_gpt_oss(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"message": {"content": "Molecular compound balanced."}}
+        mock_request.return_value = mock_response
+
+        # Setup Ollama provider with gpt-oss model and think enabled
+        provider = LLMProvider.objects.create(
+            name="Mock Ollama GPT-OSS",
+            provider_type="OLLAMA",
+            base_url="http://localhost:11434",
+            default_model="gpt-oss:8b",
+            is_enabled=True,
+            enable_thinking=True,
+            thinking_effort="low"
+        )
+
+        response = AIAssistant.chat("Create a soda mix suggestion", provider=provider)
+        self.assertEqual(response, "Molecular compound balanced.")
+        
+        # Verify request payload contains think: "low"
+        args, kwargs = mock_request.call_args
+        self.assertEqual(kwargs['json']['think'], "low")
+
+    @patch('requests.request')
+    def test_openai_reasoning_effort_o3_mini(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "Molecular compound balanced."}}]
+        }
+        mock_request.return_value = mock_response
+
+        # Setup OpenAI provider with o3-mini model
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI Reasoner",
+            provider_type="OPENAI",
+            api_key="mock-key",
+            default_model="o3-mini",
+            is_enabled=True,
+            enable_thinking=True,
+            thinking_effort="high"
+        )
+
+        response = AIAssistant.chat("Create a soda mix suggestion", provider=provider)
+        self.assertEqual(response, "Molecular compound balanced.")
+        
+        # Verify request payload contains reasoning_effort: "high"
+        args, kwargs = mock_request.call_args
+        self.assertEqual(kwargs['json']['reasoning_effort'], "high")
 
 
 class BeverageLabSettingsTest(TestCase):

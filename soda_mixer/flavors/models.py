@@ -291,9 +291,20 @@ class LLMProvider(models.Model):
     base_url = models.URLField(blank=True, null=True, help_text="e.g., http://localhost:11434")
     default_model = models.CharField(max_length=100, blank=True, null=True, help_text="e.g., gpt-4o or mistral")
     is_enabled = models.BooleanField(default=False)
+    THINKING_EFFORT_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+    ]
     enable_thinking = models.BooleanField(
         default=True,
         help_text="Enable internal model thinking/reasoning if supported by the provider/model."
+    )
+    thinking_effort = models.CharField(
+        max_length=10,
+        choices=THINKING_EFFORT_CHOICES,
+        default='medium',
+        help_text="Thinking/reasoning effort level (low, medium, high) if supported by provider/model."
     )
     
     def __str__(self):
