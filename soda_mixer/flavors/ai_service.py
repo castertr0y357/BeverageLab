@@ -551,6 +551,11 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+        url = provider.base_url or "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {provider.api_key}",
+            "Content-Type": "application/json"
+        }
         model_name = provider.default_model or "gpt-3.5-turbo"
         data = {"model": model_name, "messages": messages, "temperature": 0.7, "stream": True}
         if model_name.startswith('o1') or model_name.startswith('o3'):
