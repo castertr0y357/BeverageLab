@@ -96,12 +96,20 @@
                     <span class="readout-label" style="font-size: 0.55rem;">FLAVOR INTENSITY</span>
                     <span class="text-dim fw-bold" style="font-size: 0.65rem;">LVL {{ ingredient.intensity }}/5</span>
                 </div>
-                <div class="progress bg-white bg-opacity-5" style="height: 4px; overflow: visible;">
+                <div class="progress bg-white bg-opacity-5 mb-2" style="height: 4px; overflow: visible;">
                     <div class="progress-bar bg-{{ ingredient.category }} shadow-glow" role="progressbar" 
-                         style="--p-width: {% widthratio ingredient.intensity 5 100 %}%; width: var(--p-width); border-radius: 4px; position: relative;">
-                         <div class="position-absolute end-0 top-50 translate-middle-y rounded-circle bg-white" 
-                              style="width: 8px; height: 8px; box-shadow: 0 0 8px var(--lab-accent);"></div>
+                          style="--p-width: {% widthratio ingredient.intensity 5 100 %}%; width: var(--p-width); border-radius: 4px; position: relative;">
+                          <div class="position-absolute end-0 top-50 translate-middle-y rounded-circle bg-white" 
+                               style="width: 8px; height: 8px; box-shadow: 0 0 8px var(--lab-accent);"></div>
                     </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="readout-label" style="font-size: 0.55rem;">BASE SUITABILITY</span>
+                    <span class="text-gradient-lab fw-bold font-monospace" style="font-size: 0.65rem;">{{ ingredient.base_suitability|floatformat:1 }}/5.0</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="readout-label" style="font-size: 0.55rem;">ACCENT SUITABILITY</span>
+                    <span class="text-experimental fw-bold font-monospace" style="font-size: 0.65rem;">{{ ingredient.accent_suitability|floatformat:1 }}/5.0</span>
                 </div>
             </div>
 
@@ -133,6 +141,8 @@
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
                         data-acidity="{{ ingredient.acidity }}" data-bitterness="{{ ingredient.bitterness }}"
                         data-complexity="{{ ingredient.complexity }}"
+                        data-base-suitability="{{ ingredient.base_suitability }}"
+                        data-accent-suitability="{{ ingredient.accent_suitability }}"
                         data-systems="{{ ingredient.compatible_systems }}"
                         data-description="{{ ingredient.description|default:'' }}">
                         <i class="bi bi-pencil"></i>
@@ -236,6 +246,18 @@
                             class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center px-1">
                     </div>
                 </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-white fw-bold small">Base Suitability (1.0 - 5.0)</label>
+                        <input type="number" step="0.1" name="base_suitability" id="addBaseSuit" value="3.0" min="1" max="5"
+                            class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-white fw-bold small">Accent Suitability (1.0 - 5.0)</label>
+                        <input type="number" step="0.1" name="accent_suitability" id="addAccentSuit" value="3.0" min="1" max="5"
+                            class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label class="form-label text-white fw-bold small">System Compatibility</label>
                     <div class="d-flex gap-3 px-2 py-2 bg-dark bg-opacity-25 rounded border border-white border-opacity-10">
@@ -335,6 +357,18 @@
                         <label class="form-label text-white fw-bold small">Cpx.</label>
                         <input type="number" name="complexity" id="editCpx" min="1" max="5"
                             class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center px-1">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-white fw-bold small">Base Suitability (1.0 - 5.0)</label>
+                        <input type="number" step="0.1" name="base_suitability" id="editBaseSuit" min="1" max="5"
+                            class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-white fw-bold small">Accent Suitability (1.0 - 5.0)</label>
+                        <input type="number" step="0.1" name="accent_suitability" id="editAccentSuit" min="1" max="5"
+                            class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
                     </div>
                 </div>
                 <div class="mb-3">
@@ -453,6 +487,8 @@
                 document.getElementById('editAcd').value = d.acidity;
                 document.getElementById('editBit').value = d.bitterness;
                 document.getElementById('editCpx').value = d.complexity;
+                document.getElementById('editBaseSuit').value = d.baseSuitability;
+                document.getElementById('editAccentSuit').value = d.accentSuitability;
                 document.getElementById('editDesc').value = d.description;
                 
                 // Set system checkboxes
@@ -585,13 +621,19 @@
                     'Swt': profile.sweetness,
                     'Acd': profile.acidity,
                     'Bit': profile.bitterness,
-                    'Cpx': profile.complexity
+                    'Cpx': profile.complexity,
+                    'BaseSuit': profile.base_suitability || 3.0,
+                    'AccentSuit': profile.accent_suitability || 3.0
                 };
 
                 for (const [suffix, value] of Object.entries(fields)) {
                     const el = document.getElementById(prefix + suffix);
                     if (el) {
-                        el.value = Math.round(value);
+                        if (suffix.includes('Suit')) {
+                            el.value = parseFloat(value || 3.0).toFixed(1);
+                        } else {
+                            el.value = Math.round(value);
+                        }
                         el.classList.add('is-valid');
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
                     }

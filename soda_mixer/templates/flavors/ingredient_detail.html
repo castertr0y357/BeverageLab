@@ -34,6 +34,24 @@
                 <p class="text-dim small ps-1">Measured on the standard laboratory intensity scale (1-5).</p>
             </div>
 
+            <div class="mb-5">
+                <label class="readout-label mb-3">SUITABILITY PROFILE</label>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="readout-card p-3 border-lab">
+                            <div class="readout-label" style="font-size: 0.65rem; letter-spacing: 1.5px;">BASE SUITABILITY</div>
+                            <div class="fw-bold fs-4 text-gradient-lab">{{ ingredient.base_suitability|floatformat:1 }}/5.0</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="readout-card p-3 border-experimental">
+                            <div class="readout-label" style="font-size: 0.65rem; letter-spacing: 1.5px;">ACCENT SUITABILITY</div>
+                            <div class="fw-bold fs-4 text-experimental">{{ ingredient.accent_suitability|floatformat:1 }}/5.0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {% if ingredient.ingredient_type == 'COFFEE_BEAN' %}
             <div class="row g-3 mb-5">
                 <div class="col-md-6">

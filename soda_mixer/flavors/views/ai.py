@@ -45,6 +45,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'acidity': r['ingredient'].acidity,
                     'bitterness': r['ingredient'].bitterness,
                     'complexity': r['ingredient'].complexity,
+                    'base_suitability': r['ingredient'].base_suitability,
+                    'accent_suitability': r['ingredient'].accent_suitability,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': 'suggestions'
@@ -62,6 +64,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'acidity': r['ingredient'].acidity,
                     'bitterness': r['ingredient'].bitterness,
                     'complexity': r['ingredient'].complexity,
+                    'base_suitability': r['ingredient'].base_suitability,
+                    'accent_suitability': r['ingredient'].accent_suitability,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'secondary')
@@ -79,6 +83,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'acidity': r['ingredient'].acidity,
                     'bitterness': r['ingredient'].bitterness,
                     'complexity': r['ingredient'].complexity,
+                    'base_suitability': r['ingredient'].base_suitability,
+                    'accent_suitability': r['ingredient'].accent_suitability,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'tertiary')
@@ -358,6 +364,8 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                             'acidity': target_obj.acidity,
                             'bitterness': target_obj.bitterness,
                             'complexity': target_obj.complexity,
+                            'base_suitability': target_obj.base_suitability,
+                            'accent_suitability': target_obj.accent_suitability,
                             'resonance': round(min(resonance, 99.8), 1),
                             'reason': item.get('reason', 'Molecular Affinity Match'),
                             'amount': item.get('amount'),
@@ -592,6 +600,8 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 'acidity': ing.acidity,
                 'bitterness': ing.bitterness,
                 'complexity': ing.complexity,
+                'base_suitability': ing.base_suitability,
+                'accent_suitability': ing.accent_suitability,
                 'amount': item['amount']
             })
             

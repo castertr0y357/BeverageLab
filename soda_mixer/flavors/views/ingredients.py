@@ -28,6 +28,8 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     acidity = request.POST.get('acidity', 3)
     bitterness = request.POST.get('bitterness', 1)
     complexity = request.POST.get('complexity', 3)
+    base_suitability = request.POST.get('base_suitability', 3.0)
+    accent_suitability = request.POST.get('accent_suitability', 3.0)
     
     systems = request.POST.getlist('compatible_systems')
     compatible_systems = ",".join(systems) if systems else "SODA,COFFEE,SLUSHIE"
@@ -44,6 +46,8 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 acidity=acidity,
                 bitterness=bitterness,
                 complexity=complexity,
+                base_suitability=base_suitability,
+                accent_suitability=accent_suitability,
                 compatible_systems=compatible_systems,
                 is_in_inventory=True
             )
@@ -81,6 +85,8 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         ingredient.acidity = int(request.POST.get('acidity', ingredient.acidity))
         ingredient.bitterness = int(request.POST.get('bitterness', ingredient.bitterness))
         ingredient.complexity = int(request.POST.get('complexity', ingredient.complexity))
+        ingredient.base_suitability = float(request.POST.get('base_suitability', ingredient.base_suitability))
+        ingredient.accent_suitability = float(request.POST.get('accent_suitability', ingredient.accent_suitability))
     except ValueError as e:
         logger.warning(f"IngredientRegistry - Warning - Non-numeric stats provided for ingredient {pk}: {e}")
         

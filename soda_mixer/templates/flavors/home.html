@@ -146,6 +146,10 @@
                                  data-profile=''>
                                 <span class="fw-bold fs-5 mb-2">{{ ingredient.name }}</span>
                                 <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
+                                <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
+                                    <span class="text-gradient-lab font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
+                                    <span class="text-experimental font-monospace">A: {{ ingredient.accent_suitability|floatformat:1 }}</span>
+                                </div>
                             </div>
                         </div>
                         {% empty %}
@@ -585,6 +589,7 @@
             
             if (shouldShow) {
                 const btn = card.querySelector('.select-ingredient-btn');
+                if (!btn) return;
                 const baseScore = parseFloat(btn.getAttribute('data-base-suitability') || '3.0');
                 const accentScore = parseFloat(btn.getAttribute('data-accent-suitability') || '3.0');
                 
@@ -830,11 +835,16 @@
                              data-id="${rec.id}" data-name="${rec.name}" data-intensity="${rec.intensity}" data-category="${rec.category}"
                              data-sweetness="${rec.sweetness || 0}" data-acidity="${rec.acidity || 0}"
                              data-bitterness="${rec.bitterness || 0}" data-complexity="${rec.complexity || 0}"
+                             data-base-suitability="${rec.base_suitability || 3.0}" data-accent-suitability="${rec.accent_suitability || 3.0}"
                              data-profile='${profileJson}' data-amount="${rec.amount || ''}">
                                 <span class="fw-bold fs-5 mb-1">${rec.name}</span>
                                 <div class="d-flex gap-2 align-items-center mb-2">
                                     <span class="badge-fizz ${badgeClass}">${rec.category}</span>
                                     ${rec.resonance ? `<span class="text-info fw-black small" style="text-shadow: 0 0 8px var(--fizz-cyan);">🧪 ${rec.resonance}%</span>` : ''}
+                                </div>
+                                <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
+                                    <span class="text-gradient-lab font-monospace">B: ${parseFloat(rec.base_suitability || 3.0).toFixed(1)}</span>
+                                    <span class="text-experimental font-monospace">A: ${parseFloat(rec.accent_suitability || 3.0).toFixed(1)}</span>
                                 </div>
                                 <div class="mt-auto">
                                     <small class="${textClass} fw-bold" style="font-size: 0.7rem;">
