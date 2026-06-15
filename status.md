@@ -4,6 +4,8 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Added batch scale toggle (0.5L and 1.0L) and dual-unit (ml / oz) displays for ingredients in the recipes details view (`recipe_detail.html`) using client-side JavaScript formatting and scaling.
+- [x] Documented user manual visual inspection protocol in workspace LLM rules files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`).
 - [x] Synchronized workspace rules files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, and `.windsurfrules`) with the latest global template `C:\Users\caste\.gemini\project.md`, customizing the project name (`BeverageLab`) and the verification command
 - [x] Implemented a toggle in the database schema and UI configurations to enable or disable the model's internal thinking/reasoning process and configure the level of thinking effort (specifically passing the 'think' option to Ollama for local models like Gemma/DeepSeek-R1 and 'reasoning_effort' to OpenAI reasoning models like o1/o3-mini)
 - [x] Fixed component list filtering when swapping between lab modes (Soda, Coffee, Cryo) on the home page. Added default coffee bean ingredients and adjusted compatible systems in the database, and restricted Step 1 library display to valid base components.

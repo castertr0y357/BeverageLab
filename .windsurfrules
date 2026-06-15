@@ -15,6 +15,7 @@ docker compose run --rm web python manage.py test
 > 1. Never skip verification before committing. The verification step **MUST** execute all unit and integration test suites.
 > 2. You **MUST** update the [status.md](file:///./status.md) file after each task to reflect the current status of features, completed tasks, and architectural changes.
 > 3. You **MUST** generate a git commit with an accurate, descriptive commit message representing the changes after every successful execution (only if a Git repository is initialized in the workspace; skip this step if Git is not initialized).
+> 4. The user will handle all visual inspection. Do NOT run automated browser subagents or screenshot-based tools for user interface layout verification.
 
 ## 🧪 Automated Testing & Bug Prevention
 To ensure that projects are robust enough to share with others, you must establish and maintain strict testing habits:

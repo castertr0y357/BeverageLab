@@ -75,8 +75,17 @@
             </div>
             {% endif %}
 
-            <div class="pb-3 mb-4 border-bottom border-white border-opacity-10">
+            <div class="pb-3 mb-4 border-bottom border-white border-opacity-10 d-flex justify-content-between align-items-center">
                 <h5 class="text-gradient-lab mb-0">Molecular Component Specs</h5>
+                {% if recipe.drink_type == 'SODA' or recipe.drink_type == 'SLUSHIE' %}
+                <div class="d-flex align-items-center gap-2 print-hide">
+                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
+                    <div class="btn-group btn-group-xs">
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
                 
             <div class="row g-3 mb-5">
@@ -99,7 +108,9 @@
                         <div class="d-flex justify-content-between align-items-center mt-auto">
                             <div class="readout-card p-1 ps-2 border-primary border-opacity-50 flex-grow-1 me-2">
                                 <div class="readout-label" style="font-size: 0.6rem;">UNIT MASS</div>
-                                <div class="fw-bold">{{ ri.amount|floatformat:1 }} {% if recipe.drink_type == 'SODA' %}ml{% else %}g{% endif %}</div>
+                                <div class="fw-bold amount-display" data-original-amount="{{ ri.amount }}" data-drink-type="{{ recipe.drink_type }}">
+                                    {{ ri.amount|floatformat:1 }} {% if recipe.drink_type == 'SODA' or recipe.drink_type == 'SLUSHIE' %}ml{% else %}g{% endif %}
+                                </div>
                             </div>
                             <div class="readout-card p-1 ps-2 border-warning border-opacity-50 flex-grow-1">
                                 <div class="readout-label" style="font-size: 0.6rem;">INTENSITY</div>
@@ -221,7 +232,51 @@
 
 {% block extra_js %}
 <script>
+    let currentScale = 1.0;
+
+    function formatImperialVolume(ml) {
+        const oz = ml * 0.033814;
+        if (oz >= 1.0) return oz.toFixed(1) + 'oz';
+        
+        // 1 Tbsp = 14.78ml, 1 tsp = 4.93ml
+        if (ml >= 14) return Math.round(ml / 14.78) + ' Tbsp';
+        if (ml >= 2.5) return Math.round(ml / 4.93) + ' tsp';
+        
+        return oz.toFixed(2) + 'oz';
+    }
+
+    function setBottleScale(scale) {
+        currentScale = parseFloat(scale);
+        
+        const scale1L = document.getElementById('scale1L');
+        const scale05L = document.getElementById('scale05L');
+        if (scale1L) scale1L.classList.toggle('active-lab-mode', currentScale === 1.0);
+        if (scale05L) scale05L.classList.toggle('active-lab-mode', currentScale === 0.5);
+        
+        updateAmounts();
+    }
+
+    function updateAmounts() {
+        const amountDisplays = document.querySelectorAll('.amount-display');
+        amountDisplays.forEach(el => {
+            const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
+            if (isNaN(originalAmount)) return;
+            
+            const drinkType = el.getAttribute('data-drink-type');
+            const isCoffee = drinkType === 'COFFEE';
+            const scaledAmount = originalAmount * currentScale;
+            
+            if (isCoffee) {
+                el.innerHTML = `${scaledAmount.toFixed(1)} g`;
+            } else {
+                const displayVolume = Math.round(scaledAmount);
+                el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(scaledAmount)}`;
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+        updateAmounts();
         const ratingUI = document.getElementById('ratingUI');
         if (ratingUI) {
             ratingUI.addEventListener('click', function(e) {
