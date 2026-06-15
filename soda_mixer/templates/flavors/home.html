@@ -127,7 +127,7 @@
                     <!-- 🧠 Neural & Algorithmic Suggestion Substrate -->
                     <div id="recommendationContainer" class="mb-4"></div>
 
-                    <div class="row g-3" id="availableIngredients">
+                    <div class="row g-3" id="availableIngredients" style="display: none;">
                         {% for ingredient in ingredients %}
                         <div class="col-md-4 col-sm-6 ingredient-card" 
                              data-type="{{ ingredient.ingredient_type }}"
@@ -140,6 +140,8 @@
                                  data-acidity="{{ ingredient.acidity }}"
                                  data-bitterness="{{ ingredient.bitterness }}"
                                  data-complexity="{{ ingredient.complexity }}"
+                                 data-base-suitability="{{ ingredient.base_suitability }}"
+                                 data-accent-suitability="{{ ingredient.accent_suitability }}"
                                  data-category="{{ ingredient.category }}"
                                  data-profile=''>
                                 <span class="fw-bold fs-5 mb-2">{{ ingredient.name }}</span>
@@ -153,6 +155,18 @@
                             <a href="{% url 'ingredient_list' %}" class="btn btn-outline-primary btn-sm">Catalog Materials</a>
                         </div>
                         {% endfor %}
+                    </div>
+
+                    <!-- Partitioned Sub-Containers for Base Selection -->
+                    <div id="partitionedBasesContainer" class="w-100">
+                        <div id="recommendedBasesGroup" class="mb-4">
+                            <h6 class="readout-label mb-3 text-gradient-lab" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
+                            <div class="row g-3" id="recommendedBasesList"></div>
+                        </div>
+                        <div id="unorthodoxBasesGroup" class="mb-4">
+                            <h6 class="readout-label mb-3 text-dim" id="unorthodoxBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">UNORTHODOX / ACCENT COMPONENTS</h6>
+                            <div class="row g-3" id="unorthodoxBasesList"></div>
+                        </div>
                     </div>
                 </div>
                 
@@ -310,7 +324,7 @@
         document.getElementById('modeSlushie').classList.toggle('active', mode === 'SLUSHIE');
         
         // Update Filtered Ingredients
-        const cards = document.querySelectorAll('.ingredient-card');
+        const cards = document.querySelectorAll('#availableIngredients .ingredient-card');
         cards.forEach(card => {
             const type = card.getAttribute('data-type');
             const systems = card.getAttribute('data-systems') || "SODA,COFFEE,SLUSHIE";
@@ -532,6 +546,91 @@
         }
     });
 
+    function partitionBases() {
+        const recommendedList = document.getElementById('recommendedBasesList');
+        const unorthodoxList = document.getElementById('unorthodoxBasesList');
+        const recommendedTitle = document.getElementById('recommendedBasesTitle');
+        const unorthodoxTitle = document.getElementById('unorthodoxBasesTitle');
+        
+        recommendedList.innerHTML = '';
+        unorthodoxList.innerHTML = '';
+        
+        const isExperimental = (recommendationMode === 'experimental');
+        
+        // Temporarily render cards into a hidden element to parse them
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = allIngredientsHtml;
+        
+        const cards = Array.from(tempDiv.querySelectorAll('.ingredient-card'));
+        
+        let recommendedCount = 0;
+        let unorthodoxCount = 0;
+        
+        cards.forEach(card => {
+            const type = card.getAttribute('data-type');
+            const systems = card.getAttribute('data-systems') || "SODA,COFFEE,SLUSHIE";
+            const systemList = systems.split(',');
+            
+            let isTypeMatch = false;
+            if (currentLabMode === 'SODA') {
+                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER');
+            } else if (currentLabMode === 'COFFEE') {
+                isTypeMatch = (type === 'COFFEE_BEAN');
+            } else if (currentLabMode === 'SLUSHIE') {
+                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER');
+            }
+            
+            const isSystemMatch = systemList.map(s => s.trim()).includes(currentLabMode);
+            const shouldShow = isExperimental ? isTypeMatch : (isTypeMatch && isSystemMatch);
+            
+            if (shouldShow) {
+                const btn = card.querySelector('.select-ingredient-btn');
+                const baseScore = parseFloat(btn.getAttribute('data-base-suitability') || '3.0');
+                const accentScore = parseFloat(btn.getAttribute('data-accent-suitability') || '3.0');
+                
+                // Recreate card wrapper
+                const col = document.createElement('div');
+                col.className = 'col-md-4 col-sm-6 ingredient-card';
+                col.setAttribute('data-type', type);
+                col.setAttribute('data-systems', systems);
+                col.innerHTML = card.innerHTML;
+                
+                if (isExperimental) {
+                    // Experimental Mode: promote low base suitability (unorthodox)
+                    if (baseScore < 3.5) {
+                        recommendedList.appendChild(col);
+                        recommendedCount++;
+                    } else {
+                        unorthodoxList.appendChild(col);
+                        unorthodoxCount++;
+                    }
+                } else {
+                    // Standard Mode: traditional/safe bases (base_suitability >= 3.5)
+                    if (baseScore >= 3.5) {
+                        recommendedList.appendChild(col);
+                        recommendedCount++;
+                    } else {
+                        unorthodoxList.appendChild(col);
+                        unorthodoxCount++;
+                    }
+                }
+            }
+        });
+        
+        // Show/hide groups based on count
+        document.getElementById('recommendedBasesGroup').style.display = recommendedCount > 0 ? 'block' : 'none';
+        document.getElementById('unorthodoxBasesGroup').style.display = unorthodoxCount > 0 ? 'block' : 'none';
+        
+        // Update titles
+        if (isExperimental) {
+            recommendedTitle.innerHTML = '<i class="bi bi-flask text-experimental me-2"></i>RECOMMENDED UNORTHODOX SUBSTRATES';
+            unorthodoxTitle.innerHTML = '<i class="bi bi-shield text-dim me-2"></i>STANDARD / SAFE BASES';
+        } else {
+            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-gradient-lab me-2"></i>RECOMMENDED BASES';
+            unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY ACCENTS';
+        }
+    }
+
     function resetMixer() {
         selectedIngredients = [];
         isCreamerTransition = false;
@@ -539,13 +638,9 @@
         document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
         document.getElementById('synthesisReportContainer').style.display = 'none';
         updateSelectedArea();
-        if (selectedIngredients.length > 0) {
-            fetchRecommendations();
-        } else {
-            // Show library on empty mix
-            document.getElementById('recommendationContainer').innerHTML = '';
-            document.getElementById('availableIngredients').style.display = 'flex';
-        }
+        document.getElementById('recommendationContainer').innerHTML = '';
+        document.getElementById('partitionedBasesContainer').style.display = 'block';
+        partitionBases();
     }
 
     function stepBack() {
@@ -605,11 +700,12 @@
         
         document.getElementById('stepTitle').textContent = stepText;
         const container = document.getElementById('recommendationContainer');
-        const library = document.getElementById('availableIngredients');
+        const library = document.getElementById('partitionedBasesContainer');
         
         if (ingredientIds.length === 0) {
             container.innerHTML = '';
-            library.style.display = 'flex';
+            library.style.display = 'block';
+            partitionBases();
             return;
         }
 

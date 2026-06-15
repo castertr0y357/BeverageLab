@@ -471,6 +471,8 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         match.acidity = max(1, min(5, round(res.get('acidity', match.acidity))))
                         match.bitterness = max(1, min(5, round(res.get('bitterness', match.bitterness))))
                         match.complexity = max(1, min(5, round(res.get('complexity', match.complexity))))
+                        match.base_suitability = max(1.0, min(5.0, round(res.get('base_suitability', match.base_suitability), 1)))
+                        match.accent_suitability = max(1.0, min(5.0, round(res.get('accent_suitability', match.accent_suitability), 1)))
                         match.save()
                         total_analyzed += 1
                         

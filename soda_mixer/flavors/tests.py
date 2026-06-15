@@ -310,6 +310,43 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(provider.enable_thinking, False)
         self.assertEqual(provider.thinking_effort, 'low')
 
+    @patch('requests.request')
+    def test_ai_bulk_analyze_view_api(self, mock_request: MagicMock) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        # Configure LLM provider
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        config = SystemConfiguration.get_config()
+        config.default_llm_provider = provider
+        config.save()
+
+        self.ing.intensity = 3
+        self.ing.sweetness = 3
+        self.ing.acidity = 3
+        self.ing.bitterness = 1
+        self.ing.complexity = 3
+        self.ing.is_in_inventory = True
+        self.ing.save()
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 1, "sweetness": 1, "acidity": 1, "bitterness": 1, "complexity": 1, "base_suitability": 1.0, "accent_suitability": 3.5}]'}}]
+        }
+        mock_request.return_value = mock_response
+
+        response = self.client.post(reverse('ai_bulk_analyze_api'))
+        self.assertEqual(response.status_code, 200)
+        self.ing.refresh_from_db()
+        self.assertEqual(self.ing.intensity, 1)
+        self.assertEqual(self.ing.base_suitability, 1.0)
+        self.assertEqual(self.ing.accent_suitability, 3.5)
+
 
 class BeverageLabAIAssistantTest(TestCase):
     """Test case for the AIAssistant integrations via Mocking."""
@@ -363,6 +400,20 @@ class BeverageLabAIAssistantTest(TestCase):
         res = AIAssistant.suggest_autonomous(["Club Soda"], mode="standard")
         self.assertIsNotNone(res)
         self.assertEqual(res['suggestions'][0]['name'], "Lime")
+
+    @patch('requests.request')
+    def test_ai_analyze_flavor_profile(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"intensity": 4.0, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.0, "complexity": 3.0, "base_suitability": 4.5, "accent_suitability": 1.5}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        res = AIAssistant.analyze_flavor_profile("Sour Lemon", "Very sour")
+        self.assertIsNotNone(res)
+        self.assertEqual(res['base_suitability'], 4.5)
+        self.assertEqual(res['accent_suitability'], 1.5)
 
     @patch('requests.request')
     def test_ollama_thinking_parameter_true(self, mock_request: MagicMock) -> None:

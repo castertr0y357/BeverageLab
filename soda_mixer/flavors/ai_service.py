@@ -57,7 +57,9 @@ class AIAssistant:
     "sweetness": float,
     "acidity": float,
     "bitterness": float,
-    "complexity": float
+    "complexity": float,
+    "base_suitability": float,
+    "accent_suitability": float
 }"""
 
     @classmethod
@@ -121,7 +123,9 @@ class AIAssistant:
                     "sweetness": 3.0,
                     "acidity": 3.0,
                     "bitterness": 1.0,
-                    "complexity": 3.0
+                    "complexity": 3.0,
+                    "base_suitability": 3.0,
+                    "accent_suitability": 3.0
                 })
             if not results:
                 results.append({
@@ -130,7 +134,9 @@ class AIAssistant:
                     "sweetness": 3.0,
                     "acidity": 3.0,
                     "bitterness": 1.0,
-                    "complexity": 3.0
+                    "complexity": 3.0,
+                    "base_suitability": 3.0,
+                    "accent_suitability": 3.0
                 })
             return json.dumps(results)
         elif "Analyze this ingredient" in user_prompt:
@@ -139,7 +145,9 @@ class AIAssistant:
                 "sweetness": 3.0,
                 "acidity": 3.0,
                 "bitterness": 1.0,
-                "complexity": 3.0
+                "complexity": 3.0,
+                "base_suitability": 3.0,
+                "accent_suitability": 3.0
             })
         else:
             return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
@@ -445,9 +453,11 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - acidity
         - bitterness
         - complexity
+        - base_suitability (how well it serves as a dominant, high-volume base ingredient)
+        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
         
         OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5 }}]
+        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0 }}]
         """
         response = cls.chat(prompt)
         return cls._extract_json(response)

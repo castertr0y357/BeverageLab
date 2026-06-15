@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Implemented AI-synthesized base and accent suitability scoring for ingredients (`base_suitability` and `accent_suitability` in `Ingredient` model), including prompt structures, mock responses, database backfill migration, and dynamic frontend partitioning on the Home page grid for Standard vs. Experimental recommendation modes.
 - [x] Added batch scale toggle (0.5L and 1.0L) and dual-unit (ml / oz) displays for ingredients in the recipes details view (`recipe_detail.html`) using client-side JavaScript formatting and scaling.
 - [x] Documented user manual visual inspection protocol in workspace LLM rules files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`).
 - [x] Synchronized workspace rules files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, and `.windsurfrules`) with the latest global template `C:\Users\caste\.gemini\project.md`, customizing the project name (`BeverageLab`) and the verification command
@@ -36,5 +37,7 @@
 - Formatted log messages following standard laboratory pattern: `[Job/Operation] - [Category/Level] - [Detail Message]`.
 - Mock-isolated test suite to ensure stable, reliable runs.
 - Split Docker Compose configuration: production-safe `docker-compose.yml` without runtime volume mounts, and local-only `docker-compose.override.yml` for source code volume mounting and hot-reloading.
+- Added AI-synthesized base and accent suitability scoring model properties (`base_suitability` and `accent_suitability` fields on `Ingredient`).
+- Implemented dynamic frontend partitioning on the Home page grid to separate safe bases from unorthodox bases based on standard vs. experimental mode.
 
 

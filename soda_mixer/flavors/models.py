@@ -77,6 +77,16 @@ class Ingredient(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(5)],
         default=3
     )
+    base_suitability = models.FloatField(
+        help_text="AI-synthesized score representing how well this works as a dominant base component (1.0 to 5.0)",
+        validators=[MinValueValidator(1.0), MaxValueValidator(5.0)],
+        default=3.0
+    )
+    accent_suitability = models.FloatField(
+        help_text="AI-synthesized score representing how well this works as a supporting accent component (1.0 to 5.0)",
+        validators=[MinValueValidator(1.0), MaxValueValidator(5.0)],
+        default=3.0
+    )
     
     # Coffee-specific fields
     origin = models.CharField(max_length=100, blank=True, null=True)
