@@ -78,6 +78,17 @@ def ingredient_list(request: HttpRequest) -> HttpResponse:
     if category:
         ingredients = ingredients.filter(category=category)
         
+    # Calculate multibrand names in the registry
+    from django.db.models import Count
+    multibrand_qs = Ingredient.objects.values('name').annotate(
+        brand_count=Count('brand', distinct=True)
+    ).filter(brand_count__gt=1)
+    multibrand_names = {item['name'].lower() for item in multibrand_qs}
+
+    ingredients = list(ingredients)
+    for ing in ingredients:
+        ing.show_brand = ing.name.lower() in multibrand_names
+
     used_categories = Ingredient.objects.values_list('category', flat=True).distinct().order_by('category')
     # Deduplicate after normalization (handles existing mixed-case DB entries)
     seen: Dict[str, str] = {}
@@ -99,6 +110,7 @@ def ingredient_list(request: HttpRequest) -> HttpResponse:
         'categories': categories,
         'all_categories': RecipeCategory.objects.all().order_by('name')
     })
+
 
 
 def _get_compatible_categories(category: str) -> List[str]:

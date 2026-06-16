@@ -683,6 +683,33 @@ class BeverageLabBrandTrackingTest(TestCase):
         ing.refresh_from_db()
         self.assertEqual(ing.brand, "Monin")
 
+    def test_ingredient_list_shows_brand_badge_only_when_multibrand(self) -> None:
+        # 1. Create a unique flavor
+        unique_ing = Ingredient.objects.create(name="Apple Syrup", brand="Monin", category="fruit")
+        
+        # 2. Create duplicate flavor name with different brands
+        dupe_ing1 = Ingredient.objects.create(name="Ginger Syrup", brand="Monin", category="spice")
+        dupe_ing2 = Ingredient.objects.create(name="Ginger Syrup", brand="Torani", category="spice")
+        
+        # 3. Request the ingredient list page
+        self.client.login(username="director", password="secure_password_123")
+        response = self.client.get(reverse('ingredient_list'))
+        self.assertEqual(response.status_code, 200)
+        
+        # Check context attributes
+        ingredients = {ing.id: ing for ing in response.context['ingredients']}
+        
+        # Unique flavor should NOT show brand badge
+        self.assertIn(unique_ing.id, ingredients)
+        self.assertFalse(ingredients[unique_ing.id].show_brand)
+        
+        # Duplicate flavors SHOULD show brand badge
+        self.assertIn(dupe_ing1.id, ingredients)
+        self.assertTrue(ingredients[dupe_ing1.id].show_brand)
+        self.assertIn(dupe_ing2.id, ingredients)
+        self.assertTrue(ingredients[dupe_ing2.id].show_brand)
+
+
 
 
 

@@ -73,9 +73,12 @@
     <div class="col-md-6 col-lg-4">
         <div class="glass-card h-100 p-4 d-flex flex-column border-white border-opacity-10">
             <div class="d-flex justify-content-between align-items-start mb-3">
-                <h4 class="mb-0">
+                <h4 class="mb-0 d-flex align-items-center flex-wrap gap-2">
                     <a href="{% url 'ingredient_detail' ingredient.id %}"
-                        class="text-decoration-none text-white hover-lime fw-bold">{% if ingredient.brand %}{{ ingredient.brand }} {% endif %}{{ ingredient.name }}</a>
+                        class="text-decoration-none text-white hover-lime fw-bold">{{ ingredient.name }}</a>
+                    {% if ingredient.show_brand and ingredient.brand %}
+                    <span class="badge border border-white border-opacity-20 text-dim" style="font-size: 0.55rem; padding: 0.15rem 0.35rem; font-weight: 500; letter-spacing: 0.5px;">{{ ingredient.brand|upper }}</span>
+                    {% endif %}
                 </h4>
                 <div class="d-flex flex-column align-items-end gap-1">
                     <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
@@ -137,7 +140,7 @@
                     <button type="button"
                         class="btn btn-sm btn-outline-warning border-white border-opacity-10 btn-edit-material"
                         title="Edit Material" data-id="{{ ingredient.id }}" data-name="{{ ingredient.name }}"
-                        data-brand="{{ ingredient.brand|default:'' }}"
+                        data-brand="{{ ingredient.brand }}"
                         data-type="{{ ingredient.ingredient_type }}" data-category="{{ ingredient.category }}"
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
                         data-acidity="{{ ingredient.acidity }}" data-bitterness="{{ ingredient.bitterness }}"
@@ -145,7 +148,7 @@
                         data-base-suitability="{{ ingredient.base_suitability }}"
                         data-accent-suitability="{{ ingredient.accent_suitability }}"
                         data-systems="{{ ingredient.compatible_systems }}"
-                        data-description="{{ ingredient.description|default:'' }}">
+                        data-description="{{ ingredient.description }}">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <form action="{% url 'delete_ingredient' ingredient.id %}" method="post" class="m-0"
