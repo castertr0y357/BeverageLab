@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Display a styled, informative empty-state message containing a "Catalog Materials" redirection button when a laboratory mode lacks valid base ingredients, instead of showing a blank Step 1 layout.
 - [x] Modified bulk analysis target selection query to select all active inventory ingredients (instead of skipping already initialized ones) to ensure that any updates or changes are captured during synthesis. Updated confirmation alert and button tooltips to reflect this new behavior.
 - [x] Added `ai_notes` TextField to the `Ingredient` model to store AI-generated sensory notes, flavor profiles, and pairing recommendations. Exposed the field in the Django Admin search fields.
 - [x] Updated single-ingredient and batch analysis prompts in the AI service to ask the model to generate the `ai_notes` field, and updated mock responses to return realistic mock notes.

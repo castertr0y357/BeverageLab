@@ -391,6 +391,13 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(self.ing.accent_suitability, 4.2)
         self.assertEqual(self.ing.ai_notes, "Custom base suitability notes")
 
+    def test_home_page_renders_empty_mode_message_element(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="emptyModeMessage"')
+        self.assertContains(response, 'id="stepHeader"')
+
 
 class BeverageLabAIAssistantTest(TestCase):
     """Test case for the AIAssistant integrations via Mocking."""
