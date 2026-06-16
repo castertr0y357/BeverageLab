@@ -425,8 +425,17 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         Name: {name}
         Description: {description}
 
-        Return ONLY a JSON object with values from 1.0 to 5.0 for these metrics:
-        {cls.FLAVOR_PROFILE_FORMAT}
+        Return ONLY a JSON object with values from 1.0 to 5.0 (decimals allowed) for these metrics:
+        - intensity
+        - sweetness
+        - acidity
+        - bitterness
+        - complexity
+        - base_suitability (how well it serves as a dominant, high-volume base ingredient)
+        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
+
+        OUTPUT FORMAT: A raw JSON object. [NO MARKDOWN] [NO PREAMBLE].
+        Example: {cls.FLAVOR_PROFILE_FORMAT}
         Base your analysis on chemical flavor profiles.
         """
         response = cls.chat(prompt)

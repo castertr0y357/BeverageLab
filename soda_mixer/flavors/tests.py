@@ -347,6 +347,44 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(self.ing.base_suitability, 1.0)
         self.assertEqual(self.ing.accent_suitability, 3.5)
 
+    @patch('requests.request')
+    def test_ai_bulk_analyze_captures_uninitialized_suitability(self, mock_request: MagicMock) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        config = SystemConfiguration.get_config()
+        config.default_llm_provider = provider
+        config.save()
+
+        # Non-default stats, but default suitability (3.0, 3.0)
+        self.ing.intensity = 4
+        self.ing.sweetness = 4
+        self.ing.acidity = 2
+        self.ing.bitterness = 2
+        self.ing.complexity = 4
+        self.ing.base_suitability = 3.0
+        self.ing.accent_suitability = 3.0
+        self.ing.is_in_inventory = True
+        self.ing.save()
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 4, "sweetness": 4, "acidity": 2, "bitterness": 2, "complexity": 4, "base_suitability": 1.5, "accent_suitability": 4.2}]'}}]
+        }
+        mock_request.return_value = mock_response
+
+        response = self.client.post(reverse('ai_bulk_analyze_api'))
+        self.assertEqual(response.status_code, 200)
+        self.ing.refresh_from_db()
+        self.assertEqual(self.ing.base_suitability, 1.5)
+        self.assertEqual(self.ing.accent_suitability, 4.2)
+
 
 class BeverageLabAIAssistantTest(TestCase):
     """Test case for the AIAssistant integrations via Mocking."""

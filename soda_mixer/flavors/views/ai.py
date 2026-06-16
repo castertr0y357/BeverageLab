@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.db.models import Q
 
 from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider
 from ..recommendations import (
@@ -449,8 +450,9 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
         
     try:
         targets = Ingredient.objects.filter(
-            is_in_inventory=True,
-            intensity=3, sweetness=3, acidity=3, bitterness=1, complexity=3
+            Q(intensity=3, sweetness=3, acidity=3, bitterness=1, complexity=3) |
+            Q(base_suitability=3.0, accent_suitability=3.0),
+            is_in_inventory=True
         )
         
         if not targets.exists():

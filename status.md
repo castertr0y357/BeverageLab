@@ -4,6 +4,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Fixed ingredient analysis not adjusting base and accent suitability scores: explicitly defined suitability metrics in the single-ingredient analysis LLM prompt and updated the bulk analysis target selection query to capture ingredients with default suitability scores (3.0/3.0) even if other stats are customized.
 - [x] Fixed base and accent scores visibility in the UI by displaying them textually on all ingredient cards (Step 1 grid, recommendations, recipe creation) and detail screens (ingredients, formulas/recipes). Implemented dynamic recommended and unorthodox base/accent partitioning on the Formula Synthesis creation page (`create_recipe.html`).
 - [x] Implemented AI-synthesized base and accent suitability scoring for ingredients (`base_suitability` and `accent_suitability` in `Ingredient` model), including prompt structures, mock responses, database backfill migration, and dynamic frontend partitioning on the Home page grid for Standard vs. Experimental recommendation modes.
 - [x] Added batch scale toggle (0.5L and 1.0L) and dual-unit (ml / oz) displays for ingredients in the recipes details view (`recipe_detail.html`) using client-side JavaScript formatting and scaling.
