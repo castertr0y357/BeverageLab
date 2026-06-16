@@ -23,6 +23,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     ingredient_type = request.POST.get('ingredient_type', 'SODA_SYRUP')
     category = request.POST.get('category', 'citrus').strip().lower()
     description = request.POST.get('description', '')
+    ai_notes = request.POST.get('ai_notes', '').strip()
     
     intensity = request.POST.get('intensity', 3)
     sweetness = request.POST.get('sweetness', 3)
@@ -43,6 +44,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 ingredient_type=ingredient_type,
                 category=category,
                 description=description,
+                ai_notes=ai_notes,
                 intensity=intensity,
                 sweetness=sweetness,
                 acidity=acidity,
@@ -77,6 +79,7 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         ingredient.category = category
         
     ingredient.description = request.POST.get('description', ingredient.description)
+    ingredient.ai_notes = request.POST.get('ai_notes', ingredient.ai_notes)
     
     systems = request.POST.getlist('compatible_systems')
     if systems:

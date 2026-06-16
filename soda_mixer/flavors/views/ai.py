@@ -476,14 +476,10 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'error': 'Staff authentication required.'}, status=403)
         
     try:
-        targets = Ingredient.objects.filter(
-            Q(intensity=3, sweetness=3, acidity=3, bitterness=1, complexity=3) |
-            Q(base_suitability=3.0, accent_suitability=3.0),
-            is_in_inventory=True
-        )
+        targets = Ingredient.objects.filter(is_in_inventory=True)
         
         if not targets.exists():
-            return JsonResponse({'status': 'complete', 'message': 'All inventory reagents are already synthesized.'})
+            return JsonResponse({'status': 'complete', 'message': 'No inventory reagents found to synthesize.'})
             
         target_list = list(targets)
         batch_size = 15
@@ -510,6 +506,7 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         match.complexity = max(1, min(5, round(res.get('complexity', match.complexity))))
                         match.base_suitability = max(1.0, min(5.0, round(res.get('base_suitability', match.base_suitability), 1)))
                         match.accent_suitability = max(1.0, min(5.0, round(res.get('accent_suitability', match.accent_suitability), 1)))
+                        match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
                         total_analyzed += 1
                         

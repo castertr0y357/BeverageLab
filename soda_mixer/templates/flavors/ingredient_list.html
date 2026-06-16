@@ -36,7 +36,7 @@
             <i class="bi bi-plus-lg me-1"></i> ADD MATERIAL
         </button>
         <button class="btn btn-sm btn-outline-experimental border-white border-opacity-10 text-white" 
-            id="btnBulkAnalyze" title="Analyze all uninitialized inventory reagents">
+            id="btnBulkAnalyze" title="Analyze all inventory reagents">
             <i class="bi bi-cpu me-1"></i> BULK ANALYSIS
         </button>
         <button class="btn btn-sm btn-outline-warning border-white border-opacity-10 text-white" data-bs-toggle="modal"
@@ -148,7 +148,8 @@
                         data-base-suitability="{{ ingredient.base_suitability }}"
                         data-accent-suitability="{{ ingredient.accent_suitability }}"
                         data-systems="{{ ingredient.compatible_systems }}"
-                        data-description="{{ ingredient.description }}">
+                        data-description="{{ ingredient.description }}"
+                        data-ai-notes="{{ ingredient.ai_notes|default_if_none:'' }}">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <form action="{% url 'delete_ingredient' ingredient.id %}" method="post" class="m-0"
@@ -284,6 +285,11 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
+                    <textarea name="ai_notes" id="addAINotes" rows="2"
+                        class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">Description (Optional)</label>
                     <textarea name="description" id="addDesc" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -401,6 +407,11 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
+                    <textarea name="ai_notes" id="editAINotes" rows="2"
+                        class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">Description (Optional)</label>
                     <textarea name="description" id="editDesc" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -503,6 +514,7 @@
                 document.getElementById('editBaseSuit').value = d.baseSuitability;
                 document.getElementById('editAccentSuit').value = d.accentSuitability;
                 document.getElementById('editDesc').value = d.description;
+                document.getElementById('editAINotes').value = d.aiNotes || '';
                 
                 // Set system checkboxes
                 const systems = d.systems ? d.systems.split(',') : [];
@@ -653,6 +665,14 @@
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
                     }
                 }
+
+                const aiNotesEl = document.getElementById(prefix + 'AINotes');
+                if (aiNotesEl && profile.ai_notes) {
+                    aiNotesEl.value = profile.ai_notes;
+                    aiNotesEl.classList.add('is-valid');
+                    setTimeout(() => aiNotesEl.classList.remove('is-valid'), 2000);
+                }
+
                 btn.innerHTML = '<i class="bi bi-check-lg"></i> Synced';
                 btn.classList.replace('btn-outline-experimental', 'btn-success');
             } else {
@@ -674,7 +694,7 @@
     const btnBulkAnalyze = document.getElementById('btnBulkAnalyze');
     if (btnBulkAnalyze) {
         btnBulkAnalyze.addEventListener('click', async function() {
-            if (!confirm("Initiate Bulk Chemical Synthesis? This will analyze all reagents in your inventory that are currently at default values. This may take 10-30 seconds.")) return;
+            if (!confirm("Initiate Bulk Chemical Synthesis? This will analyze all reagents in your inventory to capture any updates. This may take 10-30 seconds.")) return;
             
             const originalHtml = btnBulkAnalyze.innerHTML;
             btnBulkAnalyze.disabled = true;

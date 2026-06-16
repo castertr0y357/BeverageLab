@@ -202,10 +202,12 @@ class BeverageLabViewsTest(TestCase):
             'sweetness': 3,
             'acidity': 2,
             'bitterness': 1,
-            'complexity': 3
+            'complexity': 3,
+            'ai_notes': 'Spicy carbonated beverage'
         })
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(Ingredient.objects.filter(name="Ginger Beer").exists())
+        ginger_beer = Ingredient.objects.get(name="Ginger Beer")
+        self.assertEqual(ginger_beer.ai_notes, 'Spicy carbonated beverage')
 
     def test_edit_ingredient_unauthorized(self) -> None:
         # Non-staff cannot edit
@@ -225,11 +227,13 @@ class BeverageLabViewsTest(TestCase):
             'sweetness': 1,
             'acidity': 1,
             'bitterness': 1,
-            'complexity': 1
+            'complexity': 1,
+            'ai_notes': 'Crisp and bubbly'
         })
         self.assertEqual(response.status_code, 302)
         self.ing.refresh_from_db()
         self.assertEqual(self.ing.name, "Sparkling Water")
+        self.assertEqual(self.ing.ai_notes, "Crisp and bubbly")
 
     def test_delete_ingredient_authorized(self) -> None:
         self.client.login(username="director", password="secure_password_123")
@@ -336,7 +340,7 @@ class BeverageLabViewsTest(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 1, "sweetness": 1, "acidity": 1, "bitterness": 1, "complexity": 1, "base_suitability": 1.0, "accent_suitability": 3.5}]'}}]
+            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 1, "sweetness": 1, "acidity": 1, "bitterness": 1, "complexity": 1, "base_suitability": 1.0, "accent_suitability": 3.5, "ai_notes": "Sparkling water notes"}]'}}]
         }
         mock_request.return_value = mock_response
 
@@ -346,6 +350,7 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(self.ing.intensity, 1)
         self.assertEqual(self.ing.base_suitability, 1.0)
         self.assertEqual(self.ing.accent_suitability, 3.5)
+        self.assertEqual(self.ing.ai_notes, "Sparkling water notes")
 
     @patch('requests.request')
     def test_ai_bulk_analyze_captures_uninitialized_suitability(self, mock_request: MagicMock) -> None:
@@ -375,7 +380,7 @@ class BeverageLabViewsTest(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 4, "sweetness": 4, "acidity": 2, "bitterness": 2, "complexity": 4, "base_suitability": 1.5, "accent_suitability": 4.2}]'}}]
+            "choices": [{"message": {"content": '[{"name": "Club Soda", "intensity": 4, "sweetness": 4, "acidity": 2, "bitterness": 2, "complexity": 4, "base_suitability": 1.5, "accent_suitability": 4.2, "ai_notes": "Custom base suitability notes"}]'}}]
         }
         mock_request.return_value = mock_response
 
@@ -384,6 +389,7 @@ class BeverageLabViewsTest(TestCase):
         self.ing.refresh_from_db()
         self.assertEqual(self.ing.base_suitability, 1.5)
         self.assertEqual(self.ing.accent_suitability, 4.2)
+        self.assertEqual(self.ing.ai_notes, "Custom base suitability notes")
 
 
 class BeverageLabAIAssistantTest(TestCase):

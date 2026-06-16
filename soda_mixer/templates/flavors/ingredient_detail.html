@@ -102,6 +102,15 @@
                     <p class="text-white">{{ ingredient.flavor_notes }}</p>
                 </div>
                 {% endif %}
+                
+                {% if ingredient.ai_notes %}
+                <div class="col-12">
+                    <label class="readout-label mb-2">AI MIXOLOGY NOTES</label>
+                    <div class="p-3 rounded bg-dark bg-opacity-25 border border-lab text-white" style="line-height: 1.6; border-left-width: 4px;">
+                        {{ ingredient.ai_notes }}
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -115,6 +115,11 @@ class Ingredient(models.Model):
         help_text="Whether this ingredient is currently in your bar/lab"
     )
     description = models.TextField(blank=True, null=True)
+    ai_notes = models.TextField(
+        blank=True,
+        null=True,
+        help_text="AI-generated notes about the flavor profile and pairings"
+    )
     flavor_notes = models.CharField(
         max_length=200,
         blank=True,

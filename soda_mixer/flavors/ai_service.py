@@ -59,7 +59,8 @@ class AIAssistant:
     "bitterness": float,
     "complexity": float,
     "base_suitability": float,
-    "accent_suitability": float
+    "accent_suitability": float,
+    "ai_notes": string
 }"""
 
     @classmethod
@@ -125,7 +126,8 @@ class AIAssistant:
                     "bitterness": 1.0,
                     "complexity": 3.0,
                     "base_suitability": 3.0,
-                    "accent_suitability": 3.0
+                    "accent_suitability": 3.0,
+                    "ai_notes": "Mock notes for batch analysis."
                 })
             if not results:
                 results.append({
@@ -136,7 +138,8 @@ class AIAssistant:
                     "bitterness": 1.0,
                     "complexity": 3.0,
                     "base_suitability": 3.0,
-                    "accent_suitability": 3.0
+                    "accent_suitability": 3.0,
+                    "ai_notes": "Mock notes for default ingredient."
                 })
             return json.dumps(results)
         elif "Analyze this ingredient" in user_prompt:
@@ -147,7 +150,8 @@ class AIAssistant:
                 "bitterness": 1.0,
                 "complexity": 3.0,
                 "base_suitability": 3.0,
-                "accent_suitability": 3.0
+                "accent_suitability": 3.0,
+                "ai_notes": "Mock notes for single analysis."
             })
         else:
             return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
@@ -433,6 +437,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - complexity
         - base_suitability (how well it serves as a dominant, high-volume base ingredient)
         - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
+        - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
 
         OUTPUT FORMAT: A raw JSON object. [NO MARKDOWN] [NO PREAMBLE].
         Example: {cls.FLAVOR_PROFILE_FORMAT}
@@ -464,9 +469,10 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - complexity
         - base_suitability (how well it serves as a dominant, high-volume base ingredient)
         - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
+        - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
         
         OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0 }}]
+        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
         """
         response = cls.chat(prompt)
         return cls._extract_json(response)

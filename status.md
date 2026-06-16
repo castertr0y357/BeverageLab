@@ -4,6 +4,12 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Modified bulk analysis target selection query to select all active inventory ingredients (instead of skipping already initialized ones) to ensure that any updates or changes are captured during synthesis. Updated confirmation alert and button tooltips to reflect this new behavior.
+- [x] Added `ai_notes` TextField to the `Ingredient` model to store AI-generated sensory notes, flavor profiles, and pairing recommendations. Exposed the field in the Django Admin search fields.
+- [x] Updated single-ingredient and batch analysis prompts in the AI service to ask the model to generate the `ai_notes` field, and updated mock responses to return realistic mock notes.
+- [x] Updated add and edit ingredient views and forms (Modals in `ingredient_list.html`) to capture and save manual updates to the `ai_notes` field.
+- [x] Rendered `ai_notes` dynamically in a stylized "AI MIXOLOGY NOTES" sensory section on the ingredient detail page and populated it in the Edit Modal.
+- [x] Updated the test suite with new assertions to verify single-ingredient addition, editing, and bulk analysis logic for the `ai_notes` field.
 - [x] Implemented brand tracking for flavor ingredients: added a nullable `brand` CharField to `Ingredient` and replaced `name` unique constraint with a `unique_together = ['name', 'brand']` constraint. Updated AI profiling APIs to prefix name with brand for accurate results, added dynamic formatting logic to display the brand on the synthesis page only when duplicate flavor names exist in active inventory. Updated ingredients listing page to display the flavor name cleanly and display a small, elegant brand badge next to it only when duplicate names exist in the registry. Updated ingredient detail pages and modals to support brand tracking.
 - [x] Fixed ingredient analysis not adjusting base and accent suitability scores: explicitly defined suitability metrics in the single-ingredient analysis LLM prompt and updated the bulk analysis target selection query to capture ingredients with default suitability scores (3.0/3.0) even if other stats are customized.
 - [x] Fixed base and accent scores visibility in the UI by displaying them textually on all ingredient cards (Step 1 grid, recommendations, recipe creation) and detail screens (ingredients, formulas/recipes). Implemented dynamic recommended and unorthodox base/accent partitioning on the Formula Synthesis creation page (`create_recipe.html`).

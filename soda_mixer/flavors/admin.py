@@ -6,7 +6,7 @@ from .models import Ingredient, Recipe, RecipeIngredient, MixHistory, MixHistory
 class IngredientAdmin(admin.ModelAdmin):
     list_display = ['name', 'ingredient_type', 'category', 'intensity', 'is_in_inventory']
     list_filter = ['ingredient_type', 'category', 'intensity', 'is_in_inventory']
-    search_fields = ['name', 'description', 'flavor_notes', 'origin', 'roaster']
+    search_fields = ['name', 'description', 'ai_notes', 'flavor_notes', 'origin', 'roaster']
     ordering = ['name']
 
 
