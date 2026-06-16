@@ -608,5 +608,82 @@ class BeverageLabSettingsTest(TestCase):
         self.assertFalse(middleware._origin_verified(request_attacker))
 
 
+class BeverageLabBrandTrackingTest(TestCase):
+    """Test case for ingredient brand tracking features."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.staff_user = User.objects.create_user(username="director", password="secure_password_123", is_staff=True)
+
+    def test_unique_together_constraint(self) -> None:
+        # Create ingredient with brand Monin
+        Ingredient.objects.create(name="Vanilla Syrup", brand="Monin", category="sweet")
+        
+        # We should be able to create another with brand Torani
+        ing_torani = Ingredient.objects.create(name="Vanilla Syrup", brand="Torani", category="sweet")
+        self.assertEqual(ing_torani.brand, "Torani")
+
+        # But trying to create a duplicate (name, brand) should raise IntegrityError
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            Ingredient.objects.create(name="Vanilla Syrup", brand="Monin", category="sweet")
+
+    def test_get_display_name_helper(self) -> None:
+        from .views.ai import get_display_name, get_multibrand_names_in_inventory
+        
+        ing_monin = Ingredient.objects.create(name="Vanilla Syrup", brand="Monin", category="sweet", is_in_inventory=True)
+        
+        # When only one brand is available, it should NOT show the brand on the synthesis page
+        multibrand = get_multibrand_names_in_inventory()
+        self.assertNotIn("vanilla syrup", multibrand)
+        self.assertEqual(get_display_name(ing_monin, multibrand), "Vanilla Syrup")
+
+        # Add another brand
+        ing_torani = Ingredient.objects.create(name="Vanilla Syrup", brand="Torani", category="sweet", is_in_inventory=True)
+        
+        # Now multiple brands are available, so it SHOULD show the brand
+        multibrand = get_multibrand_names_in_inventory()
+        self.assertIn("vanilla syrup", multibrand)
+        self.assertEqual(get_display_name(ing_monin, multibrand), "Vanilla Syrup (Monin)")
+        self.assertEqual(get_display_name(ing_torani, multibrand), "Vanilla Syrup (Torani)")
+
+    def test_add_ingredient_with_brand(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        response = self.client.post(reverse('add_ingredient'), {
+            'name': 'Lavender Syrup',
+            'brand': 'Monin',
+            'ingredient_type': 'SODA_SYRUP',
+            'category': 'floral',
+            'intensity': 3,
+            'sweetness': 3,
+            'acidity': 1,
+            'bitterness': 1,
+            'complexity': 2
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        ing = Ingredient.objects.get(name="Lavender Syrup")
+        self.assertEqual(ing.brand, "Monin")
+
+    def test_edit_ingredient_with_brand(self) -> None:
+        ing = Ingredient.objects.create(name="Peach Syrup", brand="Torani", category="fruit")
+        self.client.login(username="director", password="secure_password_123")
+        response = self.client.post(reverse('edit_ingredient', args=[ing.id]), {
+            'name': 'Peach Syrup',
+            'brand': 'Monin',
+            'intensity': 3,
+            'sweetness': 3,
+            'acidity': 2,
+            'bitterness': 1,
+            'complexity': 2
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        ing.refresh_from_db()
+        self.assertEqual(ing.brand, "Monin")
+
+
+
 
 

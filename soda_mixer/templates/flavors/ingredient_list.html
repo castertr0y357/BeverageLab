@@ -75,7 +75,7 @@
             <div class="d-flex justify-content-between align-items-start mb-3">
                 <h4 class="mb-0">
                     <a href="{% url 'ingredient_detail' ingredient.id %}"
-                        class="text-decoration-none text-white hover-lime fw-bold">{{ ingredient.name }}</a>
+                        class="text-decoration-none text-white hover-lime fw-bold">{% if ingredient.brand %}{{ ingredient.brand }} {% endif %}{{ ingredient.name }}</a>
                 </h4>
                 <div class="d-flex flex-column align-items-end gap-1">
                     <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
@@ -137,6 +137,7 @@
                     <button type="button"
                         class="btn btn-sm btn-outline-warning border-white border-opacity-10 btn-edit-material"
                         title="Edit Material" data-id="{{ ingredient.id }}" data-name="{{ ingredient.name }}"
+                        data-brand="{{ ingredient.brand|default:'' }}"
                         data-type="{{ ingredient.ingredient_type }}" data-category="{{ ingredient.category }}"
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
                         data-acidity="{{ ingredient.acidity }}" data-bitterness="{{ ingredient.bitterness }}"
@@ -197,6 +198,10 @@
                             <i class="bi bi-magic"></i> <span class="d-none d-sm-inline">Synthesize</span>
                         </button>
                     </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-white fw-bold small">Brand</label>
+                    <input type="text" name="brand" id="addBrand" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Monin, Torani, Homemade">
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -307,6 +312,10 @@
                             <i class="bi bi-magic"></i> <span class="d-none d-sm-inline">Re-Synthesize</span>
                         </button>
                     </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-white fw-bold small">Brand</label>
+                    <input type="text" name="brand" id="editBrand" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Monin, Torani, Homemade">
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -480,6 +489,7 @@
                 const d = this.dataset;
                 document.getElementById('editIngredientForm').action = `/ingredients/${d.id}/edit/`;
                 document.getElementById('editName').value = d.name;
+                document.getElementById('editBrand').value = d.brand || '';
                 document.getElementById('editType').value = d.type;
                 document.getElementById('editCategory').value = d.category;
                 document.getElementById('editInt').value = d.intensity;
@@ -590,8 +600,10 @@
 
     async function synthesizeProfile(prefix, btn) {
         const nameInput = document.getElementById(prefix + 'Name');
+        const brandInput = document.getElementById(prefix + 'Brand');
         const descInput = document.getElementById(prefix + 'Desc') || { value: '' };
         const name = nameInput.value.trim();
+        const brand = brandInput ? brandInput.value.trim() : '';
         const description = descInput.value.trim();
 
         if (!name) {
@@ -610,7 +622,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
-                body: JSON.stringify({ name, description })
+                body: JSON.stringify({ name, brand, description })
             });
             const data = await response.json();
             

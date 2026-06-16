@@ -21,6 +21,23 @@ from ..ai_service import AIAssistant
 logger = logging.getLogger(__name__)
 
 
+def get_display_name(ing: Ingredient, multibrand_names: Set[str]) -> str:
+    """Return name with brand if there are multiple brands of this flavor in inventory."""
+    if ing.brand and ing.name.lower() in multibrand_names:
+        return f"{ing.name} ({ing.brand})"
+    return ing.name
+
+
+def get_multibrand_names_in_inventory() -> Set[str]:
+    """Get lowercase names of ingredients that have multiple brands in active inventory."""
+    from django.db.models import Count
+    qs = Ingredient.objects.filter(is_in_inventory=True).values('name').annotate(
+        brand_count=Count('brand', distinct=True)
+    ).filter(brand_count__gt=1)
+    return {item['name'].lower() for item in qs}
+
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def get_recommendations_api(request: HttpRequest) -> JsonResponse:
@@ -33,13 +50,14 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
         drink_type = data.get('drink_type', 'SODA')
 
         serialized_recs: List[Dict[str, Any]] = []
+        multibrand_names = get_multibrand_names_in_inventory()
 
         if len(ingredient_ids) == 0:
             result = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
-                    'name': r['ingredient'].name,
+                    'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
@@ -58,7 +76,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
-                    'name': r['ingredient'].name,
+                    'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
@@ -77,7 +95,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
-                    'name': r['ingredient'].name,
+                    'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
@@ -150,7 +168,8 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
         registry: List[str] = []
         for ing in all_ingredients:
-            registry.append(f"{ing.name} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)")
+            ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+            registry.append(f"{ing_display} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         prompt = user_message + lab_context
@@ -288,7 +307,10 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
             
         # Get full inventory registry for AI context
         all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-        registry = [f"{ing.name} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)" for ing in all_ingredients]
+        registry = []
+        for ing in all_ingredients:
+            ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+            registry.append(f"{ing_display} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         raw_suggestion = ""
@@ -332,14 +354,16 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                     target_obj = None
                     # Tier 1: Exact Match
                     for inv in inventory_items:
-                        if inv.name.lower() == ing_name:
+                        inv_full = f"{inv.brand} {inv.name}" if inv.brand else inv.name
+                        if inv_full.lower() == ing_name or inv.name.lower() == ing_name:
                             target_obj = inv
                             break
                     
                     # Tier 2: Partial Match
                     if not target_obj:
                         for inv in inventory_items:
-                            if ing_name in inv.name.lower() or inv.name.lower() in ing_name:
+                            inv_full = f"{inv.brand} {inv.name}" if inv.brand else inv.name
+                            if ing_name in inv_full.lower() or inv_full.lower() in ing_name or ing_name in inv.name.lower() or inv.name.lower() in ing_name:
                                 target_obj = inv
                                 break
                                 
@@ -356,9 +380,10 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                         
                         resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
                         
+                        multibrand_names = get_multibrand_names_in_inventory()
                         enriched.append({
                             'id': target_obj.id,
-                            'name': target_obj.name,
+                            'name': get_display_name(target_obj, multibrand_names),
                             'category': target_obj.category,
                             'intensity': target_obj.intensity,
                             'sweetness': target_obj.sweetness,
@@ -423,12 +448,14 @@ def ai_analyze_ingredient_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         name = data.get('name')
+        brand = data.get('brand', '')
         description = data.get('description', '')
         
         if not name:
             return JsonResponse({'error': 'Ingredient name required for analysis.'}, status=400)
             
-        profile = AIAssistant.analyze_flavor_profile(name, description)
+        full_name = f"{brand} {name}" if brand else name
+        profile = AIAssistant.analyze_flavor_profile(full_name, description)
         if profile:
             logger.info(f"AIIngredientAnalysis - Info - Analyzed profile for reagent '{name}'")
             return JsonResponse({'status': 'success', 'profile': profile})
@@ -464,7 +491,7 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
         
         for i in range(0, len(target_list), batch_size):
             batch = target_list[i : i + batch_size]
-            batch_data = [{'name': t.name, 'description': t.description or ''} for t in batch]
+            batch_data = [{'name': f"{t.brand} {t.name}" if t.brand else t.name, 'description': t.description or ''} for t in batch]
             
             results = AIAssistant.bulk_analyze_flavor_profiles(batch_data)
             
@@ -535,6 +562,8 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                     name = item.get('name', '').lower()
                     match = next((i for i in all_compatible if i.name.lower() == name), None)
                     if not match:
+                        match = next((i for i in all_compatible if f"{i.brand} {i.name}".lower() == name), None)
+                    if not match:
                         match = next((i for i in all_compatible if name in i.name.lower() or i.name.lower() in name), None)
                     
                     if match and match not in [s['obj'] for s in selection]:
@@ -590,12 +619,13 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 else:
                     item['amount'] = random.choice([100.0, 75.0, 50.0, 25.0, 10.0]) if drink_type != 'COFFEE' else random.choice([18.0, 10.0, 5.0, 2.0])
             
+        multibrand_names = get_multibrand_names_in_inventory()
         result = []
         for item in selection:
             ing = item['obj']
             result.append({
                 'id': ing.id,
-                'name': ing.name,
+                'name': get_display_name(ing, multibrand_names),
                 'category': ing.category,
                 'intensity': ing.intensity,
                 'sweetness': ing.sweetness,

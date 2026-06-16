@@ -82,7 +82,7 @@ def import_data(request: HttpRequest) -> JsonResponse:
         for i_data in serializers.deserialize('json', raw_data['ingredients']):
             i = i_data.object
             old_id = i.id
-            existing = Ingredient.objects.filter(name=i.name).first()
+            existing = Ingredient.objects.filter(name=i.name, brand=getattr(i, 'brand', '')).first()
             if existing:
                 ingredient_map[old_id] = existing
             else:

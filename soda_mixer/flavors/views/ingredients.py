@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def add_ingredient(request: HttpRequest) -> HttpResponse:
     """Add a new ingredient from the frontend modal."""
     name = request.POST.get('name', '').strip()
+    brand = request.POST.get('brand', '').strip()
     ingredient_type = request.POST.get('ingredient_type', 'SODA_SYRUP')
     category = request.POST.get('category', 'citrus').strip().lower()
     description = request.POST.get('description', '')
@@ -38,6 +39,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
         try:
             Ingredient.objects.create(
                 name=name,
+                brand=brand,
                 ingredient_type=ingredient_type,
                 category=category,
                 description=description,
@@ -51,10 +53,10 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 compatible_systems=compatible_systems,
                 is_in_inventory=True
             )
-            logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name}")
+            logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name} ({brand})")
         except IntegrityError:
-            logger.warning(f"IngredientRegistry - Warning - Registry Conflict: Reagent '{name}' is already indexed.")
-            messages.error(request, f"Registry Conflict: The reagent '{name}' is already indexed in the Laboratory repository.")
+            logger.warning(f"IngredientRegistry - Warning - Registry Conflict: Reagent '{name}' with brand '{brand}' is already indexed.")
+            messages.error(request, f"Registry Conflict: The reagent '{name}' with brand '{brand}' is already indexed in the Laboratory repository.")
     return redirect('ingredient_list')
 
 
@@ -67,6 +69,7 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         
     ingredient = get_object_or_404(Ingredient, pk=pk)
     ingredient.name = request.POST.get('name', ingredient.name).strip()
+    ingredient.brand = request.POST.get('brand', ingredient.brand).strip()
     ingredient.ingredient_type = request.POST.get('ingredient_type', ingredient.ingredient_type)
     
     category = request.POST.get('category', '').strip().lower()
@@ -92,10 +95,10 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         
     try:
         ingredient.save()
-        logger.info(f"IngredientRegistry - Info - Successfully updated ingredient: {ingredient.name}")
+        logger.info(f"IngredientRegistry - Info - Successfully updated ingredient: {ingredient.name} ({ingredient.brand})")
     except IntegrityError:
-        logger.warning(f"IngredientRegistry - Warning - Registry Conflict: Name '{ingredient.name}' already assigned.")
-        messages.error(request, f"Registry Conflict: The name '{ingredient.name}' is already assigned to another reagent.")
+        logger.warning(f"IngredientRegistry - Warning - Registry Conflict: Name '{ingredient.name}' with brand '{ingredient.brand}' already assigned.")
+        messages.error(request, f"Registry Conflict: The name '{ingredient.name}' with brand '{ingredient.brand}' is already assigned to another reagent.")
         return redirect('ingredient_list')
         
     return redirect('ingredient_list')

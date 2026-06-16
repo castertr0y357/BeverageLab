@@ -14,7 +14,12 @@
     <div class="col-lg-6">
         <div class="glass-surface p-4 mb-4 border-lab h-100">
             <div class="d-flex justify-content-between align-items-start mb-4">
-                <h2 class="display-5 fw-bold mb-0 text-white">{{ ingredient.name }}</h2>
+                <div>
+                    <h2 class="display-5 fw-bold mb-0 text-white">{% if ingredient.brand %}{{ ingredient.brand }} {% endif %}{{ ingredient.name }}</h2>
+                    {% if ingredient.brand %}
+                    <span class="text-dim small">Brand: {{ ingredient.brand }}</span>
+                    {% endif %}
+                </div>
                 <div class="d-flex flex-column align-items-end gap-1">
                     <span class="badge-fizz bg-{{ ingredient.category }} fs-5 px-3 py-2">{{ ingredient.category }}</span>
                     <span class="badge border border-white border-opacity-10 text-dim" style="font-size: 0.6rem;">{{ ingredient.get_ingredient_type_display }}</span>

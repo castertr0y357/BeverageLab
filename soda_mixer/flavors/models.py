@@ -47,7 +47,13 @@ class Ingredient(models.Model):
         ('coffee', 'Coffee Profile'),
     ]
 
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    brand = models.CharField(
+        max_length=100,
+        default="",
+        blank=True,
+        help_text="The manufacturer or brand of the syrup/reagent (e.g. Monin, Torani, Homemade)"
+    )
     ingredient_type = models.CharField(max_length=20, choices=INGREDIENT_TYPE_CHOICES, default='SODA_SYRUP')
     category = models.CharField(max_length=50, default='citrus')
     
@@ -129,6 +135,7 @@ class Ingredient(models.Model):
 
     class Meta:
         verbose_name_plural = "Ingredients"
+        unique_together = ['name', 'brand']
 
 
 class Recipe(models.Model):

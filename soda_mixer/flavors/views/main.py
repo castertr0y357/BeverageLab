@@ -15,10 +15,19 @@ from ..recommendations import calculate_recipe_stats
 
 logger = logging.getLogger(__name__)
 
-
 def home(request: HttpRequest) -> HttpResponse:
     """Home page with ingredient mixer and Hall of Fame stats."""
-    ingredients = Ingredient.objects.filter(is_in_inventory=True)
+    ingredients = list(Ingredient.objects.filter(is_in_inventory=True))
+
+    # Calculate multibrand names in active inventory
+    from django.db.models import Count
+    multibrand_qs = Ingredient.objects.filter(is_in_inventory=True).values('name').annotate(
+        brand_count=Count('brand', distinct=True)
+    ).filter(brand_count__gt=1)
+    multibrand_names = {item['name'].lower() for item in multibrand_qs}
+
+    for ing in ingredients:
+        ing.show_brand = ing.name.lower() in multibrand_names
 
     # Hall of Fame stats by theme
     stats_by_theme: Dict[str, Dict[str, Any]] = {}
