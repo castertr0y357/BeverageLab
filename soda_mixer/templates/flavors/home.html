@@ -79,6 +79,13 @@
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
                                 </div>
                             </div>
+                            <div class="d-flex align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10" id="scaleContainerCoffee" style="display: none;">
+                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">SHOT SCALE</span>
+                                <div class="btn-group btn-group-xs pb-1">
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale2Shot" onclick="setCoffeeScale(1.0)">2-shot</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale1Shot" onclick="setCoffeeScale(0.5)">1-shot</button>
+                                </div>
+                            </div>
                             <button type="button" class="btn btn-xs btn-outline-info opacity-75 hover-opacity-100" onclick="stepBack()">
                                 <i class="bi bi-arrow-left"></i> STEP BACK
                             </button>
@@ -238,6 +245,13 @@
         bottleScale = parseFloat(scale);
         document.getElementById('scale1L').classList.toggle('active-lab-mode', bottleScale === 1.0);
         document.getElementById('scale05L').classList.toggle('active-lab-mode', bottleScale === 0.5);
+        updateSelectedArea();
+    }
+
+    function setCoffeeScale(scale) {
+        bottleScale = parseFloat(scale);
+        document.getElementById('scale2Shot').classList.toggle('active-lab-mode', bottleScale === 1.0);
+        document.getElementById('scale1Shot').classList.toggle('active-lab-mode', bottleScale === 0.5);
         updateSelectedArea();
     }
 
@@ -668,6 +682,19 @@
     function resetMixer() {
         selectedIngredients = [];
         isCreamerTransition = false;
+        bottleScale = 1.0;
+        
+        // Reset scale UI states
+        const scale1L = document.getElementById('scale1L');
+        const scale05L = document.getElementById('scale05L');
+        if (scale1L) scale1L.classList.add('active-lab-mode');
+        if (scale05L) scale05L.classList.remove('active-lab-mode');
+        
+        const scale2Shot = document.getElementById('scale2Shot');
+        const scale1Shot = document.getElementById('scale1Shot');
+        if (scale2Shot) scale2Shot.classList.add('active-lab-mode');
+        if (scale1Shot) scale1Shot.classList.remove('active-lab-mode');
+        
         document.getElementById('stepContainer').style.display = 'block';
         document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
         document.getElementById('synthesisReportContainer').style.display = 'none';
@@ -943,10 +970,16 @@
         selectedArea.style.display = 'block';
         document.getElementById('analyzeBtn').style.display = selectedIngredients.length >= 2 ? 'inline-block' : 'none';
         const scaleContainer = document.getElementById('scaleContainer');
+        const scaleContainerCoffee = document.getElementById('scaleContainerCoffee');
         if (currentLabMode === 'SODA' || currentLabMode === 'SLUSHIE') {
             scaleContainer.style.display = 'flex';
+            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'none';
+        } else if (currentLabMode === 'COFFEE') {
+            scaleContainer.style.display = 'none';
+            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'flex';
         } else {
             scaleContainer.style.display = 'none';
+            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'none';
         }
         
         let html = '<div class="row g-2 mb-3">';
@@ -997,7 +1030,7 @@
                 amount = amount * expansionFactor;
             }
             
-            const displayVolume = currentLabMode === 'COFFEE' ? amount : (amount * (bottleScale || 1.0)).toFixed(0);
+            const displayVolume = currentLabMode === 'COFFEE' ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0);
             
             if (currentLabMode === 'SLUSHIE' || currentLabMode === 'SODA') {
                 totalSyrup += parseFloat(amount);
@@ -1135,8 +1168,8 @@
                     const baseVolume = currentLabMode === 'COFFEE' 
                         ? (idx === 0 ? 18.0 : (idx === 1 ? 5.0 : 2.0))
                         : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
-                    amount = currentLabMode === 'COFFEE' ? baseVolume : baseVolume * bottleScale;
-                } else if (currentLabMode !== 'COFFEE') {
+                    amount = baseVolume * bottleScale;
+                } else {
                     amount = amount * bottleScale;
                 }
                 
@@ -1165,8 +1198,8 @@
                 const baseVolume = currentLabMode === 'COFFEE' 
                     ? (idx === 0 ? 18.0 : (idx === 1 ? 5.0 : 2.0))
                     : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
-                amount = currentLabMode === 'COFFEE' ? baseVolume : baseVolume * bottleScale;
-            } else if (currentLabMode !== 'COFFEE') {
+                amount = baseVolume * bottleScale;
+            } else {
                 amount = amount * bottleScale;
             }
             
@@ -1181,7 +1214,9 @@
             const notesInput = document.createElement('input');
             notesInput.type = 'hidden';
             notesInput.name = `notes_${ing.id}`;
-            notesInput.value = `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale}L Scale`;
+            notesInput.value = currentLabMode === 'COFFEE'
+                ? `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale === 1.0 ? '2-shot' : '1-shot'} Scale`
+                : `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale}L Scale`;
             notesInput.className = 'dynamic-mix-input';
             mixerForm.appendChild(notesInput);
         });

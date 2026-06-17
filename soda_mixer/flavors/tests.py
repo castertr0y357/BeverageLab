@@ -723,7 +723,51 @@ class BeverageLabBrandTrackingTest(TestCase):
         self.assertTrue(ingredients[dupe_ing2.id].show_brand)
 
 
+class BeverageLabCoffeeScalingTest(TestCase):
+    """Test case for Coffee Lab shot scaling logic."""
 
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.bean = Ingredient.objects.create(
+            name="Espresso Bean",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            intensity=4,
+            sweetness=2,
+            acidity=3,
+            bitterness=4,
+            complexity=4
+        )
 
+    def test_save_coffee_mix_history_scaled(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        # 1-shot scale (0.5x of 18g = 9g)
+        response = self.client.post(
+            reverse('save_mix_to_history_api'),
+            data=json.dumps({
+                'drink_type': 'COFFEE',
+                'ingredients': [{'id': self.bean.id, 'amount': 9.0}]
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        mix_id = response.json()['mix_id']
+        mix = MixHistory.objects.get(id=mix_id)
+        self.assertEqual(mix.drink_type, 'COFFEE')
+        self.assertEqual(mix.mix_ingredients.first().amount, 9.0)
 
-
+    def test_create_coffee_recipe_scaled(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        response = self.client.post(reverse('create_recipe'), {
+            'name': 'Espresso Double Shot',
+            'drink_type': 'COFFEE',
+            f'amount_{self.bean.id}': 18.0,
+            f'notes_{self.bean.id}': '2-shot scale'
+        })
+        self.assertEqual(response.status_code, 302)
+        recipe = Recipe.objects.get(name='Espresso Double Shot')
+        self.assertEqual(recipe.drink_type, 'COFFEE')
+        ri = recipe.recipe_ingredients.first()
+        self.assertEqual(ri.ingredient, self.bean)
+        self.assertEqual(ri.amount, 18.0)

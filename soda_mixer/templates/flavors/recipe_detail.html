@@ -85,6 +85,14 @@
                         <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
                     </div>
                 </div>
+                {% elif recipe.drink_type == 'COFFEE' %}
+                <div class="d-flex align-items-center gap-2 print-hide">
+                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">SHOT SCALE</span>
+                    <div class="btn-group btn-group-xs">
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale2Shot" onclick="setCoffeeScale(1.0)">2-shot</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale1Shot" onclick="setCoffeeScale(0.5)">1-shot</button>
+                    </div>
+                </div>
                 {% endif %}
             </div>
                 
@@ -258,6 +266,17 @@
         const scale05L = document.getElementById('scale05L');
         if (scale1L) scale1L.classList.toggle('active-lab-mode', currentScale === 1.0);
         if (scale05L) scale05L.classList.toggle('active-lab-mode', currentScale === 0.5);
+        
+        updateAmounts();
+    }
+
+    function setCoffeeScale(scale) {
+        currentScale = parseFloat(scale);
+        
+        const scale2Shot = document.getElementById('scale2Shot');
+        const scale1Shot = document.getElementById('scale1Shot');
+        if (scale2Shot) scale2Shot.classList.toggle('active-lab-mode', currentScale === 1.0);
+        if (scale1Shot) scale1Shot.classList.toggle('active-lab-mode', currentScale === 0.5);
         
         updateAmounts();
     }
