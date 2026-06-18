@@ -24,7 +24,7 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
         name = request.POST.get('name', '').strip()
         description = request.POST.get('description', '').strip()
         category_ids = request.POST.getlist('categories')
-        drink_type = request.POST.get('drink_type', 'SODA')
+        drink_type = request.POST.get('drink_type', 'SODA').upper()
 
         ingredient_ids: List[str] = []
         for key, value in request.POST.items():
@@ -172,7 +172,7 @@ def add_recipe_api(request: HttpRequest) -> JsonResponse:
         name = data.get('name', '').strip()
         description = data.get('description', '')
         ingredients = data.get('ingredients', [])
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
 
         if not name:
             logger.warning("RecipeCreationAPI - Warning - Name field is empty during API recipe creation.")
@@ -264,7 +264,7 @@ def save_mix_to_history_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         ingredients = data.get('ingredients', [])  # [{id, amount}, ...]
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
 
         if not ingredients:
             logger.warning("HistoryMixSave - Warning - No ingredients provided for mixing history.")

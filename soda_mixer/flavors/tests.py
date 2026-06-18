@@ -867,3 +867,40 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         # Verify rebalancing amount is coerced to 18.0 (Espresso Beans is COFFEE_BEAN)
         self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 18.0)
 
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
+    def test_ai_suggest_api_coffee_rebalancing_unmatched_key_dropped(self, mock_suggest: MagicMock) -> None:
+        """Unrecognized rebalancing keys must be dropped to prevent raw AI values leaking."""
+        mock_suggest.return_value = {
+            "suggestions": [
+                {
+                    "name": "Whole Milk (Local Dairy)",
+                    "reason": "Creams it up",
+                    "resonance": 95,
+                    "amount": 100.0,
+                    "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
+                }
+            ],
+            "rebalancing": {
+                "Espresso Roast Supreme": 100.0,
+                "Unknown Bean Variety": 50.0
+            },
+            "seal_recommended": False,
+            "seal_resonance": 80,
+            "reasoning": "Test unmatched rebalancing keys."
+        }
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans (Monin)'],
+                'drink_type': 'COFFEE',
+                'mode': 'standard'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        # Unmatched rebalancing keys should be dropped entirely
+        self.assertEqual(data['rebalancing'], {})
+

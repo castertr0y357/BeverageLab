@@ -361,6 +361,7 @@ class AIAssistant:
         Generate multiple proactive suggestions as a structured JSON array.
         Returns 3 specific ingredient recommendations from the inventory.
         """
+        drink_type = drink_type.upper()
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
         exclude_context = f" Exclude these previously suggested items: {', '.join(exclude)}." if exclude else ""
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
@@ -471,6 +472,7 @@ Inventory Registry for Selection:
         Soda/Slushie: 3 ingredients.
         Coffee: 3-5 ingredients, including a stabilizer.
         """
+        drink_type = drink_type.upper()
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
         drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
         count_limit = "BETWEEN 2 and 4" if drink_type != 'COFFEE' else "BETWEEN 3 and 5"
@@ -540,6 +542,7 @@ Inventory Registry for Selection:
         Given a finalized set of selected ingredients, produce a brief
         synthesis report: why they work together and what to expect. Plain text, no JSON.
         """
+        drink_type = drink_type.upper()
         drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
         ingredient_list = ', '.join(f"{i['name']} (Intensity {i.get('intensity', '?')}/5)" for i in ingredients)
         

@@ -87,7 +87,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
         ingredient_ids = data.get('ingredient_ids', [])
         experimental = data.get('mode') == 'experimental' or data.get('experimental', False)
         force_type = data.get('force_type') # e.g. 'ADDITIVE'
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
 
         serialized_recs: List[Dict[str, Any]] = []
         multibrand_names = get_multibrand_names_in_inventory()
@@ -341,7 +341,9 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
         ingredients = data.get('ingredients', [])
         mode = data.get('mode', 'standard')
         exclude = data.get('exclude', [])
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
+        
+        logger.warning(f"AISuggestion - Info - Suggestion request. Ingredients: {ingredients}, drink_type: {drink_type}")
         
         if not ingredients:
             ingredients = ["NONE - Initial Synthesis"]
@@ -369,6 +371,7 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                 exclude=exclude,
                 retry_note=retry_note
             )
+            logger.warning(f"AISuggestion - Info - Raw suggestion from LLM: {raw_suggestion}")
             
             suggested_data = raw_suggestion
             
@@ -429,14 +432,18 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                         })
                 
                 if drink_type == 'COFFEE' and rebalancing:
+                    logger.warning(f"AISuggestion - Info - Raw AI rebalancing before sanitization: {rebalancing}")
                     sanitized_rebalancing = {}
                     for key, val in rebalancing.items():
                         target_obj = find_ingredient_by_name(key, inventory_items)
                         if target_obj:
                             sanitized_rebalancing[key] = sanitize_coffee_amount(target_obj, val)
                         else:
-                            sanitized_rebalancing[key] = val
+                            # Cannot verify ingredient type — skip unmatched entries
+                            # to prevent raw AI values (e.g. 100.0) from leaking through
+                            logger.warning(f"AISuggestion - Warning - Rebalancing key '{key}' not found in inventory, skipping raw value {val}")
                     rebalancing = sanitized_rebalancing
+                    logger.warning(f"AISuggestion - Info - Sanitized rebalancing: {rebalancing}")
 
                 if enriched:
                     logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
@@ -451,11 +458,13 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
             
             retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
 
-        if not raw_suggestion or not raw_suggestion.strip():
+        if not raw_suggestion:
+            raw_suggestion = "System Failure: The Laboratory substrate returned an empty synthesis signal. Please try again."
+        elif isinstance(raw_suggestion, str) and not raw_suggestion.strip():
             raw_suggestion = "System Failure: The Laboratory substrate returned an empty synthesis signal. Please try again."
             
         logger.warning("AISuggestion - Warning - Failed to get structured suggestions; returning raw text fallback.")
-        return JsonResponse({'status': 'success', 'suggestion': raw_suggestion})
+        return JsonResponse({'status': 'success', 'suggestion': str(raw_suggestion)})
     except Exception as e:
         logger.error(f"AISuggestion - Error - Autonomous Suggestion Failed: {e}", exc_info=True)
         return JsonResponse({'error': f"Autonomous Suggestion Failed: {str(e)}"}, status=500)
@@ -468,7 +477,7 @@ def ai_synthesize_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         ingredients = data.get('ingredients', [])
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
         
         if not ingredients:
             return JsonResponse({'error': 'No ingredients provided.'}, status=400)
@@ -566,7 +575,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
     """Generate a 3-ingredient combination, prioritizing AI-driven autonomous synthesis."""
     try:
         data = json.loads(request.body)
-        drink_type = data.get('drink_type', 'SODA')
+        drink_type = data.get('drink_type', 'SODA').upper()
         mode = data.get('mode', 'standard')
         
         all_compatible = Ingredient.objects.filter(

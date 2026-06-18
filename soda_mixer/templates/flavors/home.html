@@ -335,6 +335,7 @@
     }
 
     function setLabMode(mode, isInit = false) {
+        mode = mode.toUpperCase();
         currentLabMode = mode;
         selectedIngredients = [];
         
@@ -799,14 +800,19 @@
             container.innerHTML = '';
             
             // Apply Neural Re-balancing to existing ingredients
-            if (data.rebalancing) {
+            if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
                 console.log("Applying Neural Re-balancing:", data.rebalancing);
                 selectedIngredients.forEach(ing => {
-                    const normalizedName = ing.name.toLowerCase();
+                    const normalizedName = ing.name.toLowerCase().trim();
                     for (const [key, value] of Object.entries(data.rebalancing)) {
-                        if (key.toLowerCase() === normalizedName) {
+                        const normalizedKey = key.toLowerCase().trim();
+                        // Fuzzy match: exact, substring, or partial overlap
+                        if (normalizedKey === normalizedName ||
+                            normalizedName.includes(normalizedKey) ||
+                            normalizedKey.includes(normalizedName)) {
                             ing.amount = parseFloat(value);
                             ing.isAiBalanced = true;
+                            console.log(`Neural Re-balanced: ${ing.name} → ${value}`);
                             break;
                         }
                     }
@@ -1035,6 +1041,13 @@
             // 🧪 Apply Molecular Expansion
             if (currentLabMode !== 'COFFEE') {
                 amount = amount * expansionFactor;
+            } else {
+                // Defensive clamp: prevent absurd coffee gram values (e.g., AI returning 100g)
+                const maxCoffeeGrams = index === 0 ? 30.0 : (index === 1 ? 15.0 : 10.0);
+                if (amount > maxCoffeeGrams) {
+                    console.warn(`Coffee amount clamped: ${ing.name} was ${amount}g, defaulting to tier value`);
+                    amount = index === 0 ? 18.0 : (index === 1 ? 5.0 : 2.0);
+                }
             }
             
             const displayVolume = currentLabMode === 'COFFEE' ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0);
@@ -1177,6 +1190,11 @@
                         : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
                     amount = baseVolume * bottleScale;
                 } else {
+                    // Defensive clamp for coffee before scaling
+                    if (currentLabMode === 'COFFEE') {
+                        const maxG = idx === 0 ? 30.0 : (idx === 1 ? 15.0 : 10.0);
+                        if (amount > maxG) amount = idx === 0 ? 18.0 : (idx === 1 ? 5.0 : 2.0);
+                    }
                     amount = amount * bottleScale;
                 }
                 
@@ -1207,6 +1225,11 @@
                     : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
                 amount = baseVolume * bottleScale;
             } else {
+                // Defensive clamp for coffee before scaling
+                if (currentLabMode === 'COFFEE') {
+                    const maxG = idx === 0 ? 30.0 : (idx === 1 ? 15.0 : 10.0);
+                    if (amount > maxG) amount = idx === 0 ? 18.0 : (idx === 1 ? 5.0 : 2.0);
+                }
                 amount = amount * bottleScale;
             }
             
