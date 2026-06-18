@@ -296,7 +296,19 @@
         } else { // standard_brew
             if (coffeeStyle === 'espresso_shot') {
                 coffeeBaseAmount = 2;
-            } else { // hot or iced
+            } else if (coffeeStyle === 'iced') {
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 4;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 5;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 8;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 10;
+                } else {
+                    coffeeBaseAmount = 6;
+                }
+            } else { // hot
                 if (coffeeSizeOz === 8) {
                     coffeeBaseAmount = 6;
                 } else if (coffeeSizeOz === 12) {
@@ -401,6 +413,14 @@
         updateSelectedArea();
     }
 
+    function getIceAmountOz(sizeOz) {
+        if (sizeOz === 8) return 3;
+        if (sizeOz === 12) return 5;
+        if (sizeOz === 16) return 6;
+        if (sizeOz === 20) return 8;
+        return Math.round(sizeOz * 0.4);
+    }
+
     /**
      * Calculate the amount for a coffee ingredient based on current drink settings.
      * Uses global coffeeBaseAmount (shots for espresso, oz for standard brew).
@@ -431,7 +451,13 @@
 
         // For full-size drinks: scale syrups/additives proportionally to drink size
         // Reference baseline: a 12oz drink uses ~60ml creamer/milk, ~30ml syrup
-        const scaleFactor = sizeOz / 12.0;
+        let scaleFactor = sizeOz / 12.0;
+        
+        // Ice displacement factor: if iced, reduce liquid additive/syrup volumes by 40% (multiply by 0.6)
+        if (coffeeStyle === 'iced') {
+            scaleFactor *= 0.6;
+        }
+
         if (ing.type === 'ADDITIVE') {
             return Math.round(60.0 * scaleFactor);
         }
@@ -1342,6 +1368,28 @@
                     </div>
                 </div>
             `;
+
+            // 🧊 Inject virtual Ice card right next to the coffee base for iced style
+            if (currentLabMode === 'COFFEE' && isDryCoffee && coffeeStyle === 'iced') {
+                const iceOz = getIceAmountOz(coffeeSizeOz);
+                const iceMl = Math.round(iceOz * 29.5735);
+                html += `
+                    <div class="col-auto">
+                        <div class="glass-card p-2 text-center px-4 border-info border-opacity-20" style="min-width: 150px; position: relative;">
+                            <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">BASE MODIFIER</span>
+                            <div class="fw-bold mb-1" style="font-size: 0.9rem;">Ice <i class="bi bi-snow text-info ms-1"></i></div>
+                            <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${iceOz}oz</div>
+                            <div class="mt-1 pt-1 border-top border-white border-opacity-10">
+                                <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
+                                    <div class="d-flex justify-content-between"><span>TEMP</span> <span class="text-info fw-bold">COLD</span></div>
+                                    <div class="d-flex justify-content-between"><span>VOLUME</span> <span>~${iceMl}ml</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             hiddenInputs += `<input type="hidden" name="ingredient_${ing.id}" value="${ing.id}">`;
             hiddenInputs += `<input type="hidden" name="amount_${ing.id}" value="${amount}">`;
             

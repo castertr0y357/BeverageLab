@@ -904,3 +904,51 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         # Unmatched rebalancing keys should be dropped entirely
         self.assertEqual(data['rebalancing'], {})
 
+
+class BeverageLabIcedCoffeeTest(TestCase):
+    """Test case for iced coffee recipe logic and details page rendering."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
+        self.bean = Ingredient.objects.create(
+            name="Espresso Beans",
+            brand="Monin",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            is_in_inventory=True
+        )
+        self.creamer = Ingredient.objects.create(
+            name="Whole Milk",
+            brand="Local Dairy",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_in_inventory=True
+        )
+
+    def test_create_iced_coffee_recipe(self) -> None:
+        response = self.client.post(reverse('create_recipe'), {
+            'name': 'Iced Vanilla Latte',
+            'drink_type': 'COFFEE',
+            'coffee_style': 'iced',
+            'coffee_base_type': 'standard_brew',
+            'drink_size_oz': '12',
+            f'amount_{self.bean.id}': 18.0,
+            f'amount_{self.creamer.id}': 36.0,  # 60ml * 0.6 = 36ml
+        })
+        self.assertEqual(response.status_code, 302)
+        recipe = Recipe.objects.get(name='Iced Vanilla Latte')
+        self.assertEqual(recipe.coffee_style, 'iced')
+        self.assertEqual(recipe.coffee_base_type, 'standard_brew')
+        self.assertEqual(recipe.drink_size_oz, 12.0)
+        
+        # Verify detail page renders successfully
+        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_response = self.client.get(detail_url)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'Iced')
+        self.assertContains(detail_response, 'Ice')
+        self.assertContains(detail_response, 'iceDetailVolume')
+
+

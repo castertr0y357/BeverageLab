@@ -2,9 +2,11 @@
 
 ## 📋 Todo List
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
+- [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page.
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page, scaling standard brew coffee volume and liquid additives (reduced by 40%), showing ice ounces (3oz for 8oz, 5oz for 12oz, 6oz for 16oz, 8oz for 20oz) and ~ml.
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
 - [x] Enabled dynamic scaling and recalculation of AI-balanced ingredient amounts in Coffee Lab mode when selectors (style, size, base type, base amount) are changed, preserving the relative proportions (ratios) balanced by the AI while allowing the volumes to scale fluidly without needing to query the LLM again.
 - [x] Fixed coffee liquid additives (creamers, milks, syrups) displaying and saving in weight (grams) instead of volume (milliliters/ounces). Updated AI prompts (surprise mix and suggest rebalancing), mock responses, recipe model string representation, Mealie export API, and recipe creation/editing templates to ensure only dry coffee beans are measured in grams, while liquid additives are formatted and stored in volume.
