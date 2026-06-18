@@ -5,9 +5,11 @@
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page.
 - [x] Implement espresso base additive scaling to automatically fill the remaining target cup size with milk/creamer.
 - [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly and occupy the full-width header area.
+- [x] Prioritize creamer/milk (ADDITIVE) as the recommended ingredient class in Step 2 of Coffee Lab mode.
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Prioritize creamer/milk (ADDITIVE) as the recommended ingredient class in Step 2 of Coffee Lab mode to ensure they are suggested immediately after selecting the coffee base (applied to both algorithmic and AI suggestions).
 - [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly (using `btn-md py-2 fs-6` buttons) and occupy the full-width header area.
 - [x] Implement espresso base additive scaling to automatically calculate the remaining volume of target cup size (subtracting espresso shot volume and ice volume) and scale up milk/creamer additives to fill the cup.
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page, scaling standard brew coffee volume and liquid additives (reduced by 40%), showing ice ounces (3oz for 8oz, 5oz for 12oz, 6oz for 16oz, 8oz for 20oz) and ~ml.

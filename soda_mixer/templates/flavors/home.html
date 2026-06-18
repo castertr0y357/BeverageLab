@@ -1070,16 +1070,18 @@
         const isAiEngine = engineMode === 'ai';
         const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
         
+        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'ADDITIVE' : (isCreamerTransition ? 'ADDITIVE' : null);
         const payload = isAiEngine ? {
             ingredients: selectedIngredients.map(i => i.name),
             drink_type: currentLabMode,
             mode: recommendationMode,
-            exclude: []
+            exclude: [],
+            force_type: forceType
         } : { 
             ingredient_ids: ingredientIds,
             drink_type: currentLabMode,
             mode: recommendationMode,
-            force_type: isCreamerTransition ? 'ADDITIVE' : null
+            force_type: forceType
         };
 
         try {

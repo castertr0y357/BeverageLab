@@ -345,8 +345,9 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
         mode = data.get('mode', 'standard')
         exclude = data.get('exclude', [])
         drink_type = data.get('drink_type', 'SODA').upper()
+        force_type = data.get('force_type')
         
-        logger.warning(f"AISuggestion - Info - Suggestion request. Ingredients: {ingredients}, drink_type: {drink_type}")
+        logger.warning(f"AISuggestion - Info - Suggestion request. Ingredients: {ingredients}, drink_type: {drink_type}, force_type: {force_type}")
         
         if not ingredients:
             ingredients = ["NONE - Initial Synthesis"]
@@ -372,7 +373,8 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                 drink_type=drink_type,
                 inventory=inventory_context, 
                 exclude=exclude,
-                retry_note=retry_note
+                retry_note=retry_note,
+                force_type=force_type
             )
             logger.warning(f"AISuggestion - Info - Raw suggestion from LLM: {raw_suggestion}")
             

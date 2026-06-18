@@ -356,7 +356,7 @@ class AIAssistant:
             return []
 
     @classmethod
-    def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """
         Generate multiple proactive suggestions as a structured JSON array.
         Returns 3 specific ingredient recommendations from the inventory.
@@ -367,6 +367,11 @@ class AIAssistant:
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
         if drink_type == 'COFFEE':
+            force_rule = ""
+            if force_type:
+                force_display = "Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type
+                force_rule = f"\n6. MANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+            
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
 
 Current Compound: {', '.join(ingredients)}
@@ -380,7 +385,7 @@ Rules:
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Modifiers/creamers (e.g., milk) must be 50.0ml (milliliters), and minor accents/syrups must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for modifiers/creamers, 15.0ml for accents/syrups) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid additives and flavor accents should be in volume (e.g., 50.0ml milk, 15.0ml syrup).
+5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid additives and flavor accents should be in volume (e.g., 50.0ml milk, 15.0ml syrup).{force_rule}
 
 JSON OUTPUT FORMAT:
 {{

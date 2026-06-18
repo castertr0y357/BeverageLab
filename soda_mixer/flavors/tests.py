@@ -292,6 +292,56 @@ class BeverageLabViewsTest(TestCase):
         recipe_id = response_promote.json()['recipe_id']
         self.assertTrue(Recipe.objects.filter(id=recipe_id).exists())
 
+    @patch('requests.request')
+    def test_ai_suggest_api_force_type(self, mock_request: MagicMock) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        config = SystemConfiguration.get_config()
+        config.default_llm_provider = provider
+        config.save()
+
+        Ingredient.objects.create(
+            name="Whole Milk",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            intensity=2,
+            sweetness=3,
+            acidity=1,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Whole Milk", "reason": "Adds body", "resonance": 90, "amount": 50.0}]}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans'],
+                'drink_type': 'COFFEE',
+                'force_type': 'ADDITIVE'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['suggestions'][0]['name'], 'Whole Milk')
+        
+        args, kwargs = mock_request.call_args
+        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'ADDITIVE'", kwargs['json']['messages'][1]['content'])
+
     def test_save_llm_provider_api_thinking(self) -> None:
         self.client.login(username="director", password="secure_password_123")
         url = reverse('save_llm_provider_api')
@@ -473,6 +523,22 @@ class BeverageLabAIAssistantTest(TestCase):
         self.assertEqual(res['suggestions'][0]['name'], "Espresso")
         self.assertEqual(res['suggestions'][0]['amount'], 18.0)
         self.assertEqual(res['rebalancing']['Espresso'], 18.0)
+
+    @patch('requests.request')
+    def test_ai_suggest_autonomous_force_type(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Whole Milk", "reason": "creamy", "resonance": 92, "amount": 50.0}]}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        res = AIAssistant.suggest_autonomous(["Espresso Beans"], mode="standard", drink_type="COFFEE", force_type="ADDITIVE")
+        self.assertIsNotNone(res)
+        self.assertEqual(res['suggestions'][0]['name'], "Whole Milk")
+        
+        args, kwargs = mock_request.call_args
+        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'ADDITIVE'", kwargs['json']['messages'][1]['content'])
 
     @patch('requests.request')
     def test_ai_analyze_flavor_profile(self, mock_request: MagicMock) -> None:
