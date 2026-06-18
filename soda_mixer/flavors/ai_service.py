@@ -366,43 +366,97 @@ class AIAssistant:
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
         if drink_type == 'COFFEE':
-            balance_rule = "3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in grams (g) based on coffee brewing ratios (e.g. 18.0g of coffee bean base)."
-            limit_rule = "5. Aim for coffee extraction balance: The coffee bean base (index 0) should default to 18.0g. Modify/complementary items (e.g., milk/additives) should default to 5.0g (or 2.0g for minor accents/spices). The total mass of dry coffee beans and minor flavor accents should be scaled proportionally (e.g., 18.0g Base + 5.0g Payload + 2.0g Accent = 25.0g total)."
-            example_rebalancing = '"Espresso": 18.0'
-            example_amount = '18.0'
-        else:
-            balance_rule = "3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in ml (ml) based on holistic balance."
-            limit_rule = "5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml)."
-            example_rebalancing = '"Lemon Syrup": 100.0'
-            example_amount = '25.0'
-
-        prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
 
 Current Compound: {', '.join(ingredients)}
-Lab Type: {drink_type}
+Lab Type: COFFEE (Espresso Extraction)
 Lab Mode: {tone}{exclude_context}
 
-Task: Identify 3 to 5 ingredients from the Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-{balance_rule}
-4. For new suggestions, provide a specific 'amount' and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-{limit_rule}
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in grams (g) based on coffee brewing ratios. The base coffee beans MUST be 18.0g (representing a double-shot espresso). Modifiers (e.g., milk, sugar) should be 5.0g, and minor accents/spices should be 2.0g. Do NOT prescribe ml amounts, and do NOT use 100.0 or 50.0 for coffee beans.
+4. For new suggestions, provide a specific 'amount' in grams (g) (18.0g for bases, 5.0g for modifiers, 2.0g for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for coffee extraction balance: The total mass of dry coffee beans and minor flavor accents should scale proportionally around the 18.0g double-shot baseline (e.g. 18.0g Espresso Base + 5.0g Milk Payload + 2.0g Syrup Accent = 25.0g total).
 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": {example_amount}, "profile": {{...}} }},
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 5.0, "profile": {{...}} }},
         ...
     ],
     "rebalancing": {{
-        {example_rebalancing}
+        "Espresso": 18.0
     }},
     "seal_recommended": true/false,
     "seal_resonance": 95,
-    "reasoning": "Brief overview of the balance strategy"
+    "reasoning": "Brief overview of the coffee balance strategy"
+}}
+
+Inventory Registry for Selection:
+"""
+        elif drink_type == 'SLUSHIE':
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
+
+Current Compound: {', '.join(ingredients)}
+Lab Type: SLUSHIE (Cryo Lab)
+Lab Mode: {tone}{exclude_context}
+
+Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
+4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 20.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Lemon Syrup": 80.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the cryo freezing and displacement strategy"
+}}
+
+Inventory Registry for Selection:
+"""
+        else:
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
+
+Current Compound: {', '.join(ingredients)}
+Lab Type: SODA (Soda Lab)
+Lab Mode: {tone}{exclude_context}
+
+Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
+4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Lemon Syrup": 100.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the carbonation and dilution strategy"
 }}
 
 Inventory Registry for Selection:
@@ -419,27 +473,61 @@ Inventory Registry for Selection:
         """
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
         drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
-        
         count_limit = "BETWEEN 2 and 4" if drink_type != 'COFFEE' else "BETWEEN 3 and 5"
-        extra_rules = ""
+
         if drink_type == 'COFFEE':
-            extra_rules = "5. MANDATORY: For Coffee Lab synthesis, include exactly one 'Additive' or 'Creamer' as a final stabilizer."
+            rules = """Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
+2. Select a base (e.g. coffee bean) and complementary reagents.
+3. Provide a suggested 'amount' in grams (g). The base coffee beans MUST default to 18.0g. Other modifiers/creamers should be 5.0g, and spices/accents 2.0g.
+4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
+5. For each ingredient, provide a specific 'role' (max 8 words).
+6. MANDATORY: Include exactly one 'Additive' or 'Creamer' as a final stabilizer (amount 5.0g)."""
+            example = """{
+    "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
+    "selection": [
+        { "name": "Espresso Roast Blend", "amount": 18.0, "role": "Base extraction" },
+        { "name": "Whole Milk", "amount": 5.0, "role": "Creamy body" }
+    ]
+}"""
+        elif drink_type == 'SLUSHIE':
+            rules = """Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
+2. Select a base (e.g. fruit syrup) and complementary reagents.
+3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 80ml base, 40ml payload, 20ml accents).
+4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
+5. For each ingredient, provide a specific 'role' (max 8 words)."""
+            example = """{
+    "design_intent": "A refreshing frozen berry fruit blend.",
+    "selection": [
+        { "name": "Strawberry Syrup", "amount": 80.0, "role": "Base fruit" },
+        { "name": "Blueberry Syrup", "amount": 40.0, "role": "Complementary accent" }
+    ]
+}"""
+        else:
+            rules = """Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
+2. Select a base (e.g. sweet syrup) and complementary reagents.
+3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 100ml base, 50ml payload, 25ml accents).
+4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
+5. For each ingredient, provide a specific 'role' (max 8 words)."""
+            example = """{
+    "design_intent": "A sharp carbonated citrus blend.",
+    "selection": [
+        { "name": "Lemon Syrup", "amount": 100.0, "role": "Base sweetener" },
+        { "name": "Lime Syrup", "amount": 50.0, "role": "Tart balance" }
+    ]
+}"""
 
         prompt = f"""[AUTONOMOUS SYNTHESIS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
         
 Task: Select {count_limit} ingredients from the Inventory Registry below to create a cohesive {drink_label} compound.
 Lab Mode: {tone}
 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
-2. Select a base (e.g. coffee/syrup) and complementary reagents.
-3. Provide a suggested 'amount' (ml or g) for each. Use 1:1 ratios for balance or small amounts for "flavor notes".
-4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
-5. For each ingredient, provide a specific 'role' (max 8 words).
-{extra_rules}
+{rules}
 
 OUTPUT FORMAT: A raw JSON object.
-{cls.SURPRISE_MIX_FORMAT}
+{example}
 
 Inventory Registry for Selection:
 """
