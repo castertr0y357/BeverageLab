@@ -301,6 +301,7 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
         ingredients = data.get('ingredients', [])
         mode = data.get('mode', 'standard')
         exclude = data.get('exclude', [])
+        drink_type = data.get('drink_type', 'SODA')
         
         if not ingredients:
             ingredients = ["NONE - Initial Synthesis"]
@@ -323,6 +324,7 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
             
             raw_suggestion = AIAssistant.suggest_autonomous(
                 ingredients, mode, 
+                drink_type=drink_type,
                 inventory=inventory_context, 
                 exclude=exclude,
                 retry_note=retry_note

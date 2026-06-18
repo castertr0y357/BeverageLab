@@ -72,14 +72,14 @@
                     <div class="d-flex justify-content-between align-items-end mb-2">
                         <label class="readout-label mb-0">Current Compound</label>
                         <div class="d-flex gap-2 align-items-center">
-                            <div class="d-flex align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10" id="scaleContainer" style="display: none;">
+                            <div class="align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10 d-none" id="scaleContainer">
                                 <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
                                 <div class="btn-group btn-group-xs pb-1">
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L</button>
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
                                 </div>
                             </div>
-                            <div class="d-flex align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10" id="scaleContainerCoffee" style="display: none;">
+                            <div class="align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10 d-none" id="scaleContainerCoffee">
                                 <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">SHOT SCALE</span>
                                 <div class="btn-group btn-group-xs pb-1">
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale2Shot" onclick="setCoffeeScale(1.0)">2-shot</button>
@@ -778,6 +778,7 @@
         
         const payload = isAiEngine ? {
             ingredients: selectedIngredients.map(i => i.name),
+            drink_type: currentLabMode,
             mode: recommendationMode,
             exclude: []
         } : { 
@@ -972,14 +973,26 @@
         const scaleContainer = document.getElementById('scaleContainer');
         const scaleContainerCoffee = document.getElementById('scaleContainerCoffee');
         if (currentLabMode === 'SODA' || currentLabMode === 'SLUSHIE') {
-            scaleContainer.style.display = 'flex';
-            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'none';
+            scaleContainer.classList.remove('d-none');
+            scaleContainer.classList.add('d-flex');
+            if (scaleContainerCoffee) {
+                scaleContainerCoffee.classList.add('d-none');
+                scaleContainerCoffee.classList.remove('d-flex');
+            }
         } else if (currentLabMode === 'COFFEE') {
-            scaleContainer.style.display = 'none';
-            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'flex';
+            scaleContainer.classList.add('d-none');
+            scaleContainer.classList.remove('d-flex');
+            if (scaleContainerCoffee) {
+                scaleContainerCoffee.classList.remove('d-none');
+                scaleContainerCoffee.classList.add('d-flex');
+            }
         } else {
-            scaleContainer.style.display = 'none';
-            if (scaleContainerCoffee) scaleContainerCoffee.style.display = 'none';
+            scaleContainer.classList.add('d-none');
+            scaleContainer.classList.remove('d-flex');
+            if (scaleContainerCoffee) {
+                scaleContainerCoffee.classList.add('d-none');
+                scaleContainerCoffee.classList.remove('d-flex');
+            }
         }
         
         let html = '<div class="row g-2 mb-3">';

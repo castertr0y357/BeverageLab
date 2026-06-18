@@ -453,6 +453,28 @@ class BeverageLabAIAssistantTest(TestCase):
         self.assertEqual(res['suggestions'][0]['name'], "Lime")
 
     @patch('requests.request')
+    def test_ai_suggest_autonomous_coffee(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Espresso Bean", "reason": "strong base", "resonance": 95, "amount": 18.0}]}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        res = AIAssistant.suggest_autonomous(["Whole Milk"], mode="standard", drink_type="COFFEE")
+        self.assertIsNotNone(res)
+        self.assertEqual(res['suggestions'][0]['name'], "Espresso Bean")
+        self.assertEqual(res['suggestions'][0]['amount'], 18.0)
+
+    @patch.dict('os.environ', {'MOCK_MODE': 'True'})
+    def test_ai_suggest_autonomous_mock_coffee(self) -> None:
+        res = AIAssistant.suggest_autonomous(["Espresso"], mode="standard", drink_type="COFFEE")
+        self.assertIsNotNone(res)
+        self.assertEqual(res['suggestions'][0]['name'], "Espresso")
+        self.assertEqual(res['suggestions'][0]['amount'], 18.0)
+        self.assertEqual(res['rebalancing']['Espresso'], 18.0)
+
+    @patch('requests.request')
     def test_ai_analyze_flavor_profile(self, mock_request: MagicMock) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200

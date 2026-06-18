@@ -77,6 +77,31 @@ class AIAssistant:
     def _mock_chat(cls, user_prompt: str, context: Optional[str] = None) -> str:
         """Return realistic JSON/text payloads in MOCK_MODE."""
         if "[STRUCTURED DATA REQUEST]" in user_prompt:
+            if "Lab Type: COFFEE" in user_prompt:
+                return json.dumps({
+                    "suggestions": [
+                        {
+                            "name": "Espresso",
+                            "reason": "Rich base extraction",
+                            "resonance": 95,
+                            "amount": 18.0,
+                            "profile": {"intensity": 5, "sweetness": 1, "acidity": 3, "bitterness": 4, "complexity": 4}
+                        },
+                        {
+                            "name": "Whole Milk",
+                            "reason": "Adds sweetness and creamy texture",
+                            "resonance": 90,
+                            "amount": 5.0,
+                            "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        }
+                    ],
+                    "rebalancing": {
+                        "Espresso": 18.0
+                    },
+                    "seal_recommended": False,
+                    "seal_resonance": 80,
+                    "reasoning": "Standard coffee extraction profile (MOCK_MODE)."
+                })
             return json.dumps({
                 "suggestions": [
                     {
@@ -100,6 +125,14 @@ class AIAssistant:
                 "reasoning": "Standard laboratory carbonation enhancement (MOCK_MODE)."
             })
         elif "[AUTONOMOUS SYNTHESIS REQUEST]" in user_prompt:
+            if "coffee drink" in user_prompt:
+                return json.dumps({
+                    "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
+                    "selection": [
+                        { "name": "Espresso", "amount": 18.0, "role": "Base extraction" },
+                        { "name": "Whole Milk", "amount": 5.0, "role": "Creamy body" }
+                    ]
+                })
             return json.dumps({
                 "design_intent": "A refreshing carbonated citrus blend (MOCK_MODE).",
                 "selection": [
@@ -323,7 +356,7 @@ class AIAssistant:
             return []
 
     @classmethod
-    def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """
         Generate multiple proactive suggestions as a structured JSON array.
         Returns 3 specific ingredient recommendations from the inventory.
@@ -332,9 +365,21 @@ class AIAssistant:
         exclude_context = f" Exclude these previously suggested items: {', '.join(exclude)}." if exclude else ""
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
+        if drink_type == 'COFFEE':
+            balance_rule = "3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in grams (g) based on coffee brewing ratios (e.g. 18.0g of coffee bean base)."
+            limit_rule = "5. Aim for coffee extraction balance: The coffee bean base (index 0) should default to 18.0g. Modify/complementary items (e.g., milk/additives) should default to 5.0g (or 2.0g for minor accents/spices). The total mass of dry coffee beans and minor flavor accents should be scaled proportionally (e.g., 18.0g Base + 5.0g Payload + 2.0g Accent = 25.0g total)."
+            example_rebalancing = '"Espresso": 18.0'
+            example_amount = '18.0'
+        else:
+            balance_rule = "3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in ml (ml) based on holistic balance."
+            limit_rule = "5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml)."
+            example_rebalancing = '"Lemon Syrup": 100.0'
+            example_amount = '25.0'
+
         prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
 
 Current Compound: {', '.join(ingredients)}
+Lab Type: {drink_type}
 Lab Mode: {tone}{exclude_context}
 
 Task: Identify 3 to 5 ingredients from the Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
@@ -342,18 +387,18 @@ Task: Identify 3 to 5 ingredients from the Inventory Registry below that pair we
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' (ml for Soda/Slushie, g for Coffee) based on holistic balance.
+{balance_rule}
 4. For new suggestions, provide a specific 'amount' and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+{limit_rule}
 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": {example_amount}, "profile": {{...}} }},
         ...
     ],
     "rebalancing": {{
-        "Existing Ingredient Name": 100.0
+        {example_rebalancing}
     }},
     "seal_recommended": true/false,
     "seal_resonance": 95,
