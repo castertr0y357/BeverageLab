@@ -324,9 +324,25 @@
         const oz = ml * 0.033814;
         if (oz >= 1.0) return oz.toFixed(1) + 'oz';
         
-        // 1 Tbsp = 14.78ml, 1 tsp = 4.93ml
-        if (ml >= 14) return Math.round(ml / 14.78) + ' Tbsp';
-        if (ml >= 2.5) return Math.round(ml / 4.93) + ' tsp';
+        // 1 Tbsp = 14.7868ml, 1 tsp = 4.92892ml
+        if (ml >= 2.5) {
+            let tbsp = Math.floor(ml / 14.7868);
+            let remMl = ml - tbsp * 14.7868;
+            let tsp = Math.round(remMl / 4.92892);
+            
+            if (tsp >= 3) {
+                tbsp += 1;
+                tsp -= 3;
+            }
+            
+            if (tbsp > 0 && tsp > 0) {
+                return `${tbsp} Tbsp + ${tsp} tsp`;
+            } else if (tbsp > 0) {
+                return `${tbsp} Tbsp`;
+            } else if (tsp > 0) {
+                return `${tsp} tsp`;
+            }
+        }
         
         return oz.toFixed(2) + 'oz';
     }
