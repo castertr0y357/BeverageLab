@@ -31,7 +31,8 @@ class Ingredient(models.Model):
     INGREDIENT_TYPE_CHOICES = [
         ('SODA_SYRUP', 'Soda Syrup'),
         ('COFFEE_BEAN', 'Coffee Bean'),
-        ('ADDITIVE', 'Additive (e.g., Creamer, Sugar)'),
+        ('DAIRY', 'Dairy & Plant Milk'),
+        ('ADDITIVE', 'Additive (Syrup, Sugar, Honey, etc.)'),
         ('OTHER', 'Other'),
     ]
     

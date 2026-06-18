@@ -291,7 +291,7 @@
 
         const type = document.getElementById('drink_type').value;
         const isBean = ingredientType === 'COFFEE_BEAN';
-        const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (ingredientType === 'ADDITIVE' ? '50.0' : '15.0')) : '1.0';
+        const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (ingredientType === 'DAIRY' ? '50.0' : '15.0')) : '1.0';
         const rowUnit = type === 'COFFEE' ? (isBean ? 'g' : 'ml') : (type === 'SLUSHIE' ? 'oz' : 'ml');
 
         const row = `

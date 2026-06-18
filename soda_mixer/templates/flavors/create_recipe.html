@@ -279,7 +279,7 @@
         for (const i of selectedIngredients) {
             const isBean = i.type === 'COFFEE_BEAN';
             const rowUnit = type === 'COFFEE' ? (isBean ? 'g' : 'ml') : (type === 'SLUSHIE' ? 'oz' : 'ml');
-            const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (i.type === 'ADDITIVE' ? '50.0' : '15.0')) : '1.0';
+            const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (i.type === 'DAIRY' ? '50.0' : '15.0')) : '1.0';
             
             html += `
                 <tr class="align-middle">

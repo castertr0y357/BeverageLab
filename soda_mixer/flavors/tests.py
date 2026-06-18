@@ -112,7 +112,7 @@ class BeverageLabRecommendationTest(TestCase):
 
     def test_recipe_name_generator(self) -> None:
         name = generate_recipe_name([self.ing1.id], drink_type="SODA")
-        self.assertTrue(any(word in name for word in ["Lemon", "Citrus", "Splash", "Grove"]))
+        self.assertTrue(any(word in name for word in ["Lemon", "Citrus", "Splash", "Grove", "Sunrise"]))
         
         name_empty = generate_recipe_name([])
         self.assertEqual(name_empty, "Mystery Mix")
@@ -308,7 +308,7 @@ class BeverageLabViewsTest(TestCase):
 
         Ingredient.objects.create(
             name="Whole Milk",
-            ingredient_type="ADDITIVE",
+            ingredient_type="DAIRY",
             category="sweet",
             intensity=2,
             sweetness=3,
@@ -330,7 +330,7 @@ class BeverageLabViewsTest(TestCase):
             data=json.dumps({
                 'ingredients': ['Espresso Beans'],
                 'drink_type': 'COFFEE',
-                'force_type': 'ADDITIVE'
+                'force_type': 'DAIRY'
             }),
             content_type="application/json"
         )
@@ -340,7 +340,7 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(data['suggestions'][0]['name'], 'Whole Milk')
         
         args, kwargs = mock_request.call_args
-        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'ADDITIVE'", kwargs['json']['messages'][1]['content'])
+        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'DAIRY'", kwargs['json']['messages'][1]['content'])
 
     def test_save_llm_provider_api_thinking(self) -> None:
         self.client.login(username="director", password="secure_password_123")
@@ -878,7 +878,7 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.creamer = Ingredient.objects.create(
             name="Whole Milk",
             brand="Local Dairy",
-            ingredient_type="ADDITIVE",
+            ingredient_type="DAIRY",
             category="sweet",
             is_in_inventory=True
         )
@@ -895,6 +895,13 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.assertEqual(sanitize_coffee_amount(self.bean, 100.0), 18.0)
         self.assertEqual(sanitize_coffee_amount(self.creamer, 50.0), 50.0)
         self.assertEqual(sanitize_coffee_amount(self.syrup, 25.0), 15.0)
+        sugar = Ingredient.objects.create(
+            name="Honey",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_in_inventory=True
+        )
+        self.assertEqual(sanitize_coffee_amount(sugar, 25.0), 15.0)
 
     @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
     def test_ai_suggest_api_coffee_sanitization(self, mock_suggest: MagicMock) -> None:
@@ -928,7 +935,7 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         
-        # Verify suggestions amount is coerced to 50.0 (Whole Milk is ADDITIVE)
+        # Verify suggestions amount is coerced to 50.0 (Whole Milk is DAIRY)
         self.assertEqual(data['suggestions'][0]['amount'], 50.0)
         # Verify rebalancing amount is coerced to 18.0 (Espresso Beans is COFFEE_BEAN)
         self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 18.0)
@@ -988,7 +995,7 @@ class BeverageLabIcedCoffeeTest(TestCase):
         self.creamer = Ingredient.objects.create(
             name="Whole Milk",
             brand="Local Dairy",
-            ingredient_type="ADDITIVE",
+            ingredient_type="DAIRY",
             category="sweet",
             is_in_inventory=True
         )

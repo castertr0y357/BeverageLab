@@ -149,7 +149,7 @@
                         <h5 class="fw-bold mb-0 text-gradient-lab" id="stepTitle">Step 1: Select Base Component</h5>
                         <div class="d-flex gap-2">
                             <button type="button" id="skipToCreamerBtn" class="btn btn-xs btn-outline-info" style="display: none;" onclick="startCreamerTransition()">
-                                <i class="bi bi-arrow-right-circle me-1"></i> SKIP TO CREAMER
+                                <i class="bi bi-arrow-right-circle me-1"></i> SKIP TO DAIRY
                             </button>
                             <button type="button" class="btn btn-xs btn-outline-experimental" onclick="surpriseMe()" id="surpriseBtn">
                                 <i class="bi bi-dice-3 me-1"></i> SURPRISE ME
@@ -455,12 +455,12 @@
         }
 
         if (isShot) {
-            // For pure espresso shots, keep additives minimal
-            return ing.type === 'ADDITIVE' ? 10.0 : 8.0;
+            // For pure espresso shots, keep dairy and additives minimal
+            return (ing.type === 'DAIRY' || ing.type === 'ADDITIVE') ? 10.0 : 8.0;
         }
 
-        // Scale additives to fill remaining volume for espresso bases
-        if (baseType === 'espresso' && ing.type === 'ADDITIVE') {
+        // Scale dairy to fill remaining volume for espresso bases
+        if (baseType === 'espresso' && ing.type === 'DAIRY') {
             const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(sizeOz) : 0;
             const shots = coffeeBaseAmount; // number of shots
             const remainingOz = sizeOz - iceOz - shots;
@@ -468,17 +468,17 @@
             return Math.max(30.0, Math.round(targetAdditiveMl));
         }
 
-        // For standard brew or non-additive ingredients (syrups/accents):
+        // For standard brew or non-dairy ingredients (syrups/accents):
         // Scale syrups/additives proportionally to drink size
-        // Reference baseline: a 12oz drink uses ~60ml creamer/milk, ~30ml syrup
+        // Reference baseline: a 12oz drink uses ~60ml dairy/milk, ~30ml syrup/additive
         let scaleFactor = sizeOz / 12.0;
         
-        // Ice displacement factor: if iced, reduce liquid additive/syrup volumes by 40% (multiply by 0.6)
+        // Ice displacement factor: if iced, reduce liquid volumes by 40% (multiply by 0.6)
         if (coffeeStyle === 'iced') {
             scaleFactor *= 0.6;
         }
 
-        if (ing.type === 'ADDITIVE') {
+        if (ing.type === 'DAIRY') {
             return Math.round(60.0 * scaleFactor);
         }
         return Math.round(30.0 * scaleFactor);
@@ -1070,7 +1070,7 @@
         const isAiEngine = engineMode === 'ai';
         const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
         
-        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'ADDITIVE' : (isCreamerTransition ? 'ADDITIVE' : null);
+        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'DAIRY' : (isCreamerTransition ? 'DAIRY' : null);
         const payload = isAiEngine ? {
             ingredients: selectedIngredients.map(i => i.name),
             drink_type: currentLabMode,
@@ -1335,7 +1335,7 @@
             // ☕ Always recalculate coffee amounts from current settings
             // This ensures changing Style/Size/Base immediately updates the display.
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
                     amount = Math.round(coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                 } else {
                     amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
@@ -1352,7 +1352,7 @@
             } else {
                 // For coffee mode: clamp to sensible maximums
                 const isDryCoffee2 = ing.type === 'COFFEE_BEAN';
-                const maxVal = isDryCoffee2 ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                const maxVal = isDryCoffee2 ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
                 if (amount > maxVal) {
                     console.warn(`Coffee amount clamped: ${ing.name} was ${amount}`);
                     amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
@@ -1529,12 +1529,12 @@
                 let amount = ing.amount;
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
                 if (currentLabMode === 'COFFEE') {
-                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
                         amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                     } else {
                         amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                     }
-                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
                     if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                 } else if (!amount) {
                     const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
@@ -1566,12 +1566,12 @@
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
                     amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                 } else {
                     amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                 }
-                const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
                 if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
             } else if (!amount) {
                 const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);

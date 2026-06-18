@@ -41,7 +41,7 @@ def sanitize_coffee_amount(ingredient: Ingredient, amount: Optional[Union[float,
     """Ensure coffee ingredients have proper gram/volume amounts based on their role/type."""
     if ingredient.ingredient_type == 'COFFEE_BEAN':
         return 18.0
-    elif ingredient.ingredient_type == 'ADDITIVE':
+    elif ingredient.ingredient_type == 'DAIRY':
         return 50.0
     else:
         return 15.0
@@ -637,7 +637,11 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 selection.append({'obj': random.choice(list(potential_bases)), 'amount': None})
             
             if drink_type == 'COFFEE' and target_count >= 3:
-                additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i['obj'].id for i in selection])
+                # Prioritize DAIRY as stabilizer, fallback to ADDITIVE
+                additives = all_compatible.filter(ingredient_type='DAIRY').exclude(id__in=[i['obj'].id for i in selection])
+                if not additives.exists():
+                    additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i['obj'].id for i in selection])
+                
                 if additives.exists():
                     target_additive = random.choice(list(additives))
                     
