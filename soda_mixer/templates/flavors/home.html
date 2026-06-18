@@ -96,16 +96,10 @@
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
                                 </div>
-                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">COFFEE BASE</span>
+                                <span id="coffeeBaseLabel" class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">COFFEE BASE</span>
                                 <div class="btn-group btn-group-xs pb-1" id="coffeeBaseBtns">
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
-                                </div>
-                                <span class="readout-label mb-0" id="coffeeBaseAmountLabel" style="font-size: 0.55rem; letter-spacing: 1px;">SHOTS</span>
-                                <div class="btn-group btn-group-xs pb-1" id="coffeeBaseAmountBtns">
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="baseAmt1" onclick="setCoffeeBaseAmount(1)">1</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="baseAmt2" onclick="setCoffeeBaseAmount(2)">2</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="baseAmt3" onclick="setCoffeeBaseAmount(3)">3</button>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-xs btn-outline-info opacity-75 hover-opacity-100" onclick="stepBack()">
@@ -278,6 +272,46 @@
     }
 
     // ☕ Coffee drink format controls
+    function recalculateCoffeeBaseAmount() {
+        if (coffeeBaseType === 'espresso') {
+            if (coffeeStyle === 'espresso_shot') {
+                if (coffeeSizeOz === 1) {
+                    coffeeBaseAmount = 1;
+                } else {
+                    coffeeBaseAmount = 2;
+                }
+            } else { // hot or iced
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 1;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 2;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 3;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 4;
+                } else {
+                    coffeeBaseAmount = 2;
+                }
+            }
+        } else { // standard_brew
+            if (coffeeStyle === 'espresso_shot') {
+                coffeeBaseAmount = 2;
+            } else { // hot or iced
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 6;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 8;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 12;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 16;
+                } else {
+                    coffeeBaseAmount = 8;
+                }
+            }
+        }
+    }
+
     function setCoffeeStyle(style) {
         coffeeStyle = style;
         localStorage.setItem('coffee_style', style);
@@ -292,14 +326,20 @@
 
         // Re-render size options based on style
         const shotMode = (style === 'espresso_shot');
-        const drinkSizeIds = ['size8oz', 'size12oz', 'size16oz', 'size20oz'];
-        const shotSizeIds  = ['size1oz', 'size2oz'];
         const sizeBtns = document.getElementById('coffeeSizeBtns');
         if (shotMode) {
             sizeBtns.innerHTML = `
                 <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
                 <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
             `;
+            // Force coffee base type to espresso for shots
+            coffeeBaseType = 'espresso';
+            localStorage.setItem('coffee_base_type', 'espresso');
+            document.getElementById('baseEspresso').classList.add('active-lab-mode');
+            document.getElementById('baseStandardBrew').classList.remove('active-lab-mode');
+            const coffeeBaseTypeField = document.getElementById('coffeeBaseTypeField');
+            if (coffeeBaseTypeField) coffeeBaseTypeField.value = 'espresso';
+
             setCoffeeSize(2);
         } else {
             // Default 12oz selected
@@ -314,9 +354,17 @@
             setCoffeeSize(defaultSize);
         }
 
+        // Show/hide Coffee Base Type selector based on style (shots are always espresso)
+        const baseLabel = document.getElementById('coffeeBaseLabel');
+        const baseBtns = document.getElementById('coffeeBaseBtns');
+        if (baseLabel) baseLabel.style.display = shotMode ? 'none' : '';
+        if (baseBtns) baseBtns.style.display = shotMode ? 'none' : '';
+
         // Update hidden field and refresh compound display
         const coffeeStyleField = document.getElementById('coffeeStyleField');
         if (coffeeStyleField) coffeeStyleField.value = style;
+        
+        recalculateCoffeeBaseAmount();
         updateSelectedArea();
     }
 
@@ -336,6 +384,8 @@
         });
         const drinkSizeOzField = document.getElementById('drinkSizeOzField');
         if (drinkSizeOzField) drinkSizeOzField.value = coffeeSizeOz;
+        
+        recalculateCoffeeBaseAmount();
         updateSelectedArea();
     }
 
@@ -347,45 +397,7 @@
         const coffeeBaseTypeField = document.getElementById('coffeeBaseTypeField');
         if (coffeeBaseTypeField) coffeeBaseTypeField.value = type;
 
-        // Rebuild the base amount buttons based on type
-        const amountBtns = document.getElementById('coffeeBaseAmountBtns');
-        const amountLabel = document.getElementById('coffeeBaseAmountLabel');
-        if (type === 'espresso') {
-            if (amountLabel) amountLabel.textContent = 'SHOTS';
-            const savedShots = parseInt(localStorage.getItem('coffee_base_shots') || '2');
-            coffeeBaseAmount = savedShots;
-            if (amountBtns) amountBtns.innerHTML = `
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedShots === 1 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(1)">1</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedShots === 2 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(2)">2</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedShots === 3 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(3)">3</button>
-            `;
-        } else {
-            if (amountLabel) amountLabel.textContent = 'BREW VOL';
-            const savedVol = parseInt(localStorage.getItem('coffee_base_brew_oz') || '8');
-            coffeeBaseAmount = savedVol;
-            if (amountBtns) amountBtns.innerHTML = `
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedVol === 4 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(4)">4oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedVol === 8 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(8)">8oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedVol === 12 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(12)">12oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 ${savedVol === 16 ? 'active-lab-mode' : ''}" onclick="setCoffeeBaseAmount(16)">16oz</button>
-            `;
-        }
-        updateSelectedArea();
-    }
-
-    function setCoffeeBaseAmount(val) {
-        coffeeBaseAmount = parseInt(val);
-        // Persist under the right key
-        if (coffeeBaseType === 'espresso') {
-            localStorage.setItem('coffee_base_shots', coffeeBaseAmount);
-        } else {
-            localStorage.setItem('coffee_base_brew_oz', coffeeBaseAmount);
-        }
-        // Update active button
-        document.querySelectorAll('#coffeeBaseAmountBtns button').forEach(btn => {
-            const match = btn.getAttribute('onclick');
-            btn.classList.toggle('active-lab-mode', match && match.includes('(' + val + ')'));
-        });
+        recalculateCoffeeBaseAmount();
         updateSelectedArea();
     }
 
@@ -465,7 +477,7 @@
         coffeeStyle = savedCoffeeStyle;
         coffeeSizeOz = savedCoffeeSizeOz;
         coffeeBaseType = savedCoffeeBaseType;
-        coffeeBaseAmount = savedCoffeeBaseAmount;
+        
         // Sync hidden fields
         const cStyleField = document.getElementById('coffeeStyleField');
         const cBaseField = document.getElementById('coffeeBaseTypeField');
@@ -473,9 +485,13 @@
         if (cStyleField) cStyleField.value = savedCoffeeStyle;
         if (cBaseField) cBaseField.value = savedCoffeeBaseType;
         if (cSizeField) cSizeField.value = savedCoffeeSizeOz;
-        // Rebuild base amount buttons to reflect saved type+amount
+        
+        // Apply saved selections via setters
+        setCoffeeStyle(savedCoffeeStyle);
+        if (savedCoffeeStyle !== 'espresso_shot') {
+            setCoffeeSize(savedCoffeeSizeOz);
+        }
         setCoffeeBaseType(savedCoffeeBaseType);
-        setCoffeeBaseAmount(savedCoffeeBaseAmount);
     });
 
     function setRecommendationMode(mode) {
@@ -903,22 +919,13 @@
         const savedStyle = localStorage.getItem('coffee_style') || 'hot';
         const savedSize  = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
         const savedBase  = localStorage.getItem('coffee_base_type') || 'espresso';
-        coffeeStyle = savedStyle;
-        coffeeSizeOz = savedSize;
-        coffeeBaseType = savedBase;
-        // Sync UI for coffee controls (only visible when in COFFEE mode)
-        const styleMap = { hot: 'styleHot', iced: 'styleIced', espresso_shot: 'styleShot' };
-        Object.values(styleMap).forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.remove('active-lab-mode');
-        });
-        const activeStyleBtn = document.getElementById(styleMap[savedStyle]);
-        if (activeStyleBtn) activeStyleBtn.classList.add('active-lab-mode');
-
-        if (document.getElementById('baseEspresso')) {
-            document.getElementById('baseEspresso').classList.toggle('active-lab-mode', savedBase === 'espresso');
-            document.getElementById('baseStandardBrew').classList.toggle('active-lab-mode', savedBase === 'standard_brew');
+        
+        // Sync selectors using their setter functions
+        setCoffeeStyle(savedStyle);
+        if (savedStyle !== 'espresso_shot') {
+            setCoffeeSize(savedSize);
         }
+        setCoffeeBaseType(savedBase);
         
         document.getElementById('stepContainer').style.display = 'block';
         document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
@@ -1294,7 +1301,16 @@
                 totalSyrup += parseFloat(amount);
             }
 
-            const dualLabel = !isDryCoffee ? `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}` : `${displayVolume}${ingUnit}`;
+            let dualLabel;
+            if (isDryCoffee) {
+                if (coffeeBaseType === 'espresso') {
+                    dualLabel = `${displayVolume}g (${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''})`;
+                } else {
+                    dualLabel = `${displayVolume}g (for ${coffeeBaseAmount}oz brew)`;
+                }
+            } else {
+                dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
+            }
             
             html += `
                 <div class="col-auto">
