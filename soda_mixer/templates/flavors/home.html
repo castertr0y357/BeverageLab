@@ -1304,9 +1304,9 @@
             let dualLabel;
             if (isDryCoffee) {
                 if (coffeeBaseType === 'espresso') {
-                    dualLabel = `${displayVolume}g (${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''})`;
+                    dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''}`;
                 } else {
-                    dualLabel = `${displayVolume}g (for ${coffeeBaseAmount}oz brew)`;
+                    dualLabel = `${coffeeBaseAmount}oz`;
                 }
             } else {
                 dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
