@@ -48,30 +48,68 @@
             {% if recipe.drink_type == 'COFFEE' %}
             <!-- Extraction Parameters (Coffee Specific) -->
             <div class="row g-3 mb-5">
+                {% if recipe.coffee_style or recipe.drink_size_oz or recipe.coffee_base_type %}
+                <!-- Coffee Drink Format Row -->
+                <div class="col-12">
+                    <div class="glass-card p-3 border-white border-opacity-10 d-flex flex-wrap gap-3 align-items-center">
+                        {% if recipe.coffee_style %}
+                        <div class="text-center">
+                            <div class="readout-label">DRINK STYLE</div>
+                            <div class="fw-bold text-white">
+                                {% if recipe.coffee_style == 'hot' %}☕ Hot
+                                {% elif recipe.coffee_style == 'iced' %}❄️ Iced
+                                {% elif recipe.coffee_style == 'espresso_shot' %}⚡ Espresso Shot
+                                {% else %}{{ recipe.get_coffee_style_display }}{% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if recipe.drink_size_oz %}
+                        <div class="text-center">
+                            <div class="readout-label">TARGET SIZE</div>
+                            <div class="fw-bold text-white">{{ recipe.drink_size_oz|floatformat:0 }} oz</div>
+                        </div>
+                        {% endif %}
+                        {% if recipe.coffee_base_type %}
+                        <div class="text-center">
+                            <div class="readout-label">BASE TYPE</div>
+                            <div class="fw-bold text-white">{{ recipe.get_coffee_base_type_display }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% if recipe.brew_method %}
                 <div class="col-md-3">
                     <div class="readout-card text-center">
                         <div class="readout-label">METHOD</div>
                         <div class="fw-bold text-white fs-5">{{ recipe.get_brew_method_display }}</div>
                     </div>
                 </div>
+                {% endif %}
+                {% if recipe.grind_size %}
                 <div class="col-md-3">
                     <div class="readout-card text-center">
                         <div class="readout-label">GRIND</div>
                         <div class="fw-bold text-white fs-5">{{ recipe.get_grind_size_display }}</div>
                     </div>
                 </div>
+                {% endif %}
+                {% if recipe.water_temp_c %}
                 <div class="col-md-3">
                     <div class="readout-card text-center">
                         <div class="readout-label">TEMP</div>
                         <div class="fw-bold text-white fs-5">{{ recipe.water_temp_c }}°C <small class="text-dim">/ {{ recipe.water_temp_f }}°F</small></div>
                     </div>
                 </div>
+                {% endif %}
+                {% if recipe.brew_time_sec %}
                 <div class="col-md-3">
                     <div class="readout-card text-center">
                         <div class="readout-label">EXTRACTION</div>
                         <div class="fw-bold text-white fs-5">{{ recipe.brew_time_sec }}s</div>
                     </div>
                 </div>
+                {% endif %}
             </div>
             {% endif %}
 
@@ -86,13 +124,21 @@
                     </div>
                 </div>
                 {% elif recipe.drink_type == 'COFFEE' %}
+                {% if recipe.coffee_style or recipe.drink_size_oz %}
                 <div class="d-flex align-items-center gap-2 print-hide">
-                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">SHOT SCALE</span>
-                    <div class="btn-group btn-group-xs">
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale2Shot" onclick="setCoffeeScale(1.0)">2-shot</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale1Shot" onclick="setCoffeeScale(0.5)">1-shot</button>
-                    </div>
+                    {% if recipe.coffee_style %}
+                    <span class="badge border border-white border-opacity-10 py-1 px-2 text-white" style="font-size:0.6rem;">
+                        {% if recipe.coffee_style == 'hot' %}☕{% elif recipe.coffee_style == 'iced' %}❄️{% else %}⚡{% endif %}
+                        {{ recipe.get_coffee_style_display|upper }}
+                    </span>
+                    {% endif %}
+                    {% if recipe.drink_size_oz %}
+                    <span class="badge border border-white border-opacity-10 py-1 px-2 text-white" style="font-size:0.6rem;">
+                        {{ recipe.drink_size_oz|floatformat:0 }}oz
+                    </span>
+                    {% endif %}
                 </div>
+                {% endif %}
                 {% endif %}
             </div>
                 
@@ -270,17 +316,6 @@
         const scale05L = document.getElementById('scale05L');
         if (scale1L) scale1L.classList.toggle('active-lab-mode', currentScale === 1.0);
         if (scale05L) scale05L.classList.toggle('active-lab-mode', currentScale === 0.5);
-        
-        updateAmounts();
-    }
-
-    function setCoffeeScale(scale) {
-        currentScale = parseFloat(scale);
-        
-        const scale2Shot = document.getElementById('scale2Shot');
-        const scale1Shot = document.getElementById('scale1Shot');
-        if (scale2Shot) scale2Shot.classList.toggle('active-lab-mode', currentScale === 1.0);
-        if (scale1Shot) scale1Shot.classList.toggle('active-lab-mode', currentScale === 0.5);
         
         updateAmounts();
     }

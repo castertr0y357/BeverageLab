@@ -53,6 +53,10 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
             water_temp_c=request.POST.get('water_temp_c') or None,
             brew_time_sec=request.POST.get('brew_time_sec') or None,
             total_water_g=request.POST.get('total_water_g') or None,
+            # Coffee drink format fields (only meaningful when drink_type == 'COFFEE')
+            coffee_style=request.POST.get('coffee_style') or None,
+            coffee_base_type=request.POST.get('coffee_base_type') or None,
+            drink_size_oz=float(request.POST.get('drink_size_oz')) if request.POST.get('drink_size_oz') else None,
         )
 
         if category_ids:

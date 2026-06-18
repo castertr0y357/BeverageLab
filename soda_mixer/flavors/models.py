@@ -168,6 +168,17 @@ class Recipe(models.Model):
         ('coarse', 'Coarse'),
     ]
 
+    COFFEE_STYLE_CHOICES = [
+        ('hot', 'Hot'),
+        ('iced', 'Iced'),
+        ('espresso_shot', 'Espresso Shot'),
+    ]
+
+    COFFEE_BASE_TYPE_CHOICES = [
+        ('espresso', 'Espresso'),
+        ('standard_brew', 'Standard Brew'),
+    ]
+
     name = models.CharField(max_length=100)
     drink_type = models.CharField(max_length=10, choices=DRINK_TYPE_CHOICES, default='SODA')
     description = models.TextField(blank=True, null=True)
@@ -184,6 +195,27 @@ class Recipe(models.Model):
     water_temp_c = models.FloatField(blank=True, null=True, help_text="Water temperature in Celsius")
     brew_time_sec = models.IntegerField(blank=True, null=True, help_text="Total brew time in seconds")
     total_water_g = models.FloatField(blank=True, null=True, help_text="Total water used in grams")
+
+    # Coffee drink format
+    coffee_style = models.CharField(
+        max_length=20,
+        choices=COFFEE_STYLE_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Drink format: hot, iced, or espresso shot"
+    )
+    coffee_base_type = models.CharField(
+        max_length=20,
+        choices=COFFEE_BASE_TYPE_CHOICES,
+        blank=True,
+        null=True,
+        help_text="Whether the coffee base is espresso or a standard brew"
+    )
+    drink_size_oz = models.FloatField(
+        blank=True,
+        null=True,
+        help_text="Target drink size in oz (8/12/16/20 for drinks; 1/2 for espresso shots)"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

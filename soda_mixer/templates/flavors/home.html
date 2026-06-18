@@ -67,6 +67,9 @@
             <form id="mixerForm" action="{% url 'create_recipe' %}" method="POST">
                 {% csrf_token %}
                 <input type="hidden" name="drink_type" id="drinkTypeField" value="SODA">
+                <input type="hidden" name="coffee_style" id="coffeeStyleField" value="">
+                <input type="hidden" name="coffee_base_type" id="coffeeBaseTypeField" value="">
+                <input type="hidden" name="drink_size_oz" id="drinkSizeOzField" value="">
                 
                 <div class="mb-4" id="selectedArea" style="display: none;">
                     <div class="d-flex justify-content-between align-items-end mb-2">
@@ -80,10 +83,23 @@
                                 </div>
                             </div>
                             <div class="align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10" id="scaleContainerCoffee" style="display: none !important;">
-                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">SHOT SCALE</span>
-                                <div class="btn-group btn-group-xs pb-1">
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale2Shot" onclick="setCoffeeScale(1.0)">2-shot</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale1Shot" onclick="setCoffeeScale(0.5)">1-shot</button>
+                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">DRINK STYLE</span>
+                                <div class="btn-group btn-group-xs pb-1 mb-1" id="coffeeStyleBtns">
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="styleHot" onclick="setCoffeeStyle('hot')">☕ Hot</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="styleIced" onclick="setCoffeeStyle('iced')">❄️ Iced</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="styleShot" onclick="setCoffeeStyle('espresso_shot')">⚡ Shot</button>
+                                </div>
+                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">DRINK SIZE</span>
+                                <div class="btn-group btn-group-xs pb-1 mb-1" id="coffeeSizeBtns">
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size8oz" onclick="setCoffeeSize(8)">8oz</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
+                                </div>
+                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">COFFEE BASE</span>
+                                <div class="btn-group btn-group-xs pb-1" id="coffeeBaseBtns">
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
+                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-xs btn-outline-info opacity-75 hover-opacity-100" onclick="stepBack()">
@@ -242,6 +258,11 @@
     let originalRecipesHtml = '';
     const themeStats = JSON.parse('{{ stats_json|escapejs }}');
 
+    // ☕ Coffee Drink Format State
+    let coffeeStyle = 'hot';        // 'hot' | 'iced' | 'espresso_shot'
+    let coffeeSizeOz = 12;          // oz: 8, 12, 16, 20, 1, 2
+    let coffeeBaseType = 'espresso'; // 'espresso' | 'standard_brew'
+
     function setBottleScale(scale) {
         bottleScale = parseFloat(scale);
         document.getElementById('scale1L').classList.toggle('active-lab-mode', bottleScale === 1.0);
@@ -249,12 +270,118 @@
         updateSelectedArea();
     }
 
-    function setCoffeeScale(scale) {
-        bottleScale = parseFloat(scale);
-        document.getElementById('scale2Shot').classList.toggle('active-lab-mode', bottleScale === 1.0);
-        document.getElementById('scale1Shot').classList.toggle('active-lab-mode', bottleScale === 0.5);
+    // ☕ Coffee drink format controls
+    function setCoffeeStyle(style) {
+        coffeeStyle = style;
+        localStorage.setItem('coffee_style', style);
+        // Update style button states
+        ['styleHot', 'styleIced', 'styleShot'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active-lab-mode');
+        });
+        const styleMap = { hot: 'styleHot', iced: 'styleIced', espresso_shot: 'styleShot' };
+        const activeBtn = document.getElementById(styleMap[style]);
+        if (activeBtn) activeBtn.classList.add('active-lab-mode');
+
+        // Re-render size options based on style
+        const shotMode = (style === 'espresso_shot');
+        const drinkSizeIds = ['size8oz', 'size12oz', 'size16oz', 'size20oz'];
+        const shotSizeIds  = ['size1oz', 'size2oz'];
+        const sizeBtns = document.getElementById('coffeeSizeBtns');
+        if (shotMode) {
+            sizeBtns.innerHTML = `
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
+            `;
+            setCoffeeSize(2);
+        } else {
+            // Default 12oz selected
+            const prev = coffeeSizeOz;
+            const defaultSize = [8,12,16,20].includes(prev) ? prev : 12;
+            sizeBtns.innerHTML = `
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size8oz"  onclick="setCoffeeSize(8)">8oz</button>
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
+                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
+            `;
+            setCoffeeSize(defaultSize);
+        }
+
+        // Update hidden field and refresh compound display
+        const coffeeStyleField = document.getElementById('coffeeStyleField');
+        if (coffeeStyleField) coffeeStyleField.value = style;
         updateSelectedArea();
     }
+
+    function setCoffeeSize(oz) {
+        coffeeSizeOz = parseFloat(oz);
+        localStorage.setItem('coffee_size_oz', coffeeSizeOz);
+        // Mark the active button
+        document.querySelectorAll('#coffeeSizeBtns button').forEach(btn => {
+            btn.classList.remove('active-lab-mode');
+        });
+        // Find the button with matching onclick value
+        document.querySelectorAll('#coffeeSizeBtns button').forEach(btn => {
+            const match = btn.getAttribute('onclick');
+            if (match && match.includes('(' + oz + ')')) {
+                btn.classList.add('active-lab-mode');
+            }
+        });
+        const drinkSizeOzField = document.getElementById('drinkSizeOzField');
+        if (drinkSizeOzField) drinkSizeOzField.value = coffeeSizeOz;
+        updateSelectedArea();
+    }
+
+    function setCoffeeBaseType(type) {
+        coffeeBaseType = type;
+        localStorage.setItem('coffee_base_type', type);
+        document.getElementById('baseEspresso').classList.toggle('active-lab-mode', type === 'espresso');
+        document.getElementById('baseStandardBrew').classList.toggle('active-lab-mode', type === 'standard_brew');
+        const coffeeBaseTypeField = document.getElementById('coffeeBaseTypeField');
+        if (coffeeBaseTypeField) coffeeBaseTypeField.value = type;
+        updateSelectedArea();
+    }
+
+    /**
+     * Calculate the amount for a coffee ingredient based on drink size and position.
+     * @param {object} ing - Ingredient object
+     * @param {number} index - Position in the ingredient list (0 = bean/base)
+     * @param {number} sizeOz - Target drink size in oz
+     * @param {string} baseType - 'espresso' | 'standard_brew'
+     * @returns {number} amount in appropriate units (g for beans, ml for liquids)
+     */
+    function coffeeAmountForIngredient(ing, index, sizeOz, baseType) {
+        const isDryCoffee = (ing.type === 'COFFEE_BEAN');
+        const isShot = (coffeeStyle === 'espresso_shot');
+
+        if (isDryCoffee) {
+            // Beans: fixed per shot regardless of drink size
+            // Espresso: ~18g/shot; standard brew: ~15g per serving
+            const gramsPerShot = (baseType === 'espresso') ? 18.0 : 15.0;
+            if (isShot) {
+                // sizeOz for shots is 1 or 2 (single/double)
+                return gramsPerShot * Math.max(1, sizeOz);
+            }
+            // For drinks, typical espresso base is 1-2 shots (use 2 shots = 36g for >=12oz, 1 shot=18g for 8oz)
+            return sizeOz <= 8 ? gramsPerShot : gramsPerShot * 2;
+        }
+
+        if (isShot) {
+            // For espresso shots, keep syrups/additives minimal
+            return ing.type === 'ADDITIVE' ? 10.0 : 8.0;
+        }
+
+        // For drink-size drinks: scale syrups/additives proportionally
+        // Reference: a 12oz drink uses ~30ml syrup, ~60ml creamer/milk
+        const isAdditive = (ing.type === 'ADDITIVE');
+        const scaleFactor = sizeOz / 12.0;  // 12oz is the reference
+        if (isAdditive) {
+            return Math.round(60.0 * scaleFactor);
+        }
+        // Flavor syrups and other liquids
+        return Math.round(30.0 * scaleFactor);
+    }
+
 
     function formatImperialVolume(ml) {
         const oz = ml * 0.033814;
@@ -279,11 +406,25 @@
         const savedMode = localStorage.getItem('lab_mode') || 'SODA';
         const savedRecMode = localStorage.getItem('recommendation_mode') || 'standard';
         const savedEngineMode = localStorage.getItem('engine_mode') || 'algorithmic';
-        
+        const savedCoffeeStyle = localStorage.getItem('coffee_style') || 'hot';
+        const savedCoffeeSizeOz = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
+        const savedCoffeeBaseType = localStorage.getItem('coffee_base_type') || 'espresso';
+
         setLabMode(savedMode, true); 
         setRecommendationMode(savedRecMode);
         setEngineMode(savedEngineMode);
-        
+
+        // Apply saved coffee controls (run after setLabMode so DOM is ready)
+        coffeeStyle = savedCoffeeStyle;
+        coffeeSizeOz = savedCoffeeSizeOz;
+        coffeeBaseType = savedCoffeeBaseType;
+        // Sync hidden fields
+        const cStyleField = document.getElementById('coffeeStyleField');
+        const cBaseField = document.getElementById('coffeeBaseTypeField');
+        const cSizeField = document.getElementById('drinkSizeOzField');
+        if (cStyleField) cStyleField.value = savedCoffeeStyle;
+        if (cBaseField) cBaseField.value = savedCoffeeBaseType;
+        if (cSizeField) cSizeField.value = savedCoffeeSizeOz;
     });
 
     function setRecommendationMode(mode) {
@@ -689,16 +830,32 @@
         isCreamerTransition = false;
         bottleScale = 1.0;
         
-        // Reset scale UI states
+        // Reset soda/slushie scale UI
         const scale1L = document.getElementById('scale1L');
         const scale05L = document.getElementById('scale05L');
         if (scale1L) scale1L.classList.add('active-lab-mode');
         if (scale05L) scale05L.classList.remove('active-lab-mode');
         
-        const scale2Shot = document.getElementById('scale2Shot');
-        const scale1Shot = document.getElementById('scale1Shot');
-        if (scale2Shot) scale2Shot.classList.add('active-lab-mode');
-        if (scale1Shot) scale1Shot.classList.remove('active-lab-mode');
+        // Reset coffee controls to saved/default state
+        const savedStyle = localStorage.getItem('coffee_style') || 'hot';
+        const savedSize  = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
+        const savedBase  = localStorage.getItem('coffee_base_type') || 'espresso';
+        coffeeStyle = savedStyle;
+        coffeeSizeOz = savedSize;
+        coffeeBaseType = savedBase;
+        // Sync UI for coffee controls (only visible when in COFFEE mode)
+        const styleMap = { hot: 'styleHot', iced: 'styleIced', espresso_shot: 'styleShot' };
+        Object.values(styleMap).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active-lab-mode');
+        });
+        const activeStyleBtn = document.getElementById(styleMap[savedStyle]);
+        if (activeStyleBtn) activeStyleBtn.classList.add('active-lab-mode');
+
+        if (document.getElementById('baseEspresso')) {
+            document.getElementById('baseEspresso').classList.toggle('active-lab-mode', savedBase === 'espresso');
+            document.getElementById('baseStandardBrew').classList.toggle('active-lab-mode', savedBase === 'standard_brew');
+        }
         
         document.getElementById('stepContainer').style.display = 'block';
         document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
@@ -1040,20 +1197,25 @@
             const ingUnit = isDryCoffee ? 'g' : 'ml';
 
             if (!amount) {
-                // Algorithmic Tier Fallback (Target: 160ml total for 1L)
-                const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
-                amount = currentLabMode === 'COFFEE' ? (isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0)) : baseVolume * (bottleScale || 1.0);
+                if (currentLabMode === 'COFFEE') {
+                    amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                } else {
+                    // Algorithmic Tier Fallback for Soda/Slushie (Target: 160ml total for 1L)
+                    const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
+                    amount = baseVolume * (bottleScale || 1.0);
+                }
             }
             
-            // 🧪 Apply Molecular Expansion
+            // 🧪 Apply Molecular Expansion (Soda/Slushie only)
             if (currentLabMode !== 'COFFEE') {
                 amount = amount * expansionFactor;
             } else {
-                // Defensive clamp: prevent absurd coffee values
-                const maxVal = isDryCoffee ? 30.0 : (ing.type === 'ADDITIVE' ? 150.0 : 50.0);
+                // For coffee mode: clamp to sensible maximums
+                const isDryCoffee2 = ing.type === 'COFFEE_BEAN';
+                const maxVal = isDryCoffee2 ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
                 if (amount > maxVal) {
-                    console.warn(`Coffee amount clamped: ${ing.name} was ${amount}, defaulting to tier value`);
-                    amount = isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0);
+                    console.warn(`Coffee amount clamped: ${ing.name} was ${amount}`);
+                    amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
                 }
             }
             
@@ -1189,21 +1351,27 @@
     function interceptAndSave() {
         const data = {
             drink_type: currentLabMode,
+            coffee_style: coffeeStyle,
+            coffee_base_type: coffeeBaseType,
+            drink_size_oz: coffeeSizeOz,
             ingredients: selectedIngredients.map((ing, idx) => {
                 let amount = ing.amount;
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
                 if (!amount) {
-                    const baseVolume = currentLabMode === 'COFFEE' 
-                        ? (isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0))
-                        : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
-                    amount = baseVolume * bottleScale;
-                } else {
-                    // Defensive clamp for coffee before scaling
                     if (currentLabMode === 'COFFEE') {
-                        const maxVal = isDryCoffee ? 30.0 : (ing.type === 'ADDITIVE' ? 150.0 : 50.0);
-                        if (amount > maxVal) amount = isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0);
+                        amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    } else {
+                        const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
+                        amount = baseVolume * bottleScale;
                     }
-                    amount = amount * bottleScale;
+                } else {
+                    // Defensive clamp for coffee before sending
+                    if (currentLabMode === 'COFFEE') {
+                        const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                        if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    } else {
+                        amount = amount * bottleScale;
+                    }
                 }
                 
                 return {
@@ -1229,17 +1397,20 @@
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             if (!amount) {
-                const baseVolume = currentLabMode === 'COFFEE' 
-                    ? (isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0))
-                    : (idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0));
-                amount = baseVolume * bottleScale;
+                if (currentLabMode === 'COFFEE') {
+                    amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                } else {
+                    const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
+                    amount = baseVolume * bottleScale;
+                }
             } else {
                 // Defensive clamp for coffee before scaling
                 if (currentLabMode === 'COFFEE') {
-                    const maxVal = isDryCoffee ? 30.0 : (ing.type === 'ADDITIVE' ? 150.0 : 50.0);
-                    if (amount > maxVal) amount = isDryCoffee ? 18.0 : (ing.type === 'ADDITIVE' ? 50.0 : 15.0);
+                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                    if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                } else {
+                    amount = amount * bottleScale;
                 }
-                amount = amount * bottleScale;
             }
             
             // Create inputs matching views.create_recipe expectations
@@ -1253,8 +1424,9 @@
             const notesInput = document.createElement('input');
             notesInput.type = 'hidden';
             notesInput.name = `notes_${ing.id}`;
+            const styleLabel = { hot: 'Hot', iced: 'Iced', espresso_shot: 'Espresso Shot' }[coffeeStyle] || coffeeStyle;
             notesInput.value = currentLabMode === 'COFFEE'
-                ? `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale === 1.0 ? '2-shot' : '1-shot'} Scale`
+                ? `Automatic laboratory synthesis — ${styleLabel}, ${coffeeSizeOz}oz, ${coffeeBaseType === 'espresso' ? 'Espresso base' : 'Standard Brew base'}`
                 : `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale}L Scale`;
             notesInput.className = 'dynamic-mix-input';
             mixerForm.appendChild(notesInput);
