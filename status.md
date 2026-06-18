@@ -3,9 +3,13 @@
 ## 📋 Todo List
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page.
+- [x] Implement espresso base additive scaling to automatically fill the remaining target cup size with milk/creamer.
+- [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly and occupy the full-width header area.
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly (using `btn-md py-2 fs-6` buttons) and occupy the full-width header area.
+- [x] Implement espresso base additive scaling to automatically calculate the remaining volume of target cup size (subtracting espresso shot volume and ice volume) and scale up milk/creamer additives to fill the cup.
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page, scaling standard brew coffee volume and liquid additives (reduced by 40%), showing ice ounces (3oz for 8oz, 5oz for 12oz, 6oz for 16oz, 8oz for 20oz) and ~ml.
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
 - [x] Enabled dynamic scaling and recalculation of AI-balanced ingredient amounts in Coffee Lab mode when selectors (style, size, base type, base amount) are changed, preserving the relative proportions (ratios) balanced by the AI while allowing the volumes to scale fluidly without needing to query the LLM again.

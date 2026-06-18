@@ -72,6 +72,36 @@
                 <input type="hidden" name="drink_size_oz" id="drinkSizeOzField" value="">
                 
                 <div class="mb-4" id="selectedArea" style="display: none;">
+                    <!-- Dedicated tablet-friendly large buttons container for Coffee Lab settings (fits red rectangle area) -->
+                    <div id="scaleContainerCoffee" class="glass-card p-3 mb-4 border-white border-opacity-10 bg-white bg-opacity-5" style="display: none !important;">
+                        <div class="row g-3">
+                            <div class="col-md-4 col-sm-12">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK STYLE</label>
+                                <div class="btn-group w-100" id="coffeeStyleBtns">
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="styleHot" onclick="setCoffeeStyle('hot')">☕ Hot</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="styleIced" onclick="setCoffeeStyle('iced')">❄️ Iced</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="styleShot" onclick="setCoffeeStyle('espresso_shot')">⚡ Shot</button>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-sm-12">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK SIZE</label>
+                                <div class="btn-group w-100" id="coffeeSizeBtns">
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size8oz" onclick="setCoffeeSize(8)">8oz</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-sm-12">
+                                <label id="coffeeBaseLabel" class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">COFFEE BASE</label>
+                                <div class="btn-group w-100" id="coffeeBaseBtns">
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-end mb-2">
                         <label class="readout-label mb-0">Current Compound</label>
                         <div class="d-flex gap-2 align-items-center">
@@ -80,26 +110,6 @@
                                 <div class="btn-group btn-group-xs pb-1">
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L</button>
                                     <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
-                                </div>
-                            </div>
-                            <div class="align-items-center gap-2 me-3 pb-1 border-bottom border-white border-opacity-10" id="scaleContainerCoffee" style="display: none !important;">
-                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">DRINK STYLE</span>
-                                <div class="btn-group btn-group-xs pb-1 mb-1" id="coffeeStyleBtns">
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="styleHot" onclick="setCoffeeStyle('hot')">☕ Hot</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="styleIced" onclick="setCoffeeStyle('iced')">❄️ Iced</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="styleShot" onclick="setCoffeeStyle('espresso_shot')">⚡ Shot</button>
-                                </div>
-                                <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">DRINK SIZE</span>
-                                <div class="btn-group btn-group-xs pb-1 mb-1" id="coffeeSizeBtns">
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size8oz" onclick="setCoffeeSize(8)">8oz</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
-                                </div>
-                                <span id="coffeeBaseLabel" class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">COFFEE BASE</span>
-                                <div class="btn-group btn-group-xs pb-1" id="coffeeBaseBtns">
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
-                                    <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-xs btn-outline-info opacity-75 hover-opacity-100" onclick="stepBack()">
@@ -341,8 +351,8 @@
         const sizeBtns = document.getElementById('coffeeSizeBtns');
         if (shotMode) {
             sizeBtns.innerHTML = `
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
             `;
             // Force coffee base type to espresso for shots
             coffeeBaseType = 'espresso';
@@ -358,10 +368,10 @@
             const prev = coffeeSizeOz;
             const defaultSize = [8,12,16,20].includes(prev) ? prev : 12;
             sizeBtns.innerHTML = `
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size8oz"  onclick="setCoffeeSize(8)">8oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
-                <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size8oz"  onclick="setCoffeeSize(8)">8oz</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
             `;
             setCoffeeSize(defaultSize);
         }
@@ -449,7 +459,17 @@
             return ing.type === 'ADDITIVE' ? 10.0 : 8.0;
         }
 
-        // For full-size drinks: scale syrups/additives proportionally to drink size
+        // Scale additives to fill remaining volume for espresso bases
+        if (baseType === 'espresso' && ing.type === 'ADDITIVE') {
+            const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(sizeOz) : 0;
+            const shots = coffeeBaseAmount; // number of shots
+            const remainingOz = sizeOz - iceOz - shots;
+            const targetAdditiveMl = remainingOz * 29.5735;
+            return Math.max(30.0, Math.round(targetAdditiveMl));
+        }
+
+        // For standard brew or non-additive ingredients (syrups/accents):
+        // Scale syrups/additives proportionally to drink size
         // Reference baseline: a 12oz drink uses ~60ml creamer/milk, ~30ml syrup
         let scaleFactor = sizeOz / 12.0;
         
@@ -1261,7 +1281,7 @@
         } else if (currentLabMode === 'COFFEE') {
             scaleContainer.style.setProperty('display', 'none', 'important');
             if (scaleContainerCoffee) {
-                scaleContainerCoffee.style.setProperty('display', 'flex', 'important');
+                scaleContainerCoffee.style.setProperty('display', 'block', 'important');
             }
         } else {
             scaleContainer.style.setProperty('display', 'none', 'important');
