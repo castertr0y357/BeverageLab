@@ -827,8 +827,8 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
     def test_sanitize_coffee_amount(self) -> None:
         from .views.ai import sanitize_coffee_amount
         self.assertEqual(sanitize_coffee_amount(self.bean, 100.0), 18.0)
-        self.assertEqual(sanitize_coffee_amount(self.creamer, 50.0), 5.0)
-        self.assertEqual(sanitize_coffee_amount(self.syrup, 25.0), 2.0)
+        self.assertEqual(sanitize_coffee_amount(self.creamer, 50.0), 50.0)
+        self.assertEqual(sanitize_coffee_amount(self.syrup, 25.0), 15.0)
 
     @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
     def test_ai_suggest_api_coffee_sanitization(self, mock_suggest: MagicMock) -> None:
@@ -862,8 +862,8 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         
-        # Verify suggestions amount is coerced to 5.0 (Whole Milk is ADDITIVE)
-        self.assertEqual(data['suggestions'][0]['amount'], 5.0)
+        # Verify suggestions amount is coerced to 50.0 (Whole Milk is ADDITIVE)
+        self.assertEqual(data['suggestions'][0]['amount'], 50.0)
         # Verify rebalancing amount is coerced to 18.0 (Espresso Beans is COFFEE_BEAN)
         self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 18.0)
 

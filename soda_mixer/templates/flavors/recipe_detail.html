@@ -116,8 +116,12 @@
                         <div class="d-flex justify-content-between align-items-center mt-auto gap-2">
                             <div class="readout-card p-1 ps-2 border-primary border-opacity-50 flex-grow-1">
                                 <div class="readout-label" style="font-size: 0.6rem;">UNIT MASS</div>
-                                <div class="fw-bold amount-display" data-original-amount="{{ ri.amount }}" data-drink-type="{{ recipe.drink_type }}">
-                                    {{ ri.amount|floatformat:1 }} {% if recipe.drink_type == 'SODA' or recipe.drink_type == 'SLUSHIE' %}ml{% else %}g{% endif %}
+                                <div class="fw-bold amount-display" data-original-amount="{{ ri.amount }}" data-drink-type="{{ recipe.drink_type }}" data-ingredient-type="{{ ri.ingredient.ingredient_type }}">
+                                    {% if recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
+                                        {{ ri.amount|floatformat:1 }} g
+                                    {% else %}
+                                        {{ ri.amount|floatformat:1 }} ml
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="readout-card p-1 ps-2 border-warning border-opacity-50 flex-grow-1">
@@ -288,10 +292,11 @@
             if (isNaN(originalAmount)) return;
             
             const drinkType = el.getAttribute('data-drink-type');
+            const ingredientType = el.getAttribute('data-ingredient-type');
             const isCoffee = drinkType === 'COFFEE';
             const scaledAmount = originalAmount * currentScale;
             
-            if (isCoffee) {
+            if (isCoffee && ingredientType === 'COFFEE_BEAN') {
                 el.innerHTML = `${scaledAmount.toFixed(1)} g`;
             } else {
                 const displayVolume = Math.round(scaledAmount);

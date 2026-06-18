@@ -412,7 +412,7 @@ def export_recipe_to_mealie_api(request: HttpRequest, pk: int) -> JsonResponse:
     
     mealie_ingredients: List[Dict[str, Any]] = []
     for ring in recipe.recipe_ingredients.all():
-        unit = "oz" if recipe.drink_type == "SLUSHIE" else ("g" if recipe.drink_type == "COFFEE" else "ml")
+        unit = "oz" if recipe.drink_type == "SLUSHIE" else ("g" if recipe.drink_type == "COFFEE" and ring.ingredient and ring.ingredient.ingredient_type == "COFFEE_BEAN" else "ml")
         ing_full_name = ring.ingredient.name
         amount = float(ring.amount)
         

@@ -98,7 +98,7 @@
                          data-type="{{ ingredient.ingredient_type }}"
                          data-category="{{ ingredient.category }}">
                         <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-5 hover-lime"
-                             onclick="addIngredient(this, '{{ ingredient.name|escapejs }}', {{ ingredient.intensity }}, '{{ ingredient.category }}')"
+                             onclick="addIngredient(this, '{{ ingredient.name|escapejs }}', {{ ingredient.intensity }}, '{{ ingredient.category }}', '{{ ingredient.ingredient_type }}')"
                              data-ingredient-id="{{ ingredient.id }}"
                              data-base-suitability="{{ ingredient.base_suitability }}"
                              data-accent-suitability="{{ ingredient.accent_suitability }}">
@@ -236,7 +236,7 @@
         renderSelectedIngredients();
     }
 
-    function addIngredient(btn, name, intensity, category) {
+    function addIngredient(btn, name, intensity, category, type) {
         const id = btn.getAttribute('data-ingredient-id');
         if (selectedIngredients.find(i => i.id === id)) return;
         
@@ -244,7 +244,8 @@
             id: id,
             name: name,
             intensity: intensity,
-            category: category
+            category: category,
+            type: type
         });
         renderSelectedIngredients();
     }
@@ -257,7 +258,6 @@
     function renderSelectedIngredients() {
         const container = document.getElementById('selectedIngredientsList');
         const type = document.getElementById('drink_type').value;
-        const unit = type === 'COFFEE' ? 'G' : 'ML';
         
         if (selectedIngredients.length === 0) {
             container.innerHTML = '<p class="text-dim">No materiel selected for synthesis.</p>';
@@ -270,13 +270,17 @@
                 <thead class="text-dim small readout-label">
                     <tr>
                         <th class="border-0">MATERIEL</th>
-                        <th class="border-0">MASS (${unit})</th>
+                        <th class="border-0">QUANTITY</th>
                         <th class="border-0 text-end">CONTROL</th>
                     </tr>
                 </thead>
                 <tbody class="border-0">`;
         
         for (const i of selectedIngredients) {
+            const isBean = i.type === 'COFFEE_BEAN';
+            const rowUnit = type === 'COFFEE' ? (isBean ? 'g' : 'ml') : (type === 'SLUSHIE' ? 'oz' : 'ml');
+            const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (i.type === 'ADDITIVE' ? '50.0' : '15.0')) : '1.0';
+            
             html += `
                 <tr class="align-middle">
                     <td class="border-white border-opacity-5">
@@ -284,8 +288,11 @@
                         <span class="badge-fizz bg-${i.category}" style="font-size:0.5rem;">${i.category}</span>
                     </td>
                     <td class="border-white border-opacity-5">
-                        <input type="number" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
-                               name="amount_${i.id}" value="${type === 'COFFEE' ? '18.0' : '1.0'}" min="0.1" step="0.1" style="width: 80px;">
+                        <div class="d-flex align-items-center gap-1">
+                            <input type="number" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
+                                   name="amount_${i.id}" value="${defaultAmount}" min="0.1" step="0.1" style="width: 80px;">
+                            <span class="small text-dim row-unit" data-ingredient-type="${i.type}">${rowUnit}</span>
+                        </div>
                     </td>
                     <td class="border-white border-opacity-5 text-end">
                         <button type="button" class="btn btn-outline-danger btn-sm border-0 opacity-50" onclick="removeIngredient('${i.id}')">

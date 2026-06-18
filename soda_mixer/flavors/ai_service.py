@@ -91,7 +91,7 @@ class AIAssistant:
                             "name": "Whole Milk",
                             "reason": "Adds sweetness and creamy texture",
                             "resonance": 90,
-                            "amount": 5.0,
+                            "amount": 50.0,
                             "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
                         }
                     ],
@@ -130,7 +130,7 @@ class AIAssistant:
                     "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
                     "selection": [
                         { "name": "Espresso", "amount": 18.0, "role": "Base extraction" },
-                        { "name": "Whole Milk", "amount": 5.0, "role": "Creamy body" }
+                        { "name": "Whole Milk", "amount": 50.0, "role": "Creamy body" }
                     ]
                 })
             return json.dumps({
@@ -378,18 +378,19 @@ Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in grams (g) based on coffee brewing ratios. The base coffee beans MUST be 18.0g (representing a double-shot espresso). Modifiers (e.g., milk, sugar) should be 5.0g, and minor accents/spices should be 2.0g. Do NOT prescribe ml amounts, and do NOT use 100.0 or 50.0 for coffee beans.
-4. For new suggestions, provide a specific 'amount' in grams (g) (18.0g for bases, 5.0g for modifiers, 2.0g for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for coffee extraction balance: The total mass of dry coffee beans and minor flavor accents should scale proportionally around the 18.0g double-shot baseline (e.g. 18.0g Espresso Base + 5.0g Milk Payload + 2.0g Syrup Accent = 25.0g total).
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Modifiers/creamers (e.g., milk) must be 50.0ml (milliliters), and minor accents/syrups must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
+4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for modifiers/creamers, 15.0ml for accents/syrups) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid additives and flavor accents should be in volume (e.g., 50.0ml milk, 15.0ml syrup).
 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 5.0, "profile": {{...}} }},
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 15.0, "profile": {{...}} }},
         ...
     ],
     "rebalancing": {{
-        "Espresso": 18.0
+        "Espresso": 18.0,
+        "Whole Milk": 50.0
     }},
     "seal_recommended": true/false,
     "seal_resonance": 95,
@@ -481,15 +482,15 @@ Inventory Registry for Selection:
             rules = """Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
 2. Select a base (e.g. coffee bean) and complementary reagents.
-3. Provide a suggested 'amount' in grams (g). The base coffee beans MUST default to 18.0g. Other modifiers/creamers should be 5.0g, and spices/accents 2.0g.
+3. Provide a suggested 'amount'. The base coffee beans MUST default to 18.0 (representing 18.0g weight in grams). Other liquid modifiers/creamers (e.g., milk) must be 50.0 (representing 50.0ml volume in milliliters), and spices/accents/syrups must be 15.0 (representing 15.0ml volume in milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
 5. For each ingredient, provide a specific 'role' (max 8 words).
-6. MANDATORY: Include exactly one 'Additive' or 'Creamer' as a final stabilizer (amount 5.0g)."""
+6. MANDATORY: Include exactly one 'Additive' or 'Creamer' as a final stabilizer (amount 50.0)."""
             example = """{
     "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
     "selection": [
         { "name": "Espresso Roast Blend", "amount": 18.0, "role": "Base extraction" },
-        { "name": "Whole Milk", "amount": 5.0, "role": "Creamy body" }
+        { "name": "Whole Milk", "amount": 50.0, "role": "Creamy body" }
     ]
 }"""
         elif drink_type == 'SLUSHIE':

@@ -230,7 +230,7 @@ class RecipeIngredient(models.Model):
 
     def __str__(self):
         if self.recipe.drink_type == 'COFFEE':
-            unit = "g"
+            unit = "g" if self.ingredient and self.ingredient.ingredient_type == 'COFFEE_BEAN' else "ml"
         elif self.recipe.drink_type == 'SLUSHIE':
             unit = "oz"
         else:

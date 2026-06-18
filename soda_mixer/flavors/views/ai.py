@@ -38,13 +38,13 @@ def get_multibrand_names_in_inventory() -> Set[str]:
 
 
 def sanitize_coffee_amount(ingredient: Ingredient, amount: Optional[Union[float, int]] = None) -> float:
-    """Ensure coffee ingredients have proper gram amounts based on their role/type."""
+    """Ensure coffee ingredients have proper gram/volume amounts based on their role/type."""
     if ingredient.ingredient_type == 'COFFEE_BEAN':
         return 18.0
     elif ingredient.ingredient_type == 'ADDITIVE':
-        return 5.0
+        return 50.0
     else:
-        return 2.0
+        return 15.0
 
 
 def find_ingredient_by_name(name_str: str, inventory_items: List[Ingredient]) -> Optional[Ingredient]:
@@ -99,6 +99,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'id': r['ingredient'].id,
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
+                    'type': r['ingredient'].ingredient_type,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -118,6 +119,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'id': r['ingredient'].id,
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
+                    'type': r['ingredient'].ingredient_type,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -137,6 +139,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'id': r['ingredient'].id,
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
+                    'type': r['ingredient'].ingredient_type,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -418,6 +421,7 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                             'id': target_obj.id,
                             'name': get_display_name(target_obj, multibrand_names),
                             'category': target_obj.category,
+                            'type': target_obj.ingredient_type,
                             'intensity': target_obj.intensity,
                             'sweetness': target_obj.sweetness,
                             'acidity': target_obj.acidity,
@@ -677,6 +681,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 'id': ing.id,
                 'name': get_display_name(ing, multibrand_names),
                 'category': ing.category,
+                'type': ing.ingredient_type,
                 'intensity': ing.intensity,
                 'sweetness': ing.sweetness,
                 'acidity': ing.acidity,
