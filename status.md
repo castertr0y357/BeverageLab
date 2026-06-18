@@ -1,9 +1,11 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Enabled dynamic scaling and recalculation of AI-balanced ingredient amounts in Coffee Lab mode when selectors (style, size, base type, base amount) are changed, preserving the relative proportions (ratios) balanced by the AI while allowing the volumes to scale fluidly without needing to query the LLM again.
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Enabled dynamic scaling and recalculation of AI-balanced ingredient amounts in Coffee Lab mode when selectors (style, size, base type, base amount) are changed, preserving the relative proportions (ratios) balanced by the AI while allowing the volumes to scale fluidly without needing to query the LLM again.
 - [x] Fixed coffee liquid additives (creamers, milks, syrups) displaying and saving in weight (grams) instead of volume (milliliters/ounces). Updated AI prompts (surprise mix and suggest rebalancing), mock responses, recipe model string representation, Mealie export API, and recipe creation/editing templates to ensure only dry coffee beans are measured in grams, while liquid additives are formatted and stored in volume.
 - [x] Fixed scale selector visibility conflict on the home page synthesis terminal: enforced inline `!important` display styles on both BATCH SCALE and SHOT SCALE selector containers and updated Javascript toggling to use `style.setProperty('display', '...', 'important')`, guaranteeing that only the correct scale selector is visible depending on the active lab mode.
 - [x] Implemented server-side coffee amount sanitization to override and coerce AI recommendations, rebalancings (e.g. coffee bean base values resetting to 100g) and surprise selections back to standard extraction gram baselines (18.0g for beans, 5.0g for additives/creamers, 2.0g for accents). Aligned case-insensitive tracking between frontend storage (localStorage) and backend views to guarantee that drink_type is always processed as uppercase (SODA, COFFEE, SLUSHIE) to prevent bypasses and raw fallback leaks. Added unit tests to verify sanitization.

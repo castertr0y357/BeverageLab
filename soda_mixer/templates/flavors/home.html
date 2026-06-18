@@ -627,7 +627,17 @@
         }
 
         const profileObj = typeof profile === 'string' && profile.trim() !== '' ? JSON.parse(profile) : profile;
+        const parsedAmount = amount ? parseFloat(amount) : null;
+        const isAiBalanced = (engineMode === 'ai' && parsedAmount !== null);
+        let aiRatio = 1.0;
         
+        if (isAiBalanced && currentLabMode === 'COFFEE') {
+            const tempIng = { type: type };
+            const idxForStandard = selectedIngredients.length;
+            const standard = coffeeAmountForIngredient(tempIng, idxForStandard, coffeeSizeOz, coffeeBaseType);
+            aiRatio = standard > 0 ? (parsedAmount / standard) : 1.0;
+        }
+
         selectedIngredients.push({
             id: id,
             name: name,
@@ -638,7 +648,9 @@
             complexity: profileObj ? profileObj.complexity : parseInt(complexity),
             category: category,
             type: type,
-            amount: amount ? parseFloat(amount) : null,
+            amount: parsedAmount,
+            isAiBalanced: isAiBalanced,
+            aiRatio: aiRatio,
             profile: profileObj
         });
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
@@ -1014,7 +1026,7 @@
             // Apply Neural Re-balancing to existing ingredients
             if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
                 console.log("Applying Neural Re-balancing:", data.rebalancing);
-                selectedIngredients.forEach(ing => {
+                selectedIngredients.forEach((ing, index) => {
                     const normalizedName = ing.name.toLowerCase().trim();
                     for (const [key, value] of Object.entries(data.rebalancing)) {
                         const normalizedKey = key.toLowerCase().trim();
@@ -1024,7 +1036,9 @@
                             normalizedKey.includes(normalizedName)) {
                             ing.amount = parseFloat(value);
                             ing.isAiBalanced = true;
-                            console.log(`Neural Re-balanced: ${ing.name} → ${value}`);
+                            const standard = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                            ing.aiRatio = standard > 0 ? (ing.amount / standard) : 1.0;
+                            console.log(`Neural Re-balanced: ${ing.name} → ${value} (Ratio: ${ing.aiRatio})`);
                             break;
                         }
                     }
@@ -1247,10 +1261,14 @@
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             const ingUnit = isDryCoffee ? 'g' : 'ml';
 
-            // ☕ Always recalculate coffee amounts from current settings (unless AI-balanced)
+            // ☕ Always recalculate coffee amounts from current settings
             // This ensures changing Style/Size/Base immediately updates the display.
-            if (currentLabMode === 'COFFEE' && !ing.isAiBalanced) {
-                amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+            if (currentLabMode === 'COFFEE') {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN') {
+                    amount = Math.round(coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                } else {
+                    amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                }
             } else if (!amount) {
                 // Algorithmic Tier Fallback for Soda/Slushie (Target: 160ml total for 1L)
                 const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
@@ -1408,21 +1426,19 @@
             ingredients: selectedIngredients.map((ing, idx) => {
                 let amount = ing.amount;
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
-                if (!amount) {
-                    if (currentLabMode === 'COFFEE') {
+                if (currentLabMode === 'COFFEE') {
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN') {
+                        amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                    } else {
                         amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                    } else {
-                        const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
-                        amount = baseVolume * bottleScale;
                     }
+                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                    if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                } else if (!amount) {
+                    const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
+                    amount = baseVolume * bottleScale;
                 } else {
-                    // Defensive clamp for coffee before sending
-                    if (currentLabMode === 'COFFEE') {
-                        const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
-                        if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                    } else {
-                        amount = amount * bottleScale;
-                    }
+                    amount = amount * bottleScale;
                 }
                 
                 return {
@@ -1447,21 +1463,19 @@
         selectedIngredients.forEach((ing, idx) => {
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
-            if (!amount) {
-                if (currentLabMode === 'COFFEE') {
+            if (currentLabMode === 'COFFEE') {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN') {
+                    amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                } else {
                     amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                } else {
-                    const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
-                    amount = baseVolume * bottleScale;
                 }
+                const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
+                if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+            } else if (!amount) {
+                const baseVolume = idx === 0 ? 100.0 : (idx === 1 ? 50.0 : 25.0);
+                amount = baseVolume * bottleScale;
             } else {
-                // Defensive clamp for coffee before scaling
-                if (currentLabMode === 'COFFEE') {
-                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'ADDITIVE' ? 300.0 : 120.0);
-                    if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                } else {
-                    amount = amount * bottleScale;
-                }
+                amount = amount * bottleScale;
             }
             
             // Create inputs matching views.create_recipe expectations
