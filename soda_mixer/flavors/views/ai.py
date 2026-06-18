@@ -37,6 +37,46 @@ def get_multibrand_names_in_inventory() -> Set[str]:
     return {item['name'].lower() for item in qs}
 
 
+def sanitize_coffee_amount(ingredient: Ingredient, amount: Optional[Union[float, int]] = None) -> float:
+    """Ensure coffee ingredients have proper gram amounts based on their role/type."""
+    if ingredient.ingredient_type == 'COFFEE_BEAN':
+        return 18.0
+    elif ingredient.ingredient_type == 'ADDITIVE':
+        return 5.0
+    else:
+        return 2.0
+
+
+def find_ingredient_by_name(name_str: str, inventory_items: List[Ingredient]) -> Optional[Ingredient]:
+    """Resiliently lookup an ingredient in active inventory by various name formats."""
+    name_clean = name_str.strip().lower()
+    if not name_clean:
+        return None
+    
+    # Tier 1: Exact matches or exact display matches
+    for inv in inventory_items:
+        inv_name = inv.name.lower()
+        inv_full = f"{inv.brand} {inv.name}".lower() if inv.brand else inv_name
+        inv_display = f"{inv.name} ({inv.brand})".lower() if inv.brand else inv_name
+        
+        if name_clean in (inv_name, inv_full, inv_display):
+            return inv
+            
+    # Tier 2: Partial matches
+    for inv in inventory_items:
+        inv_name = inv.name.lower()
+        inv_full = f"{inv.brand} {inv.name}".lower() if inv.brand else inv_name
+        inv_display = f"{inv.name} ({inv.brand})".lower() if inv.brand else inv_name
+        
+        if (name_clean in inv_name or inv_name in name_clean or
+            name_clean in inv_full or inv_full in name_clean or
+            name_clean in inv_display or inv_display in name_clean):
+            return inv
+            
+    return None
+
+
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -350,24 +390,8 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                 inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
                 
                 for item in suggestions_list:
-                    ing_name = item.get('name', '').strip().lower()
-                    if not ing_name: continue
-                    
-                    target_obj = None
-                    # Tier 1: Exact Match
-                    for inv in inventory_items:
-                        inv_full = f"{inv.brand} {inv.name}" if inv.brand else inv.name
-                        if inv_full.lower() == ing_name or inv.name.lower() == ing_name:
-                            target_obj = inv
-                            break
-                    
-                    # Tier 2: Partial Match
-                    if not target_obj:
-                        for inv in inventory_items:
-                            inv_full = f"{inv.brand} {inv.name}" if inv.brand else inv.name
-                            if ing_name in inv_full.lower() or inv_full.lower() in ing_name or ing_name in inv.name.lower() or inv.name.lower() in ing_name:
-                                target_obj = inv
-                                break
+                    ing_name = item.get('name', '')
+                    target_obj = find_ingredient_by_name(ing_name, inventory_items)
                                 
                     if target_obj:
                         intensity_delta = 0
@@ -382,6 +406,10 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                         
                         resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
                         
+                        amount = item.get('amount')
+                        if drink_type == 'COFFEE':
+                            amount = sanitize_coffee_amount(target_obj, amount)
+
                         multibrand_names = get_multibrand_names_in_inventory()
                         enriched.append({
                             'id': target_obj.id,
@@ -396,10 +424,20 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                             'accent_suitability': target_obj.accent_suitability,
                             'resonance': round(min(resonance, 99.8), 1),
                             'reason': item.get('reason', 'Molecular Affinity Match'),
-                            'amount': item.get('amount'),
+                            'amount': amount,
                             'profile': item.get('profile', None)
                         })
                 
+                if drink_type == 'COFFEE' and rebalancing:
+                    sanitized_rebalancing = {}
+                    for key, val in rebalancing.items():
+                        target_obj = find_ingredient_by_name(key, inventory_items)
+                        if target_obj:
+                            sanitized_rebalancing[key] = sanitize_coffee_amount(target_obj, val)
+                        else:
+                            sanitized_rebalancing[key] = val
+                    rebalancing = sanitized_rebalancing
+
                 if enriched:
                     logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
                     return JsonResponse({
@@ -618,6 +656,10 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 else:
                     item['amount'] = random.choice([100.0, 75.0, 50.0, 25.0, 10.0]) if drink_type != 'COFFEE' else random.choice([18.0, 10.0, 5.0, 2.0])
             
+        if drink_type == 'COFFEE':
+            for item in selection:
+                item['amount'] = sanitize_coffee_amount(item['obj'], item['amount'])
+
         multibrand_names = get_multibrand_names_in_inventory()
         result = []
         for item in selection:

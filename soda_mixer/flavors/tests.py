@@ -793,3 +793,77 @@ class BeverageLabCoffeeScalingTest(TestCase):
         ri = recipe.recipe_ingredients.first()
         self.assertEqual(ri.ingredient, self.bean)
         self.assertEqual(ri.amount, 18.0)
+
+
+class BeverageLabCoffeeSanitizationTest(TestCase):
+    """Test case for coffee amount sanitization rules."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
+        self.bean = Ingredient.objects.create(
+            name="Espresso Beans",
+            brand="Monin",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            is_in_inventory=True
+        )
+        self.creamer = Ingredient.objects.create(
+            name="Whole Milk",
+            brand="Local Dairy",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_in_inventory=True
+        )
+        self.syrup = Ingredient.objects.create(
+            name="Caramel Syrup",
+            brand="Torani",
+            ingredient_type="OTHER",
+            category="sweet",
+            is_in_inventory=True
+        )
+
+    def test_sanitize_coffee_amount(self) -> None:
+        from .views.ai import sanitize_coffee_amount
+        self.assertEqual(sanitize_coffee_amount(self.bean, 100.0), 18.0)
+        self.assertEqual(sanitize_coffee_amount(self.creamer, 50.0), 5.0)
+        self.assertEqual(sanitize_coffee_amount(self.syrup, 25.0), 2.0)
+
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
+    def test_ai_suggest_api_coffee_sanitization(self, mock_suggest: MagicMock) -> None:
+        mock_suggest.return_value = {
+            "suggestions": [
+                {
+                    "name": "Whole Milk (Local Dairy)",
+                    "reason": "Creams it up",
+                    "resonance": 95,
+                    "amount": 100.0,
+                    "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
+                }
+            ],
+            "rebalancing": {
+                "Espresso Beans (Monin)": 100.0
+            },
+            "seal_recommended": False,
+            "seal_resonance": 80,
+            "reasoning": "Test suggestion rebalancing."
+        }
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans (Monin)'],
+                'drink_type': 'COFFEE',
+                'mode': 'standard'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify suggestions amount is coerced to 5.0 (Whole Milk is ADDITIVE)
+        self.assertEqual(data['suggestions'][0]['amount'], 5.0)
+        # Verify rebalancing amount is coerced to 18.0 (Espresso Beans is COFFEE_BEAN)
+        self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 18.0)
+
