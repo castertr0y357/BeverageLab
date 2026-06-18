@@ -1335,7 +1335,7 @@
             // ☕ Always recalculate coffee amounts from current settings
             // This ensures changing Style/Size/Base immediately updates the display.
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && !(coffeeBaseType === 'espresso' && ing.type === 'ADDITIVE')) {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
                     amount = Math.round(coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                 } else {
                     amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
@@ -1529,7 +1529,7 @@
                 let amount = ing.amount;
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
                 if (currentLabMode === 'COFFEE') {
-                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && !(coffeeBaseType === 'espresso' && ing.type === 'ADDITIVE')) {
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
                         amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                     } else {
                         amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
@@ -1566,7 +1566,7 @@
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && !(coffeeBaseType === 'espresso' && ing.type === 'ADDITIVE')) {
+                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'ADDITIVE') {
                     amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
                 } else {
                     amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
