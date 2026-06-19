@@ -1,6 +1,7 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Added a 12oz batch size option for Soda synthesis alongside existing 1L and 0.5L bottles, and overhauled Cryo/Slushie batch sizes to strictly 16oz, 32oz, 48oz, and 64oz to align with the physical limits of the Ninja slushie machine.
 - [x] Separated Dairy & Plant Milks from other Additives: Introduced new `DAIRY` ingredient type (keeping Heavy Cream as `ADDITIVE` to prevent over-scaling), auto-migrated Whole Milk and database milks to `DAIRY`, updated AI prompts, recommendations step-2 routing, default form amounts (50ml for dairy, 15ml for additives), and Javascript scaling logic (only dairy fills the cup). Added a standard to `AGENTS.md` and project rules files to verify and push back on unrealistic classifications.
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page.
@@ -11,6 +12,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Overhauled Soda and Slushie batch configurations: added 12oz glass size option for Soda synthesis and overhauled Slushie batch sizes (16oz, 32oz, 48oz, 64oz) to map exactly to the physical volume limits of the Ninja slushie machine.
 - [x] Relayout and enlarge Soda/Slushie batch scale selector buttons to be tablet-friendly (using `btn-md py-2 fs-6` buttons) and occupy a dedicated full-width card layout (`scaleContainerSoda`) matching the coffee options panel.
 - [x] Enforce DAIRY as the secondary ingredient (index 1) in Coffee Lab surprise mixes, updated AI prompt guidelines, random pairing generator selection indexing, and created data migration 0016 to revert all creams/creamers in the database back to ADDITIVE status.
 - [x] Prioritize creamer/milk (ADDITIVE) as the recommended ingredient class in Step 2 of Coffee Lab mode to ensure they are suggested immediately after selecting the coffee base (applied to both algorithmic and AI suggestions).

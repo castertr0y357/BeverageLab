@@ -115,12 +115,23 @@
 
             <div class="pb-3 mb-4 border-bottom border-white border-opacity-10 d-flex justify-content-between align-items-center">
                 <h5 class="text-gradient-lab mb-0">Molecular Component Specs</h5>
-                {% if recipe.drink_type == 'SODA' or recipe.drink_type == 'SLUSHIE' %}
+                {% if recipe.drink_type == 'SODA' %}
                 <div class="d-flex align-items-center gap-2 print-hide">
                     <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
                     <div class="btn-group btn-group-xs">
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5)">0.5L</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0, 'scale1L')">1.0L</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5, 'scale05L')">0.5L</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale12oz" onclick="setBottleScale(0.355, 'scale12oz')">12oz</button>
+                    </div>
+                </div>
+                {% elif recipe.drink_type == 'SLUSHIE' %}
+                <div class="d-flex align-items-center gap-2 print-hide">
+                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
+                    <div class="btn-group btn-group-xs">
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale16oz" onclick="setBottleScale(0.5, 'scale16oz')">16oz</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale32oz" onclick="setBottleScale(1.0, 'scale32oz')">32oz</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale48oz" onclick="setBottleScale(1.5, 'scale48oz')">48oz</button>
+                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale64oz" onclick="setBottleScale(2.0, 'scale64oz')">64oz</button>
                     </div>
                 </div>
                 {% elif recipe.drink_type == 'COFFEE' %}
@@ -347,13 +358,26 @@
         return oz.toFixed(2) + 'oz';
     }
 
-    function setBottleScale(scale) {
-        currentScale = parseFloat(scale);
+    let savedSizeOz = parseFloat("{{ recipe.drink_size_oz|default:'' }}") || ("{{ recipe.drink_type }}" === 'SLUSHIE' ? 32.0 : 33.8);
+    let drinkType = "{{ recipe.drink_type }}";
+
+    function setBottleScale(targetScale, btnId) {
+        let savedScale = 1.0;
+        if (drinkType === 'SODA') {
+            if (savedSizeOz === 12.0) savedScale = 0.355;
+            else if (savedSizeOz === 16.9) savedScale = 0.5;
+            else savedScale = 1.0;
+        } else if (drinkType === 'SLUSHIE') {
+            savedScale = savedSizeOz / 32.0;
+        }
+
+        currentScale = targetScale / savedScale;
         
-        const scale1L = document.getElementById('scale1L');
-        const scale05L = document.getElementById('scale05L');
-        if (scale1L) scale1L.classList.toggle('active-lab-mode', currentScale === 1.0);
-        if (scale05L) scale05L.classList.toggle('active-lab-mode', currentScale === 0.5);
+        document.querySelectorAll('.btn-glass-toggle').forEach(btn => {
+            btn.classList.remove('active-lab-mode');
+        });
+        const activeBtn = document.getElementById(btnId);
+        if (activeBtn) activeBtn.classList.add('active-lab-mode');
         
         updateAmounts();
     }
@@ -438,7 +462,27 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        updateAmounts();
+        if (drinkType === 'SODA') {
+            if (savedSizeOz === 12.0) {
+                setBottleScale(0.355, 'scale12oz');
+            } else if (savedSizeOz === 16.9) {
+                setBottleScale(0.5, 'scale05L');
+            } else {
+                setBottleScale(1.0, 'scale1L');
+            }
+        } else if (drinkType === 'SLUSHIE') {
+            if (savedSizeOz === 16.0) {
+                setBottleScale(0.5, 'scale16oz');
+            } else if (savedSizeOz === 48.0) {
+                setBottleScale(1.5, 'scale48oz');
+            } else if (savedSizeOz === 64.0) {
+                setBottleScale(2.0, 'scale64oz');
+            } else {
+                setBottleScale(1.0, 'scale32oz');
+            }
+        } else {
+            updateAmounts();
+        }
         const ratingUI = document.getElementById('ratingUI');
         if (ratingUI) {
             ratingUI.addEventListener('click', function(e) {

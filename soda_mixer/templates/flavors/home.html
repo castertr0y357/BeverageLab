@@ -102,14 +102,30 @@
                         </div>
                     </div>
 
-                    <!-- Dedicated tablet-friendly large buttons container for Soda/Slushie settings -->
+                    <!-- Dedicated tablet-friendly large buttons container for Soda settings -->
                     <div id="scaleContainerSoda" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
                         <div class="row g-3">
-                            <div class="col-md-6 col-sm-12 mx-auto">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">BATCH SCALE</label>
+                            <div class="col-md-8 col-sm-12 mx-auto">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SODA BATCH SCALE</label>
                                 <div class="btn-group w-100" id="sodaScaleBtns">
-                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L Batch</button>
-                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale05L" onclick="setBottleScale(0.5)">0.5L Batch</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L Bottle</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale05L" onclick="setBottleScale(0.5)">0.5L Bottle</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale12oz" onclick="setBottleScale(0.355)">12oz Glass</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dedicated tablet-friendly large buttons container for Cryo/Slushie settings -->
+                    <div id="scaleContainerCryo" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
+                        <div class="row g-3">
+                            <div class="col-md-10 col-sm-12 mx-auto">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SLUSHIE BATCH SCALE</label>
+                                <div class="btn-group w-100" id="cryoScaleBtns">
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale16oz" onclick="setBottleScale(0.5)">16oz Batch</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale32oz" onclick="setBottleScale(1.0)">32oz Batch</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale48oz" onclick="setBottleScale(1.5)">48oz Batch</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale64oz" onclick="setBottleScale(2.0)">64oz Batch</button>
                                 </div>
                             </div>
                         </div>
@@ -278,8 +294,30 @@
 
     function setBottleScale(scale) {
         bottleScale = parseFloat(scale);
-        document.getElementById('scale1L').classList.toggle('active-lab-mode', bottleScale === 1.0);
-        document.getElementById('scale05L').classList.toggle('active-lab-mode', bottleScale === 0.5);
+        
+        // Toggle active classes for Soda
+        const sodaBtns = {
+            1.0: 'scale1L',
+            0.5: 'scale05L',
+            0.355: 'scale12oz'
+        };
+        Object.entries(sodaBtns).forEach(([val, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active-lab-mode', Math.abs(bottleScale - parseFloat(val)) < 0.01);
+        });
+
+        // Toggle active classes for Cryo
+        const cryoBtns = {
+            0.5: 'scale16oz',
+            1.0: 'scale32oz',
+            1.5: 'scale48oz',
+            2.0: 'scale64oz'
+        };
+        Object.entries(cryoBtns).forEach(([val, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active-lab-mode', Math.abs(bottleScale - parseFloat(val)) < 0.01);
+        });
+
         updateSelectedArea();
     }
 
@@ -972,10 +1010,14 @@
         bottleScale = 1.0;
         
         // Reset soda/slushie scale UI
-        const scale1L = document.getElementById('scale1L');
-        const scale05L = document.getElementById('scale05L');
-        if (scale1L) scale1L.classList.add('active-lab-mode');
-        if (scale05L) scale05L.classList.remove('active-lab-mode');
+        ['scale1L', 'scale05L', 'scale12oz'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active-lab-mode', id === 'scale1L');
+        });
+        ['scale16oz', 'scale32oz', 'scale48oz', 'scale64oz'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active-lab-mode', id === 'scale32oz');
+        });
         
         // Reset coffee controls to saved/default state
         const savedStyle = localStorage.getItem('coffee_style') || 'hot';
@@ -1257,10 +1299,24 @@
         selectedArea.style.display = 'block';
         document.getElementById('analyzeBtn').style.display = selectedIngredients.length >= 2 ? 'inline-block' : 'none';
         const scaleContainerSoda = document.getElementById('scaleContainerSoda');
+        const scaleContainerCryo = document.getElementById('scaleContainerCryo');
         const scaleContainerCoffee = document.getElementById('scaleContainerCoffee');
-        if (currentLabMode === 'SODA' || currentLabMode === 'SLUSHIE') {
+        if (currentLabMode === 'SODA') {
             if (scaleContainerSoda) {
                 scaleContainerSoda.style.setProperty('display', 'block', 'important');
+            }
+            if (scaleContainerCryo) {
+                scaleContainerCryo.style.setProperty('display', 'none', 'important');
+            }
+            if (scaleContainerCoffee) {
+                scaleContainerCoffee.style.setProperty('display', 'none', 'important');
+            }
+        } else if (currentLabMode === 'SLUSHIE') {
+            if (scaleContainerSoda) {
+                scaleContainerSoda.style.setProperty('display', 'none', 'important');
+            }
+            if (scaleContainerCryo) {
+                scaleContainerCryo.style.setProperty('display', 'block', 'important');
             }
             if (scaleContainerCoffee) {
                 scaleContainerCoffee.style.setProperty('display', 'none', 'important');
@@ -1269,12 +1325,18 @@
             if (scaleContainerSoda) {
                 scaleContainerSoda.style.setProperty('display', 'none', 'important');
             }
+            if (scaleContainerCryo) {
+                scaleContainerCryo.style.setProperty('display', 'none', 'important');
+            }
             if (scaleContainerCoffee) {
                 scaleContainerCoffee.style.setProperty('display', 'block', 'important');
             }
         } else {
             if (scaleContainerSoda) {
                 scaleContainerSoda.style.setProperty('display', 'none', 'important');
+            }
+            if (scaleContainerCryo) {
+                scaleContainerCryo.style.setProperty('display', 'none', 'important');
             }
             if (scaleContainerCoffee) {
                 scaleContainerCoffee.style.setProperty('display', 'none', 'important');
@@ -1433,8 +1495,8 @@
 
         // Ninja Ratio Logic for Slushies (Displacement Aware)
         if (currentLabMode === 'SLUSHIE') {
-            const bottleCapacity = bottleScale * 1000;
-            // Physical Displacement Limits: 160ml syrup for 1L, 80ml for 0.5L
+            const bottleCapacity = bottleScale * 946.35;
+            // Physical Displacement Limits: 160ml syrup for 32oz, proportional for other scales
             const syrupLimit = 160 * bottleScale;
             
             // Calculate available space to prevent overflow
@@ -1444,10 +1506,12 @@
             // Final water calculation prioritizing bottle capacity
             const finalWater = waterToFillLine; // Always fill to line in Ninja Creami
             const totalVolume = totalSyrup + finalWater;
+            const targetWaterVolume = bottleCapacity - syrupLimit;
+            const ozLabel = (bottleScale * 32).toFixed(0) + 'oz';
             
             const overflowWarning = isOverflow ? `
                 <div class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50 px-2 py-1 ms-2" style="font-size: 0.6rem;">
-                    <i class="bi bi-exclamation-triangle-fill"></i> SYRUP OVERFLOW (> ${syrupLimit}ml)
+                    <i class="bi bi-exclamation-triangle-fill"></i> SYRUP OVERFLOW (> ${syrupLimit.toFixed(0)}ml)
                 </div>
             ` : '';
             
@@ -1455,14 +1519,14 @@
                 <div class="glass-surface p-3 mb-3 border-lab border-opacity-50 ${isOverflow ? 'border-danger' : ''}">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="readout-label mb-1">Ninja Displacement Monitor (Target Fill: ${bottleCapacity}ml) ${overflowWarning}</div>
+                            <div class="readout-label mb-1">Ninja Displacement Monitor (Target Fill: ${bottleCapacity.toFixed(0)}ml / ~${ozLabel}) ${overflowWarning}</div>
                             <div class="d-flex gap-4">
                                 <div>
                                     <small class="text-dim d-block">Reagent Displacement</small>
                                     <span class="fw-bold ${isOverflow ? 'text-danger' : ''}">${totalSyrup.toFixed(1)}${unit} / ${formatImperialVolume(totalSyrup)}</span>
                                 </div>
                                 <div>
-                                    <small class="text-dim d-block">Water to Fill-Line (Target: 840ml)</small>
+                                    <small class="text-dim d-block">Water to Fill-Line (Target: ${targetWaterVolume.toFixed(0)}ml)</small>
                                     <span class="text-gradient-lab fw-bold">${finalWater.toFixed(1)}${unit} / ${formatImperialVolume(finalWater)}</span>
                                 </div>
                                 <div>
@@ -1509,11 +1573,27 @@
     }
 
     function interceptAndSave() {
+        let calculatedSizeOz = null;
+        if (currentLabMode === 'COFFEE') {
+            calculatedSizeOz = coffeeSizeOz;
+        } else if (currentLabMode === 'SODA') {
+            if (bottleScale === 1.0) calculatedSizeOz = 33.8;
+            else if (bottleScale === 0.5) calculatedSizeOz = 16.9;
+            else if (bottleScale === 0.355) calculatedSizeOz = 12.0;
+        } else if (currentLabMode === 'SLUSHIE') {
+            calculatedSizeOz = bottleScale * 32.0;
+        }
+
+        const drinkSizeOzField = document.getElementById('drinkSizeOzField');
+        if (drinkSizeOzField) {
+            drinkSizeOzField.value = calculatedSizeOz;
+        }
+
         const data = {
             drink_type: currentLabMode,
             coffee_style: coffeeStyle,
             coffee_base_type: coffeeBaseType,
-            drink_size_oz: coffeeSizeOz,
+            drink_size_oz: calculatedSizeOz,
             ingredients: selectedIngredients.map((ing, idx) => {
                 let amount = ing.amount;
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
@@ -1550,7 +1630,7 @@
         // Clear any existing dynamic inputs to prevent duplicates
         const oldDynamic = mixerForm.querySelectorAll('.dynamic-mix-input');
         oldDynamic.forEach(el => el.remove());
-
+ 
         selectedIngredients.forEach((ing, idx) => {
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
@@ -1576,14 +1656,24 @@
             amountInput.value = amount;
             amountInput.className = 'dynamic-mix-input';
             mixerForm.appendChild(amountInput);
-
+ 
             const notesInput = document.createElement('input');
             notesInput.type = 'hidden';
             notesInput.name = `notes_${ing.id}`;
             const styleLabel = { hot: 'Hot', iced: 'Iced', espresso_shot: 'Espresso Shot' }[coffeeStyle] || coffeeStyle;
+            
+            let scaleLabel = '';
+            if (currentLabMode === 'SODA') {
+                if (bottleScale === 1.0) scaleLabel = '1.0L Bottle';
+                else if (bottleScale === 0.5) scaleLabel = '0.5L Bottle';
+                else if (bottleScale === 0.355) scaleLabel = '12oz Glass';
+            } else if (currentLabMode === 'SLUSHIE') {
+                scaleLabel = (bottleScale * 32.0).toFixed(0) + 'oz Batch';
+            }
+            
             notesInput.value = currentLabMode === 'COFFEE'
                 ? `Automatic laboratory synthesis — ${styleLabel}, ${coffeeSizeOz}oz, ${coffeeBaseType === 'espresso' ? 'Espresso base' : 'Standard Brew base'}`
-                : `Automatic laboratory synthesis (${currentLabMode}) at ${bottleScale}L Scale`;
+                : `Automatic laboratory synthesis (${currentLabMode}) at ${scaleLabel}`;
             notesInput.className = 'dynamic-mix-input';
             mixerForm.appendChild(notesInput);
         });

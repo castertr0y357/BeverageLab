@@ -1106,4 +1106,78 @@ class BeverageLabIcedCoffeeTest(TestCase):
         self.assertIn(len(ingredients), [3, 4, 5])
 
 
+class BeverageLabBatchSizesTest(TestCase):
+    """Test case for soda and slushie batch sizes and scaling logic."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
+        self.syrup = Ingredient.objects.create(
+            name="Lemon Syrup",
+            brand="Monin",
+            ingredient_type="SODA_SYRUP",
+            category="citrus",
+            is_in_inventory=True
+        )
+
+    def test_create_soda_recipe_12oz(self) -> None:
+        response = self.client.post(reverse('create_recipe'), {
+            'name': 'Soda 12oz Test',
+            'drink_type': 'SODA',
+            'drink_size_oz': '12.0',
+            f'amount_{self.syrup.id}': 50.0,
+        })
+        self.assertEqual(response.status_code, 302)
+        recipe = Recipe.objects.get(name='Soda 12oz Test')
+        self.assertEqual(recipe.drink_type, 'SODA')
+        self.assertEqual(recipe.drink_size_oz, 12.0)
+
+        # Verify detail page renders with 12oz details
+        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_response = self.client.get(detail_url)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, '12oz')
+        self.assertContains(detail_response, 'scale12oz')
+
+    def test_create_slushie_recipe_16oz(self) -> None:
+        response = self.client.post(reverse('create_recipe'), {
+            'name': 'Slushie 16oz Test',
+            'drink_type': 'SLUSHIE',
+            'drink_size_oz': '16.0',
+            f'amount_{self.syrup.id}': 80.0,
+        })
+        self.assertEqual(response.status_code, 302)
+        recipe = Recipe.objects.get(name='Slushie 16oz Test')
+        self.assertEqual(recipe.drink_type, 'SLUSHIE')
+        self.assertEqual(recipe.drink_size_oz, 16.0)
+
+        # Verify detail page renders
+        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_response = self.client.get(detail_url)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, '16oz')
+        self.assertContains(detail_response, 'scale16oz')
+
+    def test_create_slushie_recipe_64oz(self) -> None:
+        response = self.client.post(reverse('create_recipe'), {
+            'name': 'Slushie 64oz Test',
+            'drink_type': 'SLUSHIE',
+            'drink_size_oz': '64.0',
+            f'amount_{self.syrup.id}': 320.0,
+        })
+        self.assertEqual(response.status_code, 302)
+        recipe = Recipe.objects.get(name='Slushie 64oz Test')
+        self.assertEqual(recipe.drink_type, 'SLUSHIE')
+        self.assertEqual(recipe.drink_size_oz, 64.0)
+
+        # Verify detail page renders
+        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_response = self.client.get(detail_url)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, '64oz')
+        self.assertContains(detail_response, 'scale64oz')
+
+
+
 
