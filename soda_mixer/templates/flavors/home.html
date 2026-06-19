@@ -148,9 +148,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-4 w-100" id="stepHeader">
                         <h5 class="fw-bold mb-0 text-gradient-lab" id="stepTitle">Step 1: Select Base Component</h5>
                         <div class="d-flex gap-2">
-                            <button type="button" id="skipToCreamerBtn" class="btn btn-xs btn-outline-info" style="display: none;" onclick="startCreamerTransition()">
-                                <i class="bi bi-arrow-right-circle me-1"></i> SKIP TO DAIRY
-                            </button>
                             <button type="button" class="btn btn-xs btn-outline-experimental" onclick="surpriseMe()" id="surpriseBtn">
                                 <i class="bi bi-dice-3 me-1"></i> SURPRISE ME
                             </button>
@@ -263,7 +260,6 @@
     let recommendationMode = 'standard';
     let selectedIngredients = []; 
     let bottleScale = 1.0; 
-    let isCreamerTransition = false;
     let allIngredientsHtml = ''; 
     let originalRecipesHtml = '';
     const themeStats = JSON.parse('{{ stats_json|escapejs }}');
@@ -732,7 +728,7 @@
             profile: profileObj
         });
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
-        const isDone = selectedIngredients.length >= maxIngredients || isCreamerTransition;
+        const isDone = selectedIngredients.length >= maxIngredients;
         
         updateSelectedArea(isDone);
         
@@ -740,7 +736,6 @@
             if (isDone) {
                 document.getElementById('stepContainer').style.display = 'none';
                 triggerFlavorSynthesis();
-                isCreamerTransition = false; // Reset for next use
             } else {
                 fetchRecommendations();
                 triggerProactiveSuggestion();
@@ -968,7 +963,6 @@
 
     function resetMixer() {
         selectedIngredients = [];
-        isCreamerTransition = false;
         bottleScale = 1.0;
         
         // Reset soda/slushie scale UI
@@ -1012,11 +1006,6 @@
         }
     }
 
-    function startCreamerTransition() {
-        isCreamerTransition = true;
-        fetchRecommendations();
-    }
-
     async function fetchRecommendations() {
         const ingredientIds = selectedIngredients.map(i => i.id);
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
@@ -1028,29 +1017,17 @@
             return;
         }
 
-        // Show/Hide Skip to Creamer button
-        const skipBtn = document.getElementById('skipToCreamerBtn');
-        if (currentLabMode === 'COFFEE' && ingredientIds.length >= 2 && !isCreamerTransition) {
-            skipBtn.style.display = 'block';
-        } else {
-            skipBtn.style.display = 'none';
-        }
-
         let stepText = '';
-        if (isCreamerTransition) {
-            stepText = `Step ${ingredientIds.length + 1}: Select Final Stabilizer`;
+        if (ingredientIds.length === 0) {
+            stepText = 'Step 1: Select Base Component';
+        } else if (ingredientIds.length === 1) {
+            stepText = 'Step 2: Select Complementary Payload';
+        } else if (ingredientIds.length === 2) {
+            stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
+        } else if (ingredientIds.length === 3) {
+            stepText = 'Step 4: Select Deep Accent';
         } else {
-            if (ingredientIds.length === 0) {
-                stepText = 'Step 1: Select Base Component';
-            } else if (ingredientIds.length === 1) {
-                stepText = 'Step 2: Select Complementary Payload';
-            } else if (ingredientIds.length === 2) {
-                stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
-            } else if (ingredientIds.length === 3) {
-                stepText = 'Step 4: Select Deep Accent';
-            } else {
-                stepText = 'Step 5: Select Final Stabilizer';
-            }
+            stepText = 'Step 5: Select Final Stabilizer';
         }
         
         document.getElementById('stepTitle').textContent = stepText;
@@ -1070,7 +1047,7 @@
         const isAiEngine = engineMode === 'ai';
         const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
         
-        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'DAIRY' : (isCreamerTransition ? 'DAIRY' : null);
+        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'DAIRY' : null;
         const payload = isAiEngine ? {
             ingredients: selectedIngredients.map(i => i.name),
             drink_type: currentLabMode,
