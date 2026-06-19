@@ -117,21 +117,21 @@
                 <h5 class="text-gradient-lab mb-0">Molecular Component Specs</h5>
                 {% if recipe.drink_type == 'SODA' %}
                 <div class="d-flex align-items-center gap-2 print-hide">
-                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
-                    <div class="btn-group btn-group-xs">
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0, 'scale1L')">1.0L</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale05L" onclick="setBottleScale(0.5, 'scale05L')">0.5L</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale12oz" onclick="setBottleScale(0.355, 'scale12oz')">12oz</button>
+                    <span class="readout-label mb-0" style="font-size: 0.65rem; letter-spacing: 1.5px;">BATCH SCALE</span>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1 fs-6 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0, 'scale1L')">1.0L</button>
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1" id="scale05L" onclick="setBottleScale(0.5, 'scale05L')">0.5L</button>
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1" id="scale12oz" onclick="setBottleScale(0.355, 'scale12oz')">12oz</button>
                     </div>
                 </div>
                 {% elif recipe.drink_type == 'SLUSHIE' %}
                 <div class="d-flex align-items-center gap-2 print-hide">
-                    <span class="readout-label mb-0" style="font-size: 0.55rem; letter-spacing: 1px;">BATCH SCALE</span>
-                    <div class="btn-group btn-group-xs">
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale16oz" onclick="setBottleScale(0.5, 'scale16oz')">16oz</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0 active-lab-mode" id="scale32oz" onclick="setBottleScale(1.0, 'scale32oz')">32oz</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale48oz" onclick="setBottleScale(1.5, 'scale48oz')">48oz</button>
-                        <button type="button" class="btn btn-xs btn-glass-toggle px-2 py-0" id="scale64oz" onclick="setBottleScale(2.0, 'scale64oz')">64oz</button>
+                    <span class="readout-label mb-0" style="font-size: 0.65rem; letter-spacing: 1.5px;">BATCH SCALE</span>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1" id="scale16oz" onclick="setBottleScale(0.5, 'scale16oz')">16oz</button>
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1 active-lab-mode" id="scale32oz" onclick="setBottleScale(1.0, 'scale32oz')">32oz</button>
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1" id="scale48oz" onclick="setBottleScale(1.5, 'scale48oz')">48oz</button>
+                        <button type="button" class="btn btn-sm btn-glass-toggle px-3 py-1" id="scale64oz" onclick="setBottleScale(2.0, 'scale64oz')">64oz</button>
                     </div>
                 </div>
                 {% elif recipe.drink_type == 'COFFEE' %}
