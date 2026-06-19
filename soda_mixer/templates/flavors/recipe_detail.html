@@ -202,6 +202,22 @@
                     </div>
                 </div>
                 {% endif %}
+                {% if recipe.drink_type == 'SODA' %}
+                <div class="col-md-6">
+                    <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="fw-bold fs-5 text-info">Carbonated Water <i class="bi bi-droplets text-info ms-1"></i></div>
+                            <span class="badge-fizz bg-info text-dark">Carbonation</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-auto gap-2">
+                            <div class="readout-card p-1 ps-2 border-info border-opacity-50 flex-grow-1">
+                                <div class="readout-label" style="font-size: 0.6rem;">VOLUME</div>
+                                <div class="fw-bold text-info" id="sodaWaterDetailVolume"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 {% for ri in recipe.recipe_ingredients.all %}
                 <div class="col-md-6">
                     <div class="glass-card p-3 border-white border-opacity-10 bg-dark bg-opacity-25 h-100">
@@ -657,6 +673,25 @@
             const bottleCapacity = activeScale * 946.35;
             const waterMl = Math.max(0, bottleCapacity - totalSyrup);
             waterDetailEl.innerHTML = `${Math.round(waterMl)} ml / ${formatImperialVolume(waterMl)}`;
+        }
+
+        const sodaWaterDetailEl = document.getElementById('sodaWaterDetailVolume');
+        if (sodaWaterDetailEl) {
+            let totalSyrup = 0;
+            amountDisplays.forEach(el => {
+                const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
+                if (!isNaN(originalAmount)) {
+                    totalSyrup += originalAmount * currentScale;
+                }
+            });
+            let savedScale = 1.0;
+            if (savedSizeOz === 12.0) savedScale = 0.355;
+            else if (savedSizeOz === 16.9) savedScale = 0.5;
+            
+            const activeScale = currentScale * savedScale;
+            const bottleCapacity = activeScale * 1000;
+            const waterMl = Math.max(0, bottleCapacity - totalSyrup);
+            sodaWaterDetailEl.innerHTML = `${Math.round(waterMl)} ml / ${formatImperialVolume(waterMl)}`;
         }
     }
 

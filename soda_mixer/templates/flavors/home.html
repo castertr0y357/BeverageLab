@@ -1486,6 +1486,43 @@
             `;
         }
         
+        // 💧 Inject virtual Carbonated Water card for Soda mode to the left of the base ingredient
+        if (currentLabMode === 'SODA') {
+            const bottleCapacity = bottleScale * 1000;
+            const waterToFillLine = bottleCapacity - totalSyrup;
+            const finalWater = Math.max(0, waterToFillLine);
+            const syrupLimit = 160 * bottleScale;
+            const isOverflow = totalSyrup > syrupLimit;
+            
+            const warningHtml = isOverflow ? `
+                <div class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50 px-2 py-1 mt-2" style="font-size: 0.55rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> OVERFLOW
+                </div>
+            ` : '';
+
+            let targetLabel = '';
+            if (Math.abs(bottleScale - 1.0) < 0.01) targetLabel = '1.0L';
+            else if (Math.abs(bottleScale - 0.5) < 0.01) targetLabel = '0.5L';
+            else if (Math.abs(bottleScale - 0.355) < 0.01) targetLabel = '12oz';
+
+            html += `
+                <div class="col-auto animate-fade-in">
+                    <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
+                        <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">Carbonated Water <i class="bi bi-droplets text-info ms-1"></i></div>
+                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
+                        <div class="mt-1 pt-1 border-top border-white border-opacity-10">
+                            <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
+                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">CARBONATION</span></div>
+                                <div class="d-flex justify-content-between"><span>TARGET</span> <span>${targetLabel}</span></div>
+                            </div>
+                            ${warningHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
         const roles = ['BASE', 'PAYLOAD', 'ACCENT', 'DEEP ACCENT', 'STABILIZER'];
 
         selectedIngredients.forEach((ing, index) => {

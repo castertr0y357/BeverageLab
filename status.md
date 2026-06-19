@@ -13,6 +13,7 @@
 - [x] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Rendered Soda carbonated water volume required as a standard card to the left of the base ingredient on both the synthesis page and the recipe details page, updating dynamically upon scale changes.
 - [x] Implement Server-Sent Events (SSE) progress updates for the AI suggestion engine (using Django StreamingHttpResponse) and consume/render these messages dynamically on the Home page.
 - [x] Automatically suggest base profile and system compatibility in individual material editing and bulk analysis, and enforce system compatibility filtering in standard mode while bypassing in experimental mode.
 - [x] Add colored badges, filtering, and sorting to the recipe list page: displayed colored lab theme badges on recipe cards, and implemented a premium glassmorphic Filter & Sort panel to filter recipes by drink type (Soda, Coffee, Slushie) and sort by name and date created.
