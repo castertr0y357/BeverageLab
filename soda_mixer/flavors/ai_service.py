@@ -490,7 +490,7 @@ Inventory Registry for Selection:
 3. Provide a suggested 'amount'. The base coffee beans MUST default to 18.0 (representing 18.0g weight in grams). Dairy/milks (type DAIRY) must default to 50.0 (representing 50.0ml volume in milliliters), and other minor additives/syrups/accents (type ADDITIVE) must default to 15.0 (representing 15.0ml volume in milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
 5. For each ingredient, provide a specific 'role' (max 8 words).
-6. MANDATORY: Include exactly one 'Dairy & Plant Milk' (type DAIRY) as a final stabilizer (amount 50.0)."""
+6. MANDATORY: Include exactly one 'Dairy & Plant Milk' (type DAIRY) as the secondary ingredient (directly after the base coffee beans, at index 1 / position 2 of the list) with a default amount of 50.0. Minor additives (type ADDITIVE) like Heavy Cream must NOT be used as this secondary ingredient."""
             example = """{
     "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
     "selection": [

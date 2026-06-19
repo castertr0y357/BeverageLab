@@ -7,9 +7,11 @@
 - [x] Implement espresso base additive scaling to automatically fill the remaining target cup size with milk/creamer.
 - [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly and occupy the full-width header area.
 - [x] Prioritize creamer/milk (DAIRY) as the recommended ingredient class in Step 2 of Coffee Lab mode.
+- [x] Position dairy as the secondary ingredient in Coffee Lab surprise mixes, and revert all creamers/creams in the database to ADDITIVE status.
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Enforce DAIRY as the secondary ingredient (index 1) in Coffee Lab surprise mixes, updated AI prompt guidelines, random pairing generator selection indexing, and created data migration 0016 to revert all creams/creamers in the database back to ADDITIVE status.
 - [x] Prioritize creamer/milk (ADDITIVE) as the recommended ingredient class in Step 2 of Coffee Lab mode to ensure they are suggested immediately after selecting the coffee base (applied to both algorithmic and AI suggestions).
 - [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly (using `btn-md py-2 fs-6` buttons) and occupy the full-width header area.
 - [x] Implement espresso base additive scaling to automatically calculate the remaining volume of target cup size (subtracting espresso shot volume and ice volume) and scale up milk/creamer additives to fill the cup.

@@ -1024,4 +1024,34 @@ class BeverageLabIcedCoffeeTest(TestCase):
         self.assertContains(detail_response, 'Ice')
         self.assertContains(detail_response, 'iceDetailVolume')
 
+    def test_random_pairing_api_coffee_secondary_dairy(self) -> None:
+        """Verify that Coffee Lab random pairing selects DAIRY as the secondary ingredient (index 1)."""
+        Ingredient.objects.create(
+            name="Vanilla Syrup",
+            brand="Monin",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_in_inventory=True
+        )
+
+        response = self.client.post(
+            reverse('random_pairing_api'),
+            data=json.dumps({
+                'drink_type': 'COFFEE',
+                'mode': 'standard'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        ingredients = data['ingredients']
+        # The first ingredient should be the coffee bean (index 0)
+        self.assertEqual(ingredients[0]['type'], 'COFFEE_BEAN')
+        # The secondary ingredient must be DAIRY (index 1)
+        self.assertEqual(ingredients[1]['type'], 'DAIRY')
+        # There should be between 3 and 5 ingredients
+        self.assertIn(len(ingredients), [3, 4, 5])
+
+
 

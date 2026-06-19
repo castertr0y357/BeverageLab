@@ -630,14 +630,17 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
             selection = [] # Clear any partial AI selection
             design_intent = "" 
             
-            base_types = ['SODA_SYRUP', 'COFFEE_BEAN']
+            if drink_type == 'COFFEE':
+                base_types = ['COFFEE_BEAN']
+            else:
+                base_types = ['SODA_SYRUP']
             potential_bases = all_compatible.filter(ingredient_type__in=base_types)
             
             if potential_bases.exists():
                 selection.append({'obj': random.choice(list(potential_bases)), 'amount': None})
             
             if drink_type == 'COFFEE' and target_count >= 3:
-                # Prioritize DAIRY as stabilizer, fallback to ADDITIVE
+                # Prioritize DAIRY as secondary ingredient, fallback to ADDITIVE
                 additives = all_compatible.filter(ingredient_type='DAIRY').exclude(id__in=[i['obj'].id for i in selection])
                 if not additives.exists():
                     additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i['obj'].id for i in selection])
@@ -651,7 +654,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                     while len(selection) < (target_count - 1) and remaining_reagents:
                         selection.append({'obj': remaining_reagents.pop(), 'amount': None})
                     
-                    selection.append({'obj': target_additive, 'amount': None})
+                    selection.insert(1, {'obj': target_additive, 'amount': None})
                 else:
                     remaining_reagents = list(all_compatible.exclude(id__in=[i['obj'].id for i in selection]))
                     random.shuffle(remaining_reagents)
