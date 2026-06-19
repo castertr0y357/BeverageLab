@@ -27,8 +27,8 @@
         <p class="text-dim mb-0">Baseline components available for synthesis and extraction.</p>
     </div>
     <div class="d-flex align-items-center gap-3">
-        <div class="d-none d-md-block text-dim small bg-white bg-opacity-5 px-3 py-1 rounded border border-white border-opacity-10">
-            <span class="status-dot dot-accent me-1" style="width:6px; height:6px;"></span> Registry Online: {{ ingredients.count }}
+        <div class="d-none d-md-block text-dim small px-3 py-1.5 rounded border border-white border-opacity-10" style="background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px);">
+            <span class="me-1" style="width: 8px; height: 8px; background-color: var(--lab-accent); border-radius: 50%; display: inline-block; box-shadow: 0 0 8px var(--lab-accent);"></span> Registry Online: <span class="text-white fw-bold">{{ ingredients|length }}</span>
         </div>
         {% if user.is_staff %}
         <button class="btn btn-sm btn-accent px-3 py-1 fw-bold" data-bs-toggle="modal"

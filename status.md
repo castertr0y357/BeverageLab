@@ -12,6 +12,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Fixed Reagent Registry status pill on ingredients page: corrected missing count by switching to '{{ ingredients|length }}' and replaced the solid white background with a dark, translucent glassmorphic look containing a glowing neon accent dot.
 - [x] Enlarge wizard control buttons on the home page: resized step back, hard reset, analyze compound, and surprise me buttons to 'btn-sm px-3/4 py-1.5/2 fs-6' for better tablet and distant view accessibility.
 - [x] Enlarge key UI controls on the home page: expanded lab mode buttons to 'px-5 py-3 fs-4' and resized toggle switches to 'btn-sm px-4 py-2 fs-6' to ensure tablet and distant view accessibility.
 - [x] Fixed double-scaling bug on home page synthesis terminal for Soda and Slushie mode display volumes (preventing ingredients from scaling twice by bottleScale).
