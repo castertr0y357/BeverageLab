@@ -17,60 +17,76 @@
 </div>
 
 {% if history %}
-<div class="row g-3">
+<div class="row g-4">
     {% for mix in history %}
-    <div class="col-12">
-        <div class="glass-card p-4 transition-all {% if mix.promoted_recipe %}resonance-fringe border-success border-opacity-25{% else %}border-white border-opacity-10{% endif %}">
-            <div class="row align-items-center">
-                <div class="col-md-9">
-                    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-                        <div class="readout-label text-dim bg-white bg-opacity-5 px-2 py-1 rounded border border-white border-opacity-10">
-                            <i class="bi bi-clock me-1 text-accent"></i> {{ mix.mixed_at|date:"M d, Y" }} <span class="opacity-50 ms-1">{{ mix.mixed_at|date:"H:i" }}</span>
-                        </div>
-                        <span class="badge border border-white border-opacity-10 text-dim" style="font-size: 0.6rem;">{{ mix.get_drink_type_display }}</span>
-                        {% if mix.promoted_recipe %}
-                        <div class="badge-fizz bg-success px-3" style="box-shadow: 0 0 10px var(--fizz-green);">
-                            <i class="bi bi-check-circle me-1"></i> INDEXED: {{ mix.promoted_recipe.name }}
-                        </div>
-                        {% endif %}
+    <div class="col-md-6 col-lg-4">
+        <div class="glass-card h-100 p-4 d-flex flex-column transition-all {% if mix.promoted_recipe %}resonance-fringe border-success border-opacity-25{% else %}border-white border-opacity-10{% endif %}">
+            <!-- Header: Date, Time and Type -->
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div class="d-flex flex-column gap-1">
+                    <div class="readout-label text-dim bg-dark bg-opacity-25 px-2 py-1 rounded border border-white border-opacity-10" style="width: fit-content;">
+                        <i class="bi bi-clock me-1 text-accent"></i> {{ mix.mixed_at|date:"M d, Y" }} <span class="opacity-50 ms-1">{{ mix.mixed_at|date:"H:i" }}</span>
                     </div>
+                    {% if mix.drink_type == 'SODA' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important; box-shadow: 0 0 8px rgba(164, 230, 76, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Soda Lab</span>
+                    {% elif mix.drink_type == 'COFFEE' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important; box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Coffee Lab</span>
+                    {% elif mix.drink_type == 'SLUSHIE' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; box-shadow: 0 0 8px rgba(14, 165, 233, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Cryo Lab</span>
+                    {% endif %}
+                </div>
+                {% if mix.promoted_recipe %}
+                <div class="badge-fizz bg-success px-2 py-1" style="font-size: 0.55rem; box-shadow: 0 0 10px rgba(40, 167, 69, 0.2);">
+                    <i class="bi bi-check-circle me-1"></i> INDEXED
+                </div>
+                {% endif %}
+            </div>
 
-                    <div class="d-flex flex-wrap gap-2">
-                        {% for mi in mix.mix_ingredients.all %}
-                        <div class="glass-card p-2 px-3 border-white border-opacity-5 bg-white bg-opacity-5 d-flex align-items-center gap-3" style="min-width: 180px;">
-                            <div class="flex-grow-1">
-                                <div class="readout-label mb-1" style="font-size: 0.5rem; color: var(--fizz-lime);">
-                                    {% if forloop.first %}PRIMARY{% elif forloop.counter == 2 %}SECONDARY{% else %}MODIFIER{% endif %}
-                                </div>
-                                <div class="fw-bold text-white fs-6 mb-0">{{ mi.ingredient.name|default:"Signal Unidentified" }}</div>
-                                <div class="text-dim extra-small opacity-75">
-                                    {{ mi.amount|floatformat:0 }}{% if mix.drink_type == 'SODA' %}ml{% else %}g{% endif %}
-                                    <span class="mx-1">•</span> 
-                                    <span class="text-{{ mi.ingredient.category }}">{{ mi.ingredient.category|upper }}</span>
-                                </div>
+            <!-- Molecular specs (Ingredients) -->
+            <div class="mb-4 flex-grow-1">
+                <label class="readout-label mb-2">Molecular Specs</label>
+                <div class="d-flex flex-column gap-2">
+                    {% for mi in mix.mix_ingredients.all %}
+                    <div class="glass-card p-2 px-3 border-white border-opacity-5 bg-dark bg-opacity-25 d-flex align-items-center gap-3">
+                        <div class="flex-grow-1">
+                            <div class="readout-label mb-1" style="font-size: 0.5rem; color: var(--fizz-lime);">
+                                {% if forloop.first %}PRIMARY{% elif forloop.counter == 2 %}SECONDARY{% else %}MODIFIER{% endif %}
+                            </div>
+                            <div class="fw-bold text-white fs-6 mb-0">{{ mi.ingredient.name|default:"Signal Unidentified" }}</div>
+                            <div class="text-dim extra-small opacity-75">
+                                {{ mi.amount|floatformat:0 }}{% if mix.drink_type == 'SODA' %}ml{% else %}g{% endif %}
+                                <span class="mx-1">•</span> 
+                                <span class="text-{{ mi.ingredient.category }}">{{ mi.ingredient.category|upper }}</span>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
+                    {% endfor %}
                 </div>
+            </div>
 
-                <div class="col-md-3 mt-3 mt-md-0 d-flex flex-column align-items-md-end gap-2">
-                    <div class="d-flex gap-2">
-                        {% if not mix.promoted_recipe %}
-                        <button class="btn btn-primary btn-sm px-4 promote-btn" 
-                                data-mix-id="{{ mix.id }}" 
-                                data-ingredients="[{% for mi in mix.mix_ingredients.all %}{{ mi.ingredient.id }}{% if not forloop.last %},{% endif %}{% endfor %}]">
-                            <i class="bi bi-journal-plus me-1"></i> Index Protocol
-                        </button>
-                        {% else %}
-                        <a href="{% url 'recipe_detail' mix.promoted_recipe.id %}" class="btn btn-sm btn-outline-success border-white border-opacity-10 px-3">
-                            <i class="bi bi-kanban me-1"></i> Inspect
-                        </a>
-                        {% endif %}
-                        <button class="btn btn-outline-danger btn-sm border-0 opacity-25 hover-opacity-100" onclick="decommissionProtocol({{ mix.id }}, this)" title="Decommission Protocol">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
+            <!-- Actions row -->
+            <div class="mt-auto pt-3 border-top border-white border-opacity-5 d-flex justify-content-between align-items-center">
+                {% if mix.promoted_recipe %}
+                <span class="text-dim italic small" title="{{ mix.promoted_recipe.name }}">Indexed: {{ mix.promoted_recipe.name|truncatechars:12 }}</span>
+                {% else %}
+                <span class="text-dim small italic">Pending Indexing</span>
+                {% endif %}
+                <div class="d-flex gap-2">
+                    {% if not mix.promoted_recipe %}
+                    <button class="btn btn-primary btn-sm px-3 promote-btn" 
+                            data-mix-id="{{ mix.id }}" 
+                            data-ingredients="[{% for mi in mix.mix_ingredients.all %}{{ mi.ingredient.id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
+                            style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
+                        <i class="bi bi-journal-plus me-1"></i> Index
+                    </button>
+                    {% else %}
+                    <a href="{% url 'recipe_detail' mix.promoted_recipe.id %}" class="btn btn-sm btn-outline-success border-white border-opacity-10 text-white px-3" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
+                        Inspect
+                    </a>
+                    {% endif %}
+                    <button class="btn btn-outline-danger btn-sm border-0 opacity-25 hover-opacity-100" onclick="decommissionProtocol({{ mix.id }}, this)" title="Decommission Protocol" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             </div>
         </div>

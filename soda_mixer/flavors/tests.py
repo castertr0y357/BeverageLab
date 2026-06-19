@@ -192,6 +192,22 @@ class BeverageLabViewsTest(TestCase):
         names = [ing.name for ing in response.context['ingredients']]
         self.assertEqual(names, sorted(names))
 
+    def test_mix_history_list_view(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        # Create a mix history entry
+        mix = MixHistory.objects.create(drink_type="SODA")
+        from .models import MixHistoryIngredient
+        MixHistoryIngredient.objects.create(
+            mix=mix,
+            ingredient=self.ing,
+            amount=150.0
+        )
+        response = self.client.get(reverse('mix_history_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Club Soda")
+        self.assertContains(response, "Soda Lab")
+
+
     def test_add_ingredient_post(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
         response = self.client.post(reverse('add_ingredient'), {
