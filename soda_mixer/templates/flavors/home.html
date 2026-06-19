@@ -1455,7 +1455,9 @@
                 }
             }
             
-            const displayVolume = isDryCoffee ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0);
+            const displayVolume = (currentLabMode === 'COFFEE') 
+                ? (isDryCoffee ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0))
+                : amount.toFixed(0);
             
             if (currentLabMode === 'SLUSHIE' || currentLabMode === 'SODA') {
                 totalSyrup += parseFloat(amount);
