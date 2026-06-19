@@ -1344,11 +1344,6 @@
             }
         }
         
-        let html = '<div class="row g-2 mb-3">';
-        let hiddenInputs = '';
-        
-        const roles = ['BASE', 'PAYLOAD', 'ACCENT', 'DEEP ACCENT', 'STABILIZER'];
-        
         let initialTotal = 0;
         const limit = (160 * (bottleScale || 1.0));
         
@@ -1369,6 +1364,55 @@
         }
 
         let totalSyrup = 0;
+        selectedIngredients.forEach((ing, index) => {
+            let amount = ing.amount;
+            if (currentLabMode !== 'COFFEE') {
+                if (!amount) {
+                    const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
+                    amount = baseVolume * (bottleScale || 1.0);
+                }
+                amount = amount * expansionFactor;
+                totalSyrup += parseFloat(amount);
+            }
+        });
+
+        let html = '<div class="row g-2 mb-3">';
+        let hiddenInputs = '';
+
+        // 💧 Inject virtual Water card for Slushie mode to the left of the base ingredient
+        if (currentLabMode === 'SLUSHIE') {
+            const bottleCapacity = bottleScale * 946.35;
+            const waterToFillLine = bottleCapacity - totalSyrup;
+            const finalWater = Math.max(0, waterToFillLine);
+            const syrupLimit = 160 * bottleScale;
+            const isOverflow = totalSyrup > syrupLimit;
+            
+            const warningHtml = isOverflow ? `
+                <div class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50 px-2 py-1 mt-2" style="font-size: 0.55rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> OVERFLOW
+                </div>
+            ` : '';
+
+            html += `
+                <div class="col-auto animate-fade-in">
+                    <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
+                        <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">Water <i class="bi bi-droplets text-info ms-1"></i></div>
+                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
+                        <div class="mt-1 pt-1 border-top border-white border-opacity-10">
+                            <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
+                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">FILL LINE</span></div>
+                                <div class="d-flex justify-content-between"><span>TARGET</span> <span>${(bottleScale * 32).toFixed(0)}oz</span></div>
+                            </div>
+                            ${warningHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        const roles = ['BASE', 'PAYLOAD', 'ACCENT', 'DEEP ACCENT', 'STABILIZER'];
+
         selectedIngredients.forEach((ing, index) => {
             const isLast = index === (selectedIngredients.length - 1);
             const isFull = selectedIngredients.length >= maxIngredients || isDone;
@@ -1494,55 +1538,7 @@
         
         html += '</div>';
 
-        // Ninja Ratio Logic for Slushies (Displacement Aware)
-        if (currentLabMode === 'SLUSHIE') {
-            const bottleCapacity = bottleScale * 946.35;
-            // Physical Displacement Limits: 160ml syrup for 32oz, proportional for other scales
-            const syrupLimit = 160 * bottleScale;
-            
-            // Calculate available space to prevent overflow
-            const waterToFillLine = bottleCapacity - totalSyrup;
-            const isOverflow = totalSyrup > syrupLimit;
-            
-            // Final water calculation prioritizing bottle capacity
-            const finalWater = waterToFillLine; // Always fill to line in Ninja Creami
-            const totalVolume = totalSyrup + finalWater;
-            const targetWaterVolume = bottleCapacity - syrupLimit;
-            const ozLabel = (bottleScale * 32).toFixed(0) + 'oz';
-            
-            const overflowWarning = isOverflow ? `
-                <div class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-50 px-2 py-1 ms-2" style="font-size: 0.6rem;">
-                    <i class="bi bi-exclamation-triangle-fill"></i> SYRUP OVERFLOW (> ${syrupLimit.toFixed(0)}ml)
-                </div>
-            ` : '';
-            
-            html += `
-                <div class="glass-surface p-3 mb-3 border-lab border-opacity-50 ${isOverflow ? 'border-danger' : ''}">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="readout-label mb-1">Ninja Displacement Monitor (Target Fill: ${bottleCapacity.toFixed(0)}ml / ~${ozLabel}) ${overflowWarning}</div>
-                            <div class="d-flex gap-4">
-                                <div>
-                                    <small class="text-dim d-block">Reagent Displacement</small>
-                                    <span class="fw-bold ${isOverflow ? 'text-danger' : ''}">${totalSyrup.toFixed(1)}${unit} / ${formatImperialVolume(totalSyrup)}</span>
-                                </div>
-                                <div>
-                                    <small class="text-dim d-block">Water to Fill-Line (Target: ${targetWaterVolume.toFixed(0)}ml)</small>
-                                    <span class="text-gradient-lab fw-bold">${finalWater.toFixed(1)}${unit} / ${formatImperialVolume(finalWater)}</span>
-                                </div>
-                                <div>
-                                    <small class="text-dim d-block">Total Synthesis Yield</small>
-                                    <span class="fw-bold text-white">${totalVolume.toFixed(1)}${unit} / ${formatImperialVolume(totalVolume)}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <i class="bi bi-droplets fs-2 opacity-10"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+
         
         if (isDone || selectedIngredients.length >= maxIngredients) {
             html += `<div class="alert bg-success bg-opacity-10 border border-success border-opacity-20 text-success small py-2">
