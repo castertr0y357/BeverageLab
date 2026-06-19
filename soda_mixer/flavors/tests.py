@@ -14,6 +14,16 @@ from .ai_service import AIAssistant
 User = get_user_model()
 
 
+def _get_sse_data(response) -> dict:
+    content = b"".join(response.streaming_content).decode('utf-8')
+    for line in content.split('\n\n'):
+        if line.strip().startswith('data:'):
+            parsed = json.loads(line.replace('data:', '').strip())
+            if parsed.get('status') == 'success':
+                return parsed
+    return {}
+
+
 class BeverageLabModelTest(TestCase):
     """Test case for database models and properties."""
 
@@ -351,7 +361,7 @@ class BeverageLabViewsTest(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = _get_sse_data(response)
         self.assertEqual(data['status'], 'success')
         self.assertEqual(data['suggestions'][0]['name'], 'Whole Milk')
         
@@ -463,6 +473,67 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="emptyModeMessage"')
         self.assertContains(response, 'id="stepHeader"')
+
+    @patch('requests.request')
+    def test_ai_suggest_api_streams_progress(self, mock_request: MagicMock) -> None:
+        """Verify that ai_suggest_api returns a StreamingHttpResponse with progress event payloads."""
+        self.client.login(username="lab_tech", password="secure_password_123")
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        config = SystemConfiguration.get_config()
+        config.default_llm_provider = provider
+        config.save()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Club Soda", "reason": "Adds fizz", "resonance": 95, "amount": 100.0}]}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans'],
+                'drink_type': 'COFFEE',
+            }),
+            content_type="application/json"
+        )
+        
+        # Verify it returns a streaming response
+        self.assertTrue(response.streaming)
+        self.assertEqual(response['Content-Type'], 'text/event-stream')
+
+        # Decode streamed content chunks
+        content = b"".join(response.streaming_content).decode('utf-8')
+        lines = [line.strip() for line in content.split('\n\n') if line.strip()]
+
+        # Parse messages
+        progress_msgs = []
+        success_data = None
+        for line in lines:
+            if line.startswith('data:'):
+                parsed = json.loads(line.replace('data:', '').strip())
+                if parsed.get('status') == 'progress':
+                    progress_msgs.append(parsed.get('message'))
+                elif parsed.get('status') == 'success':
+                    success_data = parsed
+
+        # Assert progress messages are sent in order
+        self.assertIn("Scanning current compound registry...", progress_msgs)
+        self.assertIn("Locating matching flavor affinity groups...", progress_msgs)
+        self.assertIn("Querying Mixology Oracle...", progress_msgs)
+        self.assertIn("Sanitizing extraction volumes & balancing ratios...", progress_msgs)
+
+        # Assert final success payload contains suggestions
+        self.assertIsNotNone(success_data)
+        self.assertEqual(success_data['status'], 'success')
+        self.assertEqual(success_data['suggestions'][0]['name'], 'Club Soda')
 
 
 class BeverageLabAIAssistantTest(TestCase):
@@ -949,7 +1020,7 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = _get_sse_data(response)
         
         # Verify suggestions amount is coerced to 50.0 (Whole Milk is DAIRY)
         self.assertEqual(data['suggestions'][0]['amount'], 50.0)
@@ -988,7 +1059,7 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = _get_sse_data(response)
 
         # Unmatched rebalancing keys should be dropped entirely
         self.assertEqual(data['rebalancing'], {})
@@ -1037,7 +1108,7 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
-        data = response.json()
+        data = _get_sse_data(response)
         
         # Verify only Whole Milk (DAIRY) is returned, and Vanilla Syrup (ADDITIVE) is filtered out
         suggestions = data['suggestions']

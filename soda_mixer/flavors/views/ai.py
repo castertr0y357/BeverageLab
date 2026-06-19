@@ -337,8 +337,8 @@ def discover_provider_models_api(request: HttpRequest) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def ai_suggest_api(request: HttpRequest) -> JsonResponse:
-    """Get proactive, structured multi-suggestions from the assistant."""
+def ai_suggest_api(request: HttpRequest) -> HttpResponse:
+    """Get proactive, structured multi-suggestions from the assistant, streaming progress first."""
     try:
         data = json.loads(request.body)
         ingredients = data.get('ingredients', [])
@@ -352,131 +352,133 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
         if not ingredients:
             ingredients = ["NONE - Initial Synthesis"]
             
-        # Get full inventory registry for AI context
-        all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-        registry = []
-        for ing in all_ingredients:
-            ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-            registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
-        inventory_context = "\n".join(registry)
+        def generator():
+            def send_progress(msg: str):
+                return f"data: {json.dumps({'status': 'progress', 'message': msg})}\n\n"
 
-        raw_suggestion = ""
-        retry_note = None
-        
-        for attempt in range(3):
-            # On the final attempt, strip persona for brute-force compliance
-            if attempt == 2 and not retry_note:
-                 retry_note = "CRITICAL DATA MISMATCH: STOP all prose. Provide ONLY the JSON array of ingredients from the registry. [RAW JSON ONLY]"
+            yield send_progress("Scanning current compound registry...")
             
-            raw_suggestion = AIAssistant.suggest_autonomous(
-                ingredients, mode, 
-                drink_type=drink_type,
-                inventory=inventory_context, 
-                exclude=exclude,
-                retry_note=retry_note,
-                force_type=force_type
-            )
-            logger.warning(f"AISuggestion - Info - Raw suggestion from LLM: {raw_suggestion}")
-            
-            suggested_data = raw_suggestion
-            
-            if suggested_data:
-                if isinstance(suggested_data, dict):
-                    suggestions_list = suggested_data.get('suggestions', [])
-                    rebalancing = suggested_data.get('rebalancing', {})
-                    seal_recommended = suggested_data.get('seal_recommended', False)
-                    seal_resonance = suggested_data.get('seal_resonance', 0)
-                    reasoning = suggested_data.get('reasoning', '')
-                else:
-                    suggestions_list = suggested_data
-                    rebalancing = {}
-                    seal_recommended = False
-                    seal_resonance = 0
-                    reasoning = ''
+            # Get full inventory registry for AI context
+            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
+            registry = []
+            for ing in all_ingredients:
+                ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
+            inventory_context = "\n".join(registry)
 
-                enriched: List[Dict[str, Any]] = []
-                inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
+            yield send_progress("Locating matching flavor affinity groups...")
+            yield send_progress("Querying Mixology Oracle...")
+
+            raw_suggestion = ""
+            retry_note = None
+            
+            for attempt in range(3):
+                # On the final attempt, strip persona for brute-force compliance
+                if attempt == 2 and not retry_note:
+                     retry_note = "CRITICAL DATA MISMATCH: STOP all prose. Provide ONLY the JSON array of ingredients from the registry. [RAW JSON ONLY]"
                 
-                for item in suggestions_list:
-                    ing_name = item.get('name', '')
-                    target_obj = find_ingredient_by_name(ing_name, inventory_items)
-                                
-                    if target_obj:
-                        if force_type and target_obj.ingredient_type != force_type:
-                            logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' (type: {target_obj.ingredient_type}) which does not match force_type '{force_type}'")
-                            continue
-                        intensity_delta = 0
-                        if ingredients and ingredients[0] != "NONE - Initial Synthesis":
-                            baseline_name = ingredients[0].strip().lower()
-                            first_ing = next((inv for inv in inventory_items if inv.name.lower() == baseline_name), None)
-                            if not first_ing:
-                                first_ing = Ingredient.objects.filter(name__iexact=ingredients[0]).first()
-                            
-                            base_intensity = first_ing.intensity if first_ing else 3
-                            intensity_delta = abs(target_obj.intensity - base_intensity)
-                        
-                        resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
-                        
-                        amount = item.get('amount')
-                        if drink_type == 'COFFEE':
-                            amount = sanitize_coffee_amount(target_obj, amount)
-
-                        multibrand_names = get_multibrand_names_in_inventory()
-                        enriched.append({
-                            'id': target_obj.id,
-                            'name': get_display_name(target_obj, multibrand_names),
-                            'category': target_obj.category,
-                            'type': target_obj.ingredient_type,
-                            'intensity': target_obj.intensity,
-                            'sweetness': target_obj.sweetness,
-                            'acidity': target_obj.acidity,
-                            'bitterness': target_obj.bitterness,
-                            'complexity': target_obj.complexity,
-                            'base_suitability': target_obj.base_suitability,
-                            'accent_suitability': target_obj.accent_suitability,
-                            'resonance': round(min(resonance, 99.8), 1),
-                            'reason': item.get('reason', 'Molecular Affinity Match'),
-                            'amount': amount,
-                            'profile': item.get('profile', None)
-                        })
+                raw_suggestion = AIAssistant.suggest_autonomous(
+                    ingredients, mode, 
+                    drink_type=drink_type,
+                    inventory=inventory_context, 
+                    exclude=exclude,
+                    retry_note=retry_note,
+                    force_type=force_type
+                )
+                logger.warning(f"AISuggestion - Info - Raw suggestion from LLM: {raw_suggestion}")
                 
-                if drink_type == 'COFFEE' and rebalancing:
-                    logger.warning(f"AISuggestion - Info - Raw AI rebalancing before sanitization: {rebalancing}")
-                    sanitized_rebalancing = {}
-                    for key, val in rebalancing.items():
-                        target_obj = find_ingredient_by_name(key, inventory_items)
+                suggested_data = raw_suggestion
+                
+                if suggested_data:
+                    yield send_progress("Sanitizing extraction volumes & balancing ratios...")
+                    if isinstance(suggested_data, dict):
+                        suggestions_list = suggested_data.get('suggestions', [])
+                        rebalancing = suggested_data.get('rebalancing', {})
+                        seal_recommended = suggested_data.get('seal_recommended', False)
+                        seal_resonance = suggested_data.get('seal_resonance', 0)
+                        reasoning = suggested_data.get('reasoning', '')
+                    else:
+                        suggestions_list = suggested_data
+                        rebalancing = {}
+                        seal_recommended = False
+                        seal_resonance = 0
+                        reasoning = ''
+
+                    enriched: List[Dict[str, Any]] = []
+                    inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
+                    
+                    for item in suggestions_list:
+                        ing_name = item.get('name', '')
+                        target_obj = find_ingredient_by_name(ing_name, inventory_items)
+                                    
                         if target_obj:
-                            sanitized_rebalancing[key] = sanitize_coffee_amount(target_obj, val)
-                        else:
-                            # Cannot verify ingredient type — skip unmatched entries
-                            # to prevent raw AI values (e.g. 100.0) from leaking through
-                            logger.warning(f"AISuggestion - Warning - Rebalancing key '{key}' not found in inventory, skipping raw value {val}")
-                    rebalancing = sanitized_rebalancing
-                    logger.warning(f"AISuggestion - Info - Sanitized rebalancing: {rebalancing}")
+                            if force_type and target_obj.ingredient_type != force_type:
+                                logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' (type: {target_obj.ingredient_type}) which does not match force_type '{force_type}'")
+                                continue
+                            intensity_delta = 0
+                            if ingredients and ingredients[0] != "NONE - Initial Synthesis":
+                                baseline_name = ingredients[0].strip().lower()
+                                first_ing = next((inv for inv in inventory_items if inv.name.lower() == baseline_name), None)
+                                if not first_ing:
+                                    first_ing = Ingredient.objects.filter(name__iexact=ingredients[0]).first()
+                                
+                                base_intensity = first_ing.intensity if first_ing else 3
+                                intensity_delta = abs(target_obj.intensity - base_intensity)
+                            
+                            resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
+                            
+                            amount = item.get('amount')
+                            if drink_type == 'COFFEE':
+                                amount = sanitize_coffee_amount(target_obj, amount)
 
-                if enriched:
-                    logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
-                    return JsonResponse({
-                        'status': 'success', 
-                        'suggestions': enriched,
-                        'rebalancing': rebalancing,
-                        'seal_recommended': seal_recommended,
-                        'seal_resonance': seal_resonance,
-                        'reasoning': reasoning
-                    })
-            
-            retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
+                            multibrand_names = get_multibrand_names_in_inventory()
+                            enriched.append({
+                                'id': target_obj.id,
+                                'name': get_display_name(target_obj, multibrand_names),
+                                'category': target_obj.category,
+                                'type': target_obj.ingredient_type,
+                                'intensity': target_obj.intensity,
+                                'sweetness': target_obj.sweetness,
+                                'acidity': target_obj.acidity,
+                                'bitterness': target_obj.bitterness,
+                                'complexity': target_obj.complexity,
+                                'base_suitability': target_obj.base_suitability,
+                                'accent_suitability': target_obj.accent_suitability,
+                                'resonance': round(min(resonance, 99.8), 1),
+                                'reason': item.get('reason', 'Molecular Affinity Match'),
+                                'amount': amount,
+                                'profile': item.get('profile', None)
+                            })
+                    
+                    if drink_type == 'COFFEE' and rebalancing:
+                        logger.warning(f"AISuggestion - Info - Raw AI rebalancing before sanitization: {rebalancing}")
+                        sanitized_rebalancing = {}
+                        for key, val in rebalancing.items():
+                            target_obj = find_ingredient_by_name(key, inventory_items)
+                            if target_obj:
+                                sanitized_rebalancing[key] = sanitize_coffee_amount(target_obj, val)
+                            else:
+                                logger.warning(f"AISuggestion - Warning - Rebalancing key '{key}' not found in inventory, skipping raw value {val}")
+                        rebalancing = sanitized_rebalancing
+                        logger.warning(f"AISuggestion - Info - Sanitized rebalancing: {rebalancing}")
 
-        if not raw_suggestion:
-            raw_suggestion = "System Failure: The Laboratory substrate returned an empty synthesis signal. Please try again."
-        elif isinstance(raw_suggestion, str) and not raw_suggestion.strip():
-            raw_suggestion = "System Failure: The Laboratory substrate returned an empty synthesis signal. Please try again."
-            
-        logger.warning("AISuggestion - Warning - Failed to get structured suggestions; returning raw text fallback.")
-        return JsonResponse({'status': 'success', 'suggestion': str(raw_suggestion)})
+                    if enriched:
+                        logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
+                        yield f"data: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': rebalancing, 'seal_recommended': seal_recommended, 'seal_resonance': seal_resonance, 'reasoning': reasoning})}\n\n"
+                        return
+                
+                retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
+
+            # Fallback or empty suggestions if all attempts fail
+            yield f"data: {json.dumps({'status': 'success', 'suggestions': [], 'rebalancing': {}, 'seal_recommended': False, 'seal_resonance': 0, 'reasoning': 'AI suggestions fallback.'})}\n\n"
+
+        return StreamingHttpResponse(generator(), content_type='text/event-stream')
+
     except Exception as e:
         logger.error(f"AISuggestion - Error - Autonomous Suggestion Failed: {e}", exc_info=True)
-        return JsonResponse({'error': f"Autonomous Suggestion Failed: {str(e)}"}, status=500)
+        def error_generator():
+            yield f"data: {json.dumps({'status': 'error', 'message': f'Autonomous Suggestion Failed: {str(e)}'})}\n\n"
+        return StreamingHttpResponse(error_generator(), content_type='text/event-stream')
 
 
 @csrf_exempt

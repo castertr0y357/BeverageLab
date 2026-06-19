@@ -1088,7 +1088,7 @@
             return;
         }
 
-        container.innerHTML = '<div class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p class="mt-2 text-dim">Computing molecular affinity...</p></div>';
+        container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim">Computing molecular affinity...</p></div>';
         library.style.display = 'none'; // Hide library when focused on recommendations
 
         const isAiEngine = engineMode === 'ai';
@@ -1114,7 +1114,45 @@
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                 body: JSON.stringify(payload)
             });
-            const data = await r.json();
+
+            let data;
+            if (isAiEngine) {
+                const reader = r.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.trim().startsWith('data:')) {
+                            const jsonStr = line.replace('data:', '').trim();
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                if (parsed.status === 'progress') {
+                                    const textEl = document.getElementById('recommendationProgressText');
+                                    if (textEl) {
+                                        textEl.textContent = parsed.message;
+                                    }
+                                } else if (parsed.status === 'success') {
+                                    data = parsed;
+                                } else if (parsed.status === 'error') {
+                                    throw new Error(parsed.message);
+                                }
+                            } catch (e) {
+                                console.error("Error parsing recommendation stream line:", line, e);
+                            }
+                        }
+                    }
+                }
+            } else {
+                data = await r.json();
+            }
             
             container.innerHTML = '';
             
@@ -1141,7 +1179,6 @@
                 updateSelectedArea(); // Refresh UI with new volumes
             }
 
-            const isAiEngine = engineMode === 'ai';
             let suggestions = isAiEngine ? (data.suggestions || []) : (data.recommended || []);
             
             // 🧪 Integrated Sorting Protocol: Add Seal Mix to the list so it can compete with ingredients
