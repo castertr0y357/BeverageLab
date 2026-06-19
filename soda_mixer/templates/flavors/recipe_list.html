@@ -18,11 +18,11 @@
 <div class="mb-4">
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <span class="readout-label me-2">Classification:</span>
-        <a href="{% url 'recipe_list' %}" class="fizz-pill {% if not active_category_id %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %} text-decoration-none">
+        <a href="?{% if active_drink_type %}drink_type={{ active_drink_type }}&{% endif %}{% if active_sort %}sort={{ active_sort }}{% endif %}" class="fizz-pill {% if not active_category_id %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %} text-decoration-none">
             All Protocols
         </a>
         {% for cat in all_categories %}
-        <a href="?category={{ cat.id }}"
+        <a href="?category={{ cat.id }}{% if active_drink_type %}&drink_type={{ active_drink_type }}{% endif %}{% if active_sort %}&sort={{ active_sort }}{% endif %}"
            class="fizz-pill text-decoration-none {% if active_category_id == cat.id %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}">
             {{ cat.name }}
         </a>
@@ -30,6 +30,47 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Filter & Sort Panel -->
+<form method="GET" action="{% url 'recipe_list' %}" class="glass-surface p-3 mb-4 print-hide">
+    <div class="row g-3 align-items-center">
+        <!-- Keep active category if selected -->
+        {% if active_category_id %}
+        <input type="hidden" name="category" value="{{ active_category_id }}">
+        {% endif %}
+        
+        <!-- Filter by Drink Type -->
+        <div class="col-md-4 col-sm-6">
+            <label class="readout-label d-block mb-1">Filter by Lab</label>
+            <select name="drink_type" class="form-select" onchange="this.form.submit()">
+                <option value="">All Laboratories</option>
+                <option value="SODA" {% if active_drink_type == 'SODA' %}selected{% endif %}>Soda Lab</option>
+                <option value="COFFEE" {% if active_drink_type == 'COFFEE' %}selected{% endif %}>Coffee Lab</option>
+                <option value="SLUSHIE" {% if active_drink_type == 'SLUSHIE' %}selected{% endif %}>Cryo Lab</option>
+            </select>
+        </div>
+
+        <!-- Sort by -->
+        <div class="col-md-4 col-sm-6">
+            <label class="readout-label d-block mb-1">Sort Order</label>
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="-created_at" {% if active_sort == '-created_at' %}selected{% endif %}>Date Created: Newest First</option>
+                <option value="created_at" {% if active_sort == 'created_at' %}selected{% endif %}>Date Created: Oldest First</option>
+                <option value="name" {% if active_sort == 'name' %}selected{% endif %}>Alphabetical: A-Z</option>
+                <option value="-name" {% if active_sort == '-name' %}selected{% endif %}>Alphabetical: Z-A</option>
+            </select>
+        </div>
+
+        <!-- Clear/Reset controls -->
+        <div class="col-md-4 col-sm-12 d-flex align-items-end justify-content-md-end">
+            {% if active_drink_type or active_sort != '-created_at' or active_category_id %}
+            <a href="{% url 'recipe_list' %}" class="btn btn-outline-secondary btn-sm border-white border-opacity-10 text-white px-3 py-2 w-100 w-md-auto text-center" style="border-radius: 12px;">
+                <i class="bi bi-x-circle me-1"></i> Clear Filters
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</form>
 
 <div class="row g-4">
     {% for recipe in recipes %}
@@ -40,7 +81,13 @@
                     <h4 class="mb-1">
                         <a href="{% url 'recipe_detail' recipe.id %}" class="text-decoration-none text-white hover-lime fw-bold">{{ recipe.name }}</a>
                     </h4>
-                    <span class="badge border border-white border-opacity-10 p-1 px-2 text-dim" style="font-size: 0.55rem; width: fit-content;">{{ recipe.get_drink_type_display }}</span>
+                    {% if recipe.drink_type == 'SODA' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important; box-shadow: 0 0 8px rgba(164, 230, 76, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Soda Lab</span>
+                    {% elif recipe.drink_type == 'COFFEE' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important; box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Coffee Lab</span>
+                    {% elif recipe.drink_type == 'SLUSHIE' %}
+                    <span class="badge text-dark fw-bold p-1 px-2" style="background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; box-shadow: 0 0 8px rgba(14, 165, 233, 0.3); border: 1px solid var(--glass-border); font-size: 0.55rem; width: fit-content; text-transform: uppercase;">Cryo Lab</span>
+                    {% endif %}
                 </div>
                 {% if recipe.rating > 0 %}
                 <div class="d-flex gap-1 text-warning align-items-center bg-white bg-opacity-5 px-2 py-1 rounded-pill">

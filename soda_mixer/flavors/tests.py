@@ -1179,5 +1179,70 @@ class BeverageLabBatchSizesTest(TestCase):
         self.assertContains(detail_response, 'scale64oz')
 
 
+class BeverageLabRecipeListFilterSortTest(TestCase):
+    """Test case for filtering and sorting on the recipe list page."""
 
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
 
+        # Create some recipes
+        self.recipe_soda = Recipe.objects.create(name="Alpha Soda", drink_type="SODA")
+        self.recipe_coffee = Recipe.objects.create(name="Gamma Coffee", drink_type="COFFEE")
+        self.recipe_slushie = Recipe.objects.create(name="Beta Slushie", drink_type="SLUSHIE")
+
+    def test_filter_by_drink_type(self) -> None:
+        url = reverse('recipe_list')
+        
+        # Filter: Soda only
+        response = self.client.get(url, {'drink_type': 'SODA'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(len(recipes), 1)
+        self.assertEqual(recipes[0].name, "Alpha Soda")
+
+        # Filter: Coffee only
+        response = self.client.get(url, {'drink_type': 'COFFEE'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(len(recipes), 1)
+        self.assertEqual(recipes[0].name, "Gamma Coffee")
+
+    def test_sort_alphabetically(self) -> None:
+        url = reverse('recipe_list')
+
+        # Sort: A-Z
+        response = self.client.get(url, {'sort': 'name'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(recipes[0].name, "Alpha Soda")
+        self.assertEqual(recipes[1].name, "Beta Slushie")
+        self.assertEqual(recipes[2].name, "Gamma Coffee")
+
+        # Sort: Z-A
+        response = self.client.get(url, {'sort': '-name'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(recipes[0].name, "Gamma Coffee")
+        self.assertEqual(recipes[1].name, "Beta Slushie")
+        self.assertEqual(recipes[2].name, "Alpha Soda")
+
+    def test_sort_by_date_created(self) -> None:
+        url = reverse('recipe_list')
+
+        # Sort: Oldest First (created_at)
+        response = self.client.get(url, {'sort': 'created_at'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(recipes[0].name, "Alpha Soda")
+        self.assertEqual(recipes[1].name, "Gamma Coffee")
+        self.assertEqual(recipes[2].name, "Beta Slushie")
+
+        # Sort: Newest First (-created_at)
+        response = self.client.get(url, {'sort': '-created_at'})
+        self.assertEqual(response.status_code, 200)
+        recipes = list(response.context['recipes'])
+        self.assertEqual(recipes[0].name, "Beta Slushie")
+        self.assertEqual(recipes[1].name, "Gamma Coffee")
+        self.assertEqual(recipes[2].name, "Alpha Soda")

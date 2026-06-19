@@ -145,19 +145,49 @@ def ingredient_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def recipe_list(request: HttpRequest) -> HttpResponse:
-    """List all saved recipes, optionally filtered by category."""
+    """List all saved recipes, optionally filtered and sorted."""
     category_id = request.GET.get('category')
+    drink_type = request.GET.get('drink_type')
+    sort_by = request.GET.get('sort', '-created_at')
+
     all_categories = RecipeCategory.objects.all().order_by('name')
 
     # Optimized Archive Fetch with prefetching
-    recipes = Recipe.objects.prefetch_related('categories', 'recipe_ingredients__ingredient').all().order_by('-updated_at')
+    recipes = Recipe.objects.prefetch_related('categories', 'recipe_ingredients__ingredient').all()
+    
+    # Filter by category
     if category_id:
         recipes = recipes.filter(categories__id=category_id)
+        
+    # Filter by drink type
+    if drink_type:
+        recipes = recipes.filter(drink_type=drink_type)
+
+    # Apply sorting
+    valid_sorts = {
+        'name': 'name',
+        '-name': '-name',
+        'created_at': 'created_at',
+        '-created_at': '-created_at',
+        'updated_at': 'updated_at',
+        '-updated_at': '-updated_at',
+    }
+    sort_field = valid_sorts.get(sort_by, '-created_at')
+    recipes = recipes.order_by(sort_field)
+
+    active_cat_id = None
+    if category_id:
+        try:
+            active_cat_id = int(category_id)
+        except ValueError:
+            pass
 
     return render(request, 'flavors/recipe_list.html', {
         'recipes': recipes,
         'all_categories': all_categories,
-        'active_category_id': int(category_id) if category_id else None,
+        'active_category_id': active_cat_id,
+        'active_drink_type': drink_type,
+        'active_sort': sort_by,
     })
 
 
