@@ -4,8 +4,8 @@ from .models import Ingredient, Recipe, RecipeIngredient, MixHistory, MixHistory
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'ingredient_type', 'category', 'intensity', 'is_in_inventory', 'is_ready_to_drink']
-    list_filter = ['ingredient_type', 'category', 'intensity', 'is_in_inventory', 'is_ready_to_drink']
+    list_display = ['name', 'ingredient_type', 'category', 'intensity', 'is_in_inventory', 'is_ready_to_drink', 'is_dry']
+    list_filter = ['ingredient_type', 'category', 'intensity', 'is_in_inventory', 'is_ready_to_drink', 'is_dry']
     search_fields = ['name', 'description', 'ai_notes', 'flavor_notes', 'origin', 'roaster']
     ordering = ['name']
 

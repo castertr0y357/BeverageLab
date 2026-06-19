@@ -244,8 +244,9 @@
                                      data-coffee-base-type="{{ recipe.coffee_base_type }}"
                                      data-coffee-style="{{ recipe.coffee_style }}"
                                      data-drink-size-oz="{{ recipe.drink_size_oz }}"
-                                     data-is-ready-to-drink="{{ ri.ingredient.is_ready_to_drink|yesno:'true,false' }}">
-                                    {% if recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
+                                     data-is-ready-to-drink="{{ ri.ingredient.is_ready_to_drink|yesno:'true,false' }}"
+                                     data-is-dry="{{ ri.ingredient.is_dry|yesno:'true,false' }}">
+                                    {% if ri.ingredient.is_dry or recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
                                         {{ ri.amount|floatformat:1 }} g
                                     {% else %}
                                         {{ ri.amount|floatformat:1 }} ml
@@ -620,7 +621,8 @@
         amountDisplays.forEach((el, idx) => {
             if (idx !== firstRtdIndex) {
                 const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
-                if (!isNaN(originalAmount)) {
+                const isDry = el.getAttribute('data-is-dry') === 'true';
+                if (!isNaN(originalAmount) && !isDry) {
                     nonFillerTotal += originalAmount * currentScale;
                 }
             }
@@ -634,6 +636,7 @@
             const drinkType = el.getAttribute('data-drink-type');
             const ingredientType = el.getAttribute('data-ingredient-type');
             const isCoffee = drinkType === 'COFFEE';
+            const isDry = el.getAttribute('data-is-dry') === 'true';
             
             if (isCoffee) {
                 let amount = originalAmount;
@@ -645,6 +648,10 @@
                         amount = Math.round((7.0 / 6.0) * coffeeBaseAmount);
                         el.innerHTML = `${coffeeBaseAmount}oz brew / ~${amount}g`;
                     }
+                } else if (isDry) {
+                    const scaleFactor = coffeeSizeOz / savedSizeOz;
+                    amount = originalAmount * scaleFactor;
+                    el.innerHTML = `${amount.toFixed(1)} g`;
                 } else {
                     let scaleFactor = coffeeSizeOz / savedSizeOz;
                     
@@ -677,8 +684,12 @@
                 } else {
                     amount = originalAmount * currentScale;
                 }
-                const displayVolume = Math.round(amount);
-                el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
+                if (isDry) {
+                    el.innerHTML = `${amount.toFixed(1)} g`;
+                } else {
+                    const displayVolume = Math.round(amount);
+                    el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
+                }
             }
         });
 
@@ -698,7 +709,8 @@
             let totalSyrup = 0;
             amountDisplays.forEach(el => {
                 const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
-                if (!isNaN(originalAmount)) {
+                const isDry = el.getAttribute('data-is-dry') === 'true';
+                if (!isNaN(originalAmount) && !isDry) {
                     totalSyrup += originalAmount * currentScale;
                 }
             });
@@ -714,7 +726,8 @@
             let totalSyrup = 0;
             amountDisplays.forEach(el => {
                 const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
-                if (!isNaN(originalAmount)) {
+                const isDry = el.getAttribute('data-is-dry') === 'true';
+                if (!isNaN(originalAmount) && !isDry) {
                     totalSyrup += originalAmount * currentScale;
                 }
             });

@@ -54,7 +54,13 @@
                             </div>
                             <div class="fw-bold text-white fs-6 mb-0">{{ mi.ingredient.name|default:"Signal Unidentified" }}</div>
                             <div class="text-dim extra-small opacity-75">
-                                {{ mi.amount|floatformat:0 }}{% if mix.drink_type == 'SODA' %}ml{% else %}g{% endif %}
+                                {% if mi.ingredient.is_dry or mix.drink_type == 'COFFEE' and mi.ingredient.ingredient_type == 'COFFEE_BEAN' %}
+                                    {{ mi.amount|floatformat:1 }}g
+                                {% elif mix.drink_type == 'SLUSHIE' %}
+                                    {{ mi.amount|floatformat:1 }}oz
+                                {% else %}
+                                    {{ mi.amount|floatformat:0 }}ml
+                                {% endif %}
                                 <span class="mx-1">•</span> 
                                 <span class="text-{{ mi.ingredient.category }}">{{ mi.ingredient.category|upper }}</span>
                             </div>

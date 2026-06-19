@@ -109,6 +109,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
+                    'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': 'suggestions'
@@ -130,6 +131,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
+                    'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'secondary')
@@ -151,6 +153,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
+                    'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'tertiary')
@@ -451,6 +454,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 'base_suitability': target_obj.base_suitability,
                                 'accent_suitability': target_obj.accent_suitability,
                                 'is_ready_to_drink': target_obj.is_ready_to_drink,
+                                'is_dry': target_obj.is_dry,
                                 'resonance': round(min(resonance, 99.8), 1),
                                 'reason': item.get('reason', 'Molecular Affinity Match'),
                                 'amount': amount,
@@ -593,6 +597,8 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                                 
                         if 'is_ready_to_drink' in res:
                             match.is_ready_to_drink = bool(res.get('is_ready_to_drink'))
+                        if 'is_dry' in res:
+                            match.is_dry = bool(res.get('is_dry'))
                             
                         match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
@@ -732,6 +738,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 'base_suitability': ing.base_suitability,
                 'accent_suitability': ing.accent_suitability,
                 'is_ready_to_drink': ing.is_ready_to_drink,
+                'is_dry': ing.is_dry,
                 'amount': item['amount']
             })
             

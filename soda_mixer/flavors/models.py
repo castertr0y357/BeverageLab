@@ -119,6 +119,10 @@ class Ingredient(models.Model):
         default=False,
         help_text="Whether this ingredient is a ready-to-drink liquid (e.g. juices, milk, tea) that can serve as a primary volume filler."
     )
+    is_dry = models.BooleanField(
+        default=False,
+        help_text="Whether this ingredient is measured in weight (g) rather than volume (ml/oz)."
+    )
     description = models.TextField(blank=True, null=True)
     ai_notes = models.TextField(
         blank=True,

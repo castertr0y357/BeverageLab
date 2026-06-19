@@ -98,7 +98,7 @@
                          data-type="{{ ingredient.ingredient_type }}"
                          data-category="{{ ingredient.category }}">
                         <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-5 hover-lime"
-                             onclick="addIngredient(this, '{{ ingredient.name|escapejs }}', {{ ingredient.intensity }}, '{{ ingredient.category }}', '{{ ingredient.ingredient_type }}')"
+                             onclick="addIngredient(this, '{{ ingredient.name|escapejs }}', {{ ingredient.intensity }}, '{{ ingredient.category }}', '{{ ingredient.ingredient_type }}', {{ ingredient.is_dry|yesno:'true,false' }})"
                              data-ingredient-id="{{ ingredient.id }}"
                              data-base-suitability="{{ ingredient.base_suitability }}"
                              data-accent-suitability="{{ ingredient.accent_suitability }}">
@@ -236,7 +236,7 @@
         renderSelectedIngredients();
     }
 
-    function addIngredient(btn, name, intensity, category, type) {
+    function addIngredient(btn, name, intensity, category, type, isDry = false) {
         const id = btn.getAttribute('data-ingredient-id');
         if (selectedIngredients.find(i => i.id === id)) return;
         
@@ -245,7 +245,8 @@
             name: name,
             intensity: intensity,
             category: category,
-            type: type
+            type: type,
+            isDry: isDry
         });
         renderSelectedIngredients();
     }
@@ -278,8 +279,9 @@
         
         for (const i of selectedIngredients) {
             const isBean = i.type === 'COFFEE_BEAN';
-            const rowUnit = type === 'COFFEE' ? (isBean ? 'g' : 'ml') : (type === 'SLUSHIE' ? 'oz' : 'ml');
-            const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (i.type === 'DAIRY' ? '50.0' : '15.0')) : '1.0';
+            const isDry = i.isDry === true || i.isDry === 'true';
+            const rowUnit = isDry || (type === 'COFFEE' && isBean) ? 'g' : (type === 'SLUSHIE' ? 'oz' : 'ml');
+            const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (i.type === 'DAIRY' ? '50.0' : '15.0')) : (isDry ? '15.0' : '1.0');
             
             html += `
                 <tr class="align-middle">
@@ -291,7 +293,7 @@
                         <div class="d-flex align-items-center gap-1">
                             <input type="number" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
                                    name="amount_${i.id}" value="${defaultAmount}" min="0.1" step="0.1" style="width: 80px;">
-                            <span class="small text-dim row-unit" data-ingredient-type="${i.type}">${rowUnit}</span>
+                            <span class="small text-dim row-unit" data-ingredient-type="${i.type}" data-is-dry="${isDry}">${rowUnit}</span>
                         </div>
                     </td>
                     <td class="border-white border-opacity-5 text-end">

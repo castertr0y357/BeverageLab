@@ -131,8 +131,8 @@
                                         <div class="d-flex align-items-center gap-1">
                                             <input type="number" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
                                                    name="amount_{{ ri.ingredient.id }}" value="{{ ri.amount|floatformat:1 }}" min="0.1" step="0.1" style="width: 80px;">
-                                            <span class="small text-dim row-unit" data-ingredient-type="{{ ri.ingredient.ingredient_type }}">
-                                                {% if recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}g{% elif recipe.drink_type == 'SLUSHIE' %}oz{% else %}ml{% endif %}
+                                            <span class="small text-dim row-unit" data-ingredient-type="{{ ri.ingredient.ingredient_type }}" data-is-dry="{{ ri.ingredient.is_dry|yesno:'true,false' }}">
+                                                {% if ri.ingredient.is_dry or recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}g{% elif recipe.drink_type == 'SLUSHIE' %}oz{% else %}ml{% endif %}
                                             </span>
                                         </div>
                                     </td>
@@ -176,7 +176,7 @@
                     {% for ingredient in ingredients %}
                     <div class="col-md-4 col-sm-6 ingredient-item" data-type="{{ ingredient.ingredient_type }}">
                         <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-5 hover-lime"
-                             onclick="addIngredientToTable('{{ ingredient.id }}', '{{ ingredient.name|escapejs }}', '{{ ingredient.category }}', '{{ ingredient.ingredient_type }}')"
+                             onclick="addIngredientToTable('{{ ingredient.id }}', '{{ ingredient.name|escapejs }}', '{{ ingredient.category }}', '{{ ingredient.ingredient_type }}', {{ ingredient.is_dry|yesno:'true,false' }})"
                              data-ingredient-id="{{ ingredient.id }}">
                             <span class="fw-bold mb-1 text-white">{{ ingredient.name }}</span>
                             <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
@@ -231,8 +231,9 @@
         const rowUnits = document.querySelectorAll('.row-unit');
         rowUnits.forEach(el => {
             const ingType = el.getAttribute('data-ingredient-type');
-            if (type === 'COFFEE') {
-                el.textContent = ingType === 'COFFEE_BEAN' ? 'g' : 'ml';
+            const isDry = el.getAttribute('data-is-dry') === 'true';
+            if (isDry || (type === 'COFFEE' && ingType === 'COFFEE_BEAN')) {
+                el.textContent = 'g';
             } else if (type === 'SLUSHIE') {
                 el.textContent = 'oz';
             } else {
@@ -259,7 +260,7 @@
         });
     }
 
-    function addIngredientToTable(id, name, category, ingredientType) {
+    function addIngredientToTable(id, name, category, ingredientType, isDry = false) {
         if (document.getElementById(`ingredient-row-${id}`)) {
             alert('Ingredient already present in formula.');
             return;
@@ -285,14 +286,14 @@
                 </div>
             `;
             // Call recursively or just get the new tbody
-            addIngredientToTable(id, name, category, ingredientType);
+            addIngredientToTable(id, name, category, ingredientType, isDry);
             return;
         }
 
         const type = document.getElementById('drink_type').value;
         const isBean = ingredientType === 'COFFEE_BEAN';
-        const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (ingredientType === 'DAIRY' ? '50.0' : '15.0')) : '1.0';
-        const rowUnit = type === 'COFFEE' ? (isBean ? 'g' : 'ml') : (type === 'SLUSHIE' ? 'oz' : 'ml');
+        const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (ingredientType === 'DAIRY' ? '50.0' : '15.0')) : (isDry ? '15.0' : '1.0');
+        const rowUnit = isDry || (type === 'COFFEE' && isBean) ? 'g' : (type === 'SLUSHIE' ? 'oz' : 'ml');
 
         const row = `
             <tr id="ingredient-row-${id}" class="align-middle">
@@ -304,7 +305,7 @@
                     <div class="d-flex align-items-center gap-1">
                         <input type="number" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
                                name="amount_${id}" value="${defaultAmount}" min="0.1" step="0.1" style="width: 80px;">
-                        <span class="small text-dim row-unit" data-ingredient-type="${ingredientType}">${rowUnit}</span>
+                        <span class="small text-dim row-unit" data-ingredient-type="${ingredientType}" data-is-dry="${isDry}">${rowUnit}</span>
                     </div>
                 </td>
                 <td class="border-white border-opacity-5">

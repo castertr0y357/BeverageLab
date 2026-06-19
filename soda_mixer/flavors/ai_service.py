@@ -63,6 +63,7 @@ class AIAssistant:
     "category": string (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee'),
     "ingredient_type": string (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER'),
     "is_ready_to_drink": boolean (true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false if it is a concentrated syrup, bean, or powder that needs to be diluted/brewed),
+    "is_dry": boolean (true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false if it is a liquid like syrup, juice, milk, water),
     "compatible_systems": string (comma-separated list of systems, e.g., 'SODA,SLUSHIE' or 'COFFEE'),
     "ai_notes": string
 }"""
@@ -167,6 +168,7 @@ class AIAssistant:
                     "category": "sweet",
                     "ingredient_type": "SODA_SYRUP",
                     "is_ready_to_drink": False,
+                    "is_dry": False,
                     "compatible_systems": "SODA,SLUSHIE",
                     "ai_notes": "Mock notes for batch analysis."
                 })
@@ -183,6 +185,7 @@ class AIAssistant:
                     "category": "sweet",
                     "ingredient_type": "SODA_SYRUP",
                     "is_ready_to_drink": False,
+                    "is_dry": False,
                     "compatible_systems": "SODA,SLUSHIE",
                     "ai_notes": "Mock notes for default ingredient."
                 })
@@ -199,6 +202,7 @@ class AIAssistant:
                 "category": "citrus",
                 "ingredient_type": "SODA_SYRUP",
                 "is_ready_to_drink": False,
+                "is_dry": False,
                 "compatible_systems": "SODA,SLUSHIE",
                 "ai_notes": "Mock notes for single analysis."
             })
@@ -598,6 +602,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - category (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee')
         - ingredient_type (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER')
         - is_ready_to_drink (boolean, true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false for concentrated syrups, beans, or powders)
+        - is_dry (boolean, true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false for liquid ingredients like syrups, juice, milk, water)
         - compatible_systems (comma-separated list of systems it fits physically and flavor-wise, from: 'SODA', 'COFFEE', 'SLUSHIE' - e.g., 'SODA,SLUSHIE' or 'COFFEE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
 
@@ -634,11 +639,12 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - category (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee')
         - ingredient_type (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER')
         - is_ready_to_drink (boolean, true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false for concentrated syrups, beans, or powders)
+        - is_dry (boolean, true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false for liquid ingredients like syrups, juice, milk, water)
         - compatible_systems (comma-separated list of compatible systems from: 'SODA', 'COFFEE', 'SLUSHIE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
         
         OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "is_ready_to_drink": false, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
+        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "is_ready_to_drink": false, "is_dry": false, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
         """
         response = cls.chat(prompt)
         return cls._extract_json(response)

@@ -86,6 +86,9 @@
                     {% if ingredient.is_ready_to_drink %}
                     <span class="badge bg-info text-dark" style="font-size: 0.5rem;"><i class="bi bi-droplets-fill me-1"></i>BASE FILLER</span>
                     {% endif %}
+                    {% if ingredient.is_dry %}
+                    <span class="badge bg-warning text-dark" style="font-size: 0.5rem;"><i class="bi bi-box-seam me-1"></i>DRY WEIGHT</span>
+                    {% endif %}
                 </div>
             </div>
 
@@ -151,6 +154,7 @@
                         data-base-suitability="{{ ingredient.base_suitability }}"
                         data-accent-suitability="{{ ingredient.accent_suitability }}"
                         data-is-ready-to-drink="{{ ingredient.is_ready_to_drink|yesno:'true,false' }}"
+                        data-is-dry="{{ ingredient.is_dry|yesno:'true,false' }}"
                         data-systems="{{ ingredient.compatible_systems }}"
                         data-description="{{ ingredient.description }}"
                         data-ai-notes="{{ ingredient.ai_notes|default_if_none:'' }}">
@@ -297,6 +301,13 @@
                     <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for juices, milk, teas, etc., to use them as volume-filling bases.</span>
                 </div>
                 <div class="mb-3">
+                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                        <input class="neon-check" type="checkbox" name="is_dry" id="addIsDry">
+                        <label class="form-label text-white fw-bold small mb-0" for="addIsDry">Is Dry Ingredient?</label>
+                    </div>
+                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
                     <textarea name="ai_notes" id="addAINotes" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -427,6 +438,13 @@
                     <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for juices, milk, teas, etc., to use them as volume-filling bases.</span>
                 </div>
                 <div class="mb-3">
+                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                        <input class="neon-check" type="checkbox" name="is_dry" id="editIsDry">
+                        <label class="form-label text-white fw-bold small mb-0" for="editIsDry">Is Dry Ingredient?</label>
+                    </div>
+                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
                     <textarea name="ai_notes" id="editAINotes" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -536,6 +554,7 @@
                 document.getElementById('editDesc').value = d.description;
                 document.getElementById('editAINotes').value = d.aiNotes || '';
                 document.getElementById('editReadyToDrink').checked = d.isReadyToDrink === 'true';
+                document.getElementById('editIsDry').checked = d.isDry === 'true';
                 
                 // Set system checkboxes
                 const systems = d.systems ? d.systems.split(',') : [];
@@ -728,6 +747,13 @@
                     rtdEl.checked = profile.is_ready_to_drink === true || profile.is_ready_to_drink === 'true';
                     rtdEl.classList.add('is-valid');
                     setTimeout(() => rtdEl.classList.remove('is-valid'), 2000);
+                }
+
+                const dryEl = document.getElementById(prefix + 'IsDry');
+                if (dryEl && profile.is_dry !== undefined) {
+                    dryEl.checked = profile.is_dry === true || profile.is_dry === 'true';
+                    dryEl.classList.add('is-valid');
+                    setTimeout(() => dryEl.classList.remove('is-valid'), 2000);
                 }
 
                 btn.innerHTML = '<i class="bi bi-check-lg"></i> Synced';

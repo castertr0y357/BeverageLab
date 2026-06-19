@@ -1555,3 +1555,62 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         ing.refresh_from_db()
         self.assertTrue(ing.is_ready_to_drink)
 
+    def test_ingredient_is_dry_attribute(self) -> None:
+        """Verify is_dry attribute handling in database creation, views, and serialization."""
+        self.client.login(username="director", password="secure_password_123")
+        
+        # Test creating ingredient with is_dry=True via POST
+        response = self.client.post(reverse('add_ingredient'), {
+            'name': 'Powdered Cane Sugar',
+            'brand': 'Lab Brand',
+            'ingredient_type': 'ADDITIVE',
+            'category': 'sweet',
+            'is_dry': 'on'
+        })
+        self.assertEqual(response.status_code, 302)
+        ing = Ingredient.objects.get(name='Powdered Cane Sugar')
+        self.assertTrue(ing.is_dry)
+
+        # Test editing ingredient with is_dry=False via POST
+        response = self.client.post(reverse('edit_ingredient', args=[ing.pk]), {
+            'name': 'Powdered Cane Sugar',
+            'brand': 'Lab Brand',
+            'ingredient_type': 'ADDITIVE',
+            'category': 'sweet',
+            # is_dry not passed => becomes False
+        })
+        self.assertEqual(response.status_code, 302)
+        ing.refresh_from_db()
+        self.assertFalse(ing.is_dry)
+
+    @patch('requests.request')
+    def test_bulk_analyze_saves_is_dry(self, mock_request: MagicMock) -> None:
+        """Verify that bulk AI analysis updates the is_dry attribute."""
+        self.client.login(username="director", password="secure_password_123")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{
+                "message": {
+                    "content": '[{"name": "Powdered Cane Sugar", "intensity": 3, "sweetness": 5, "acidity": 1, "bitterness": 1, "complexity": 1, "base_suitability": 1.0, "accent_suitability": 3.0, "category": "sweet", "ingredient_type": "ADDITIVE", "is_ready_to_drink": false, "is_dry": true, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Sweet granular sugar"}]'
+                }
+            }]
+        }
+        mock_request.return_value = mock_response
+
+        # Clear existing to prevent duplicate key
+        Ingredient.objects.filter(name="Powdered Cane Sugar").delete()
+
+        ing = Ingredient.objects.create(
+            name="Powdered Cane Sugar",
+            ingredient_type="ADDITIVE",
+            is_dry=False,
+            is_in_inventory=True
+        )
+
+        response = self.client.post(reverse('ai_bulk_analyze_api'))
+        self.assertEqual(response.status_code, 200)
+        
+        ing.refresh_from_db()
+        self.assertTrue(ing.is_dry)
+
