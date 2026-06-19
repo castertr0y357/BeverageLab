@@ -564,6 +564,24 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         match.complexity = max(1, min(5, round(res.get('complexity', match.complexity))))
                         match.base_suitability = max(1.0, min(5.0, round(res.get('base_suitability', match.base_suitability), 1)))
                         match.accent_suitability = max(1.0, min(5.0, round(res.get('accent_suitability', match.accent_suitability), 1)))
+                        
+                        category_res = res.get('category', '').strip().lower()
+                        if category_res in ['citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee']:
+                            match.category = category_res
+                            
+                        type_res = res.get('ingredient_type', '').strip().upper()
+                        if type_res in ['SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER']:
+                            match.ingredient_type = type_res
+                            
+                        systems_res = res.get('compatible_systems')
+                        if systems_res:
+                            if isinstance(systems_res, list):
+                                systems_list = [s.strip().upper() for s in systems_res if s.strip().upper() in ['SODA', 'COFFEE', 'SLUSHIE']]
+                            else:
+                                systems_list = [s.strip().upper() for s in str(systems_res).split(',') if s.strip().upper() in ['SODA', 'COFFEE', 'SLUSHIE']]
+                            if systems_list:
+                                match.compatible_systems = ",".join(systems_list)
+                                
                         match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
                         total_analyzed += 1

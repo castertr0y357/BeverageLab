@@ -60,6 +60,9 @@ class AIAssistant:
     "complexity": float,
     "base_suitability": float,
     "accent_suitability": float,
+    "category": string (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee'),
+    "ingredient_type": string (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER'),
+    "compatible_systems": string (comma-separated list of systems, e.g., 'SODA,SLUSHIE' or 'COFFEE'),
     "ai_notes": string
 }"""
 
@@ -160,6 +163,9 @@ class AIAssistant:
                     "complexity": 3.0,
                     "base_suitability": 3.0,
                     "accent_suitability": 3.0,
+                    "category": "sweet",
+                    "ingredient_type": "SODA_SYRUP",
+                    "compatible_systems": "SODA,SLUSHIE",
                     "ai_notes": "Mock notes for batch analysis."
                 })
             if not results:
@@ -172,6 +178,9 @@ class AIAssistant:
                     "complexity": 3.0,
                     "base_suitability": 3.0,
                     "accent_suitability": 3.0,
+                    "category": "sweet",
+                    "ingredient_type": "SODA_SYRUP",
+                    "compatible_systems": "SODA,SLUSHIE",
                     "ai_notes": "Mock notes for default ingredient."
                 })
             return json.dumps(results)
@@ -184,6 +193,9 @@ class AIAssistant:
                 "complexity": 3.0,
                 "base_suitability": 3.0,
                 "accent_suitability": 3.0,
+                "category": "citrus",
+                "ingredient_type": "SODA_SYRUP",
+                "compatible_systems": "SODA,SLUSHIE",
                 "ai_notes": "Mock notes for single analysis."
             })
         else:
@@ -571,14 +583,17 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         Name: {name}
         Description: {description}
 
-        Return ONLY a JSON object with values from 1.0 to 5.0 (decimals allowed) for these metrics:
-        - intensity
-        - sweetness
-        - acidity
-        - bitterness
-        - complexity
-        - base_suitability (how well it serves as a dominant, high-volume base ingredient)
-        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
+        Return ONLY a JSON object with values for these metrics:
+        - intensity (value from 1.0 to 5.0)
+        - sweetness (value from 1.0 to 5.0)
+        - acidity (value from 1.0 to 5.0)
+        - bitterness (value from 1.0 to 5.0)
+        - complexity (value from 1.0 to 5.0)
+        - base_suitability (how well it serves as a dominant, high-volume base ingredient, from 1.0 to 5.0)
+        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance, from 1.0 to 5.0)
+        - category (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee')
+        - ingredient_type (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER')
+        - compatible_systems (comma-separated list of systems it fits physically and flavor-wise, from: 'SODA', 'COFFEE', 'SLUSHIE' - e.g., 'SODA,SLUSHIE' or 'COFFEE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
 
         OUTPUT FORMAT: A raw JSON object. [NO MARKDOWN] [NO PREAMBLE].
@@ -603,18 +618,21 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         Ingredients to analyze:
         {ing_text}
         
-        For each, return values from 1.0 to 5.0 (decimals allowed) for:
-        - intensity
-        - sweetness
-        - acidity
-        - bitterness
-        - complexity
-        - base_suitability (how well it serves as a dominant, high-volume base ingredient)
-        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance)
+        For each, return values for:
+        - intensity (value from 1.0 to 5.0)
+        - sweetness (value from 1.0 to 5.0)
+        - acidity (value from 1.0 to 5.0)
+        - bitterness (value from 1.0 to 5.0)
+        - complexity (value from 1.0 to 5.0)
+        - base_suitability (how well it serves as a dominant, high-volume base ingredient, from 1.0 to 5.0)
+        - accent_suitability (how well it serves as a low-volume accent / high-impact nuance, from 1.0 to 5.0)
+        - category (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee')
+        - ingredient_type (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER')
+        - compatible_systems (comma-separated list of compatible systems from: 'SODA', 'COFFEE', 'SLUSHIE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
         
         OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
+        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
         """
         response = cls.chat(prompt)
         return cls._extract_json(response)

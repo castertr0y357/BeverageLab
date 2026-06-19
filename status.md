@@ -9,9 +9,11 @@
 - [x] Relayout and enlarge drink style, size, and coffee base selectors to be tablet-friendly and occupy the full-width header area.
 - [x] Prioritize creamer/milk (DAIRY) as the recommended ingredient class in Step 2 of Coffee Lab mode.
 - [x] Position dairy as the secondary ingredient in Coffee Lab surprise mixes, and revert all creamers/creams in the database to ADDITIVE status.
-- [ ] Implement additional creative AI features as requested by user
+- [x] Upgraded the mixology AI agent to automatically suggest both a base profile (category), ingredient type, and system compatibility in individual material editing and bulk analysis. Implemented system compatibility checks in Standard Mode (filtering cards and recommendation candidates by compatible systems) while allowing any ingredient to be shown or recommended in Experimental Mode.
+- [x] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Automatically suggest base profile and system compatibility in individual material editing and bulk analysis, and enforce system compatibility filtering in standard mode while bypassing in experimental mode.
 - [x] Add colored badges, filtering, and sorting to the recipe list page: displayed colored lab theme badges on recipe cards, and implemented a premium glassmorphic Filter & Sort panel to filter recipes by drink type (Soda, Coffee, Slushie) and sort by name and date created.
 - [x] Align recipe details layouts & style: moved the recipe type badge directly next to the title (Soda Lab, Coffee Lab, Cryo Lab) with colored gradients and glows matching each lab theme, forced the theme on the page to match the recipe type dynamically, and implemented full interactive coffee selectors (Style, Size, Base) on Coffee recipe detail pages to dynamically scale and update coffee parameters and volumes in real-time.
 - [x] Enlarge recipe details page batch scale buttons: upgraded both Soda and Slushie batch scale selector buttons to `btn-sm px-3 py-1 fs-6` for improved readability and tap target size.

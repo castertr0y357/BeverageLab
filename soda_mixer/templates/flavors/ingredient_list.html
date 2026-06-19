@@ -210,7 +210,7 @@
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label text-white fw-bold small">Type</label>
-                        <select name="ingredient_type"
+                        <select name="ingredient_type" id="addType"
                             class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
                             <option value="SODA_SYRUP">Soda Syrup</option>
                             <option value="COFFEE_BEAN">Coffee Bean</option>
@@ -221,7 +221,7 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label text-white fw-bold small">Base Profile</label>
-                        <input type="text" name="category" list="category-list" autocomplete="off" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" required placeholder="Select or type new...">
+                        <input type="text" name="category" id="addCategory" list="category-list" autocomplete="off" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" required placeholder="Select or type new...">
                         <datalist id="category-list">
                             {% for cat_val, cat_display in categories %}
                             <option value="{{ cat_val }}">{{ cat_display }}</option>
@@ -666,6 +666,35 @@
                         el.classList.add('is-valid');
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
                     }
+                }
+
+                const categoryEl = document.getElementById(prefix + 'Category');
+                if (categoryEl && profile.category) {
+                    categoryEl.value = profile.category;
+                    categoryEl.classList.add('is-valid');
+                    setTimeout(() => categoryEl.classList.remove('is-valid'), 2000);
+                }
+
+                const typeEl = document.getElementById(prefix + 'Type');
+                if (typeEl && profile.ingredient_type) {
+                    typeEl.value = profile.ingredient_type;
+                    typeEl.classList.add('is-valid');
+                    setTimeout(() => typeEl.classList.remove('is-valid'), 2000);
+                }
+
+                if (profile.compatible_systems) {
+                    let systems = [];
+                    if (Array.isArray(profile.compatible_systems)) {
+                        systems = profile.compatible_systems.map(s => s.trim().toUpperCase());
+                    } else if (typeof profile.compatible_systems === 'string') {
+                        systems = profile.compatible_systems.split(',').map(s => s.trim().toUpperCase());
+                    }
+                    const sodaChk = document.getElementById(prefix + 'SysSoda');
+                    const coffeeChk = document.getElementById(prefix + 'SysCoffee');
+                    const slushieChk = document.getElementById(prefix + 'SysSlushie');
+                    if (sodaChk) sodaChk.checked = systems.includes('SODA');
+                    if (coffeeChk) coffeeChk.checked = systems.includes('COFFEE');
+                    if (slushieChk) slushieChk.checked = systems.includes('SLUSHIE');
                 }
 
                 const aiNotesEl = document.getElementById(prefix + 'AINotes');

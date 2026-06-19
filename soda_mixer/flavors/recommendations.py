@@ -174,7 +174,7 @@ def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', expe
     """
     if not ingredient_ids:
         return {
-            'recommended': _get_top_recommendations(drink_type),
+            'recommended': _get_top_recommendations(drink_type, experimental),
             'recipes': [],
             'suggestions': []
         }
@@ -193,11 +193,12 @@ def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', expe
                 avg_rating=Avg('ingredient_usage__recipe__rating')
             ).exclude(id__in=ingredient_ids)
         else:
-            # Standard mode: Respect category compatibility
+            # Standard mode: Respect category compatibility and system compatibility
             compatible_categories = CATEGORY_COMPATIBILITY.get(ingredient.category, [])
             matching_ingredients = Ingredient.objects.filter(
                 category__in=compatible_categories,
-                is_in_inventory=True
+                is_in_inventory=True,
+                compatible_systems__icontains=drink_type
             ).annotate(
                 avg_rating=Avg('ingredient_usage__recipe__rating')
             ).exclude(id__in=ingredient_ids)
@@ -260,7 +261,8 @@ def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, 
             compat_cats = CATEGORY_COMPATIBILITY.get(base_ingredient.category, [])
             candidates = Ingredient.objects.filter(
                 category__in=compat_cats, 
-                is_in_inventory=True
+                is_in_inventory=True,
+                compatible_systems__icontains=drink_type
             ).annotate(
                 avg_rating=Avg('ingredient_usage__recipe__rating')
             ).exclude(id=base_id)
@@ -298,7 +300,8 @@ def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, 
             
             candidates = Ingredient.objects.filter(
                 category__in=shared_compat,
-                is_in_inventory=True
+                is_in_inventory=True,
+                compatible_systems__icontains=drink_type
             ).annotate(
                 avg_rating=Avg('ingredient_usage__recipe__rating')
             ).exclude(id__in=[base_id, secondary_id])
@@ -430,14 +433,16 @@ def calculate_recipe_stats(recipe_ingredients: Union[List[RecipeIngredient], Que
     }
 
 
-def _get_top_recommendations(drink_type: str = 'SODA') -> List[Dict[str, Any]]:
+def _get_top_recommendations(drink_type: str = 'SODA', experimental: bool = False) -> List[Dict[str, Any]]:
     """Get top recommended base ingredients to start a mix."""
     recommendations = []
     
     # Filter by inventory and type if possible
     query = Ingredient.objects.filter(is_in_inventory=True)
-    if drink_type == 'COFFEE':
-        query = query.filter(ingredient_type='COFFEE_BEAN')
+    if not experimental:
+        query = query.filter(compatible_systems__icontains=drink_type)
+        if drink_type == 'COFFEE':
+            query = query.filter(ingredient_type='COFFEE_BEAN')
         
     # Get a diverse, dynamic set of 10 ingredients to serve as bases
     diverse_bases = query.order_by('?')[:10]

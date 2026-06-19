@@ -1262,3 +1262,137 @@ class BeverageLabRecipeListFilterSortTest(TestCase):
         self.assertEqual(recipes[0].name, "Beta Slushie")
         self.assertEqual(recipes[1].name, "Gamma Coffee")
         self.assertEqual(recipes[2].name, "Alpha Soda")
+
+
+class BeverageLabAIProfileCompatibilityTest(TestCase):
+    """Test case for AI single-ingredient/bulk suggestion profile populate and compatibility filters."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.staff_user = User.objects.create_user(username="director", password="secure_password_123", is_staff=True)
+        self.client.login(username="lab_tech", password="secure_password_123")
+        
+        # Configure LLM provider
+        self.provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        self.config = SystemConfiguration.get_config()
+        self.config.default_llm_provider = self.provider
+        self.config.save()
+
+        # Create test ingredients
+        self.ing_soda = Ingredient.objects.create(
+            name="Soda Syrup Cola",
+            ingredient_type="SODA_SYRUP",
+            category="sweet",
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        self.ing_coffee = Ingredient.objects.create(
+            name="Coffee Bean Kenya",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
+        )
+        self.ing_slushie = Ingredient.objects.create(
+            name="Slushie Syrup Blue Raspberry",
+            ingredient_type="SODA_SYRUP",
+            category="berry",
+            is_in_inventory=True,
+            compatible_systems="SLUSHIE"
+        )
+
+    @patch('requests.request')
+    def test_single_ingredient_analysis_returns_compatibility(self, mock_request: MagicMock) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{
+                "message": {
+                    "content": '{"intensity": 4.0, "sweetness": 3.0, "acidity": 2.0, "bitterness": 1.0, "complexity": 3.0, "base_suitability": 4.0, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright citrus flavor"}'
+                }
+            }]
+        }
+        mock_request.return_value = mock_response
+
+        response = self.client.post(
+            reverse('ai_analyze_ingredient_api'),
+            data=json.dumps({'name': 'Citrus Splash', 'description': 'Zesty citrus'}),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['profile']['category'], 'citrus')
+        self.assertEqual(data['profile']['ingredient_type'], 'SODA_SYRUP')
+        self.assertEqual(data['profile']['compatible_systems'], 'SODA,SLUSHIE')
+
+    @patch('requests.request')
+    def test_bulk_analyze_saves_compatibility_type_category(self, mock_request: MagicMock) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{
+                "message": {
+                    "content": '[{"name": "Soda Syrup Cola", "intensity": 4, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3, "base_suitability": 4.0, "accent_suitability": 2.0, "category": "sweet", "ingredient_type": "SODA_SYRUP", "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Classic cola taste"}]'
+                }
+            }]
+        }
+        mock_request.return_value = mock_response
+
+        # Verify initial values
+        self.assertEqual(self.ing_soda.compatible_systems, "SODA")
+        
+        response = self.client.post(reverse('ai_bulk_analyze_api'))
+        self.assertEqual(response.status_code, 200)
+        
+        self.ing_soda.refresh_from_db()
+        self.assertEqual(self.ing_soda.category, "sweet")
+        self.assertEqual(self.ing_soda.ingredient_type, "SODA_SYRUP")
+        self.assertEqual(self.ing_soda.compatible_systems, "SODA,SLUSHIE")
+
+    def test_recommendation_filtering_by_system_compatibility(self) -> None:
+        # Clear seeded ingredients to have a clean slate for recommendations test
+        Ingredient.objects.all().delete()
+        
+        self.ing_soda = Ingredient.objects.create(
+            name="Soda Syrup Cola",
+            ingredient_type="SODA_SYRUP",
+            category="sweet",
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        self.ing_coffee = Ingredient.objects.create(
+            name="Coffee Bean Kenya",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
+        )
+        self.ing_slushie = Ingredient.objects.create(
+            name="Slushie Syrup Blue Raspberry",
+            ingredient_type="SODA_SYRUP",
+            category="berry",
+            is_in_inventory=True,
+            compatible_systems="SLUSHIE"
+        )
+
+        # Standard mode recommendations in Coffee drink lab should only return Coffee system compatible ingredients
+        recs_std = get_recommendation([self.ing_coffee.id], drink_type="COFFEE", experimental=False)
+        rec_ingredients_std = [r['ingredient'] for r in recs_std['recommended']]
+        for ing in rec_ingredients_std:
+            self.assertIn("COFFEE", ing.compatible_systems)
+
+        # Experimental mode bypasses system compatibility filters
+        recs_exp = get_recommendation([self.ing_coffee.id], drink_type="COFFEE", experimental=True)
+        rec_ingredients_exp = [r['ingredient'] for r in recs_exp['recommended']]
+        # Should be able to find self.ing_soda (compatible only with SODA) in results
+        self.assertTrue(any(ing.id == self.ing_soda.id for ing in rec_ingredients_exp))
+

@@ -685,10 +685,9 @@
             const isSystemMatch = systemList.map(s => s.trim()).includes(mode);
             const isExperimental = (recommendationMode === 'experimental');
             
-            // In experimental mode, we bypass the system list check but keep the type check 
-            // for basic sanity (e.g., don't show beans in a soda mix by default).
+            // In experimental mode, any ingredient should be considered for inclusion.
             if (isExperimental) {
-                card.style.display = isTypeMatch ? 'block' : 'none';
+                card.style.display = 'block';
             } else {
                 card.style.display = (isTypeMatch && isSystemMatch) ? 'block' : 'none';
             }
@@ -938,7 +937,7 @@
             }
             
             const isSystemMatch = systemList.map(s => s.trim()).includes(currentLabMode);
-            const shouldShow = isExperimental ? isTypeMatch : (isTypeMatch && isSystemMatch);
+            const shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
             
             if (shouldShow) {
                 const btn = card.querySelector('.select-ingredient-btn');
