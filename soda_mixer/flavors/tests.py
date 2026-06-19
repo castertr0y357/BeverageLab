@@ -977,6 +977,58 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         # Unmatched rebalancing keys should be dropped entirely
         self.assertEqual(data['rebalancing'], {})
 
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
+    def test_ai_suggest_api_force_type_filtering(self, mock_suggest: MagicMock) -> None:
+        """Verify that suggestions not matching the force_type are programmatically filtered out."""
+        Ingredient.objects.create(
+            name="Vanilla Syrup",
+            brand="Monin",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_in_inventory=True
+        )
+
+        mock_suggest.return_value = {
+            "suggestions": [
+                {
+                    "name": "Whole Milk (Local Dairy)",
+                    "reason": "Creams it up",
+                    "resonance": 95,
+                    "amount": 50.0,
+                    "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
+                },
+                {
+                    "name": "Vanilla Syrup (Monin)",
+                    "reason": "Adds vanilla sweetness",
+                    "resonance": 90,
+                    "amount": 15.0,
+                    "profile": {"intensity": 3, "sweetness": 4, "acidity": 1, "bitterness": 1, "complexity": 2}
+                }
+            ],
+            "rebalancing": {},
+            "seal_recommended": False,
+            "seal_resonance": 80,
+            "reasoning": "Test force_type filtering."
+        }
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans (Monin)'],
+                'drink_type': 'COFFEE',
+                'force_type': 'DAIRY'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify only Whole Milk (DAIRY) is returned, and Vanilla Syrup (ADDITIVE) is filtered out
+        suggestions = data['suggestions']
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual(suggestions[0]['name'], 'Whole Milk')
+
+
 
 class BeverageLabIcedCoffeeTest(TestCase):
     """Test case for iced coffee recipe logic and details page rendering."""

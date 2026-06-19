@@ -402,6 +402,9 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
                     target_obj = find_ingredient_by_name(ing_name, inventory_items)
                                 
                     if target_obj:
+                        if force_type and target_obj.ingredient_type != force_type:
+                            logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' (type: {target_obj.ingredient_type}) which does not match force_type '{force_type}'")
+                            continue
                         intensity_delta = 0
                         if ingredients and ingredients[0] != "NONE - Initial Synthesis":
                             baseline_name = ingredients[0].strip().lower()
