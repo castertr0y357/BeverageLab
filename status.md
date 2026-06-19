@@ -1,7 +1,7 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
-- [x] Separated Dairy & Plant Milks from other Additives: Introduced new `DAIRY` ingredient type, auto-migrated existing milks/creamers in database, updated AI prompts, recommendations step-2 routing, default form amounts (50ml for dairy, 15ml for additives), and Javascript scaling logic (only dairy fills the cup).
+- [x] Separated Dairy & Plant Milks from other Additives: Introduced new `DAIRY` ingredient type (keeping Heavy Cream as `ADDITIVE` to prevent over-scaling), auto-migrated Whole Milk and database milks to `DAIRY`, updated AI prompts, recommendations step-2 routing, default form amounts (50ml for dairy, 15ml for additives), and Javascript scaling logic (only dairy fills the cup). Added a standard to `AGENTS.md` and project rules files to verify and push back on unrealistic classifications.
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
 - [x] Implement iced coffee volume adjustments for ice displacement and render a virtual "Ice" card next to the coffee base for iced drinks in the wizard and on the recipe details page.
 - [x] Implement espresso base additive scaling to automatically fill the remaining target cup size with milk/creamer.
