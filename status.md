@@ -12,6 +12,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Enlarge key UI controls on the home page: expanded lab mode buttons to 'px-5 py-3 fs-4' and resized toggle switches to 'btn-sm px-4 py-2 fs-6' to ensure tablet and distant view accessibility.
 - [x] Fixed double-scaling bug on home page synthesis terminal for Soda and Slushie mode display volumes (preventing ingredients from scaling twice by bottleScale).
 - [x] Rendered Slushie water volume required as a standard card to the left of the base ingredient on both the synthesis page and the recipe details page, updating dynamically upon scale changes.
 - [x] Overhauled Soda and Slushie batch configurations: added 12oz glass size option for Soda synthesis and overhauled Slushie batch sizes (16oz, 32oz, 48oz, 64oz) to map exactly to the physical volume limits of the Ninja slushie machine.

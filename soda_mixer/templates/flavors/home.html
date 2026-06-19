@@ -18,14 +18,14 @@
         </div>
         {% endif %}
         
-            <div class="d-flex justify-content-center gap-2 mt-4">
-                <button type="button" id="modeSoda" class="btn btn-lg btn-glass-toggle px-4 active" onclick="setLabMode('SODA')">
+            <div class="d-flex justify-content-center gap-3 mt-4">
+                <button type="button" id="modeSoda" class="btn btn-glass-toggle px-5 py-3 fs-4 active" onclick="setLabMode('SODA')">
                     <i class="bi bi-water"></i> Soda Lab
                 </button>
-                <button type="button" id="modeCoffee" class="btn btn-lg btn-glass-toggle px-4" onclick="setLabMode('COFFEE')">
+                <button type="button" id="modeCoffee" class="btn btn-glass-toggle px-5 py-3 fs-4" onclick="setLabMode('COFFEE')">
                     <i class="bi bi-cup-hot"></i> Coffee Lab
                 </button>
-                <button type="button" id="modeSlushie" class="btn btn-lg btn-glass-toggle px-4" onclick="setLabMode('SLUSHIE')">
+                <button type="button" id="modeSlushie" class="btn btn-glass-toggle px-5 py-3 fs-4" onclick="setLabMode('SLUSHIE')">
                     <i class="bi bi-snow"></i> Cryo Lab
                 </button>
             </div>
@@ -33,19 +33,19 @@
             <!-- Laboratory Sensitivity Toggle -->
             <div class="d-flex justify-content-center mt-3 gap-3">
                 <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
-                    <button type="button" id="toggleStandard" class="btn btn-xs rounded-pill px-3 active-lab-mode" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
+                    <button type="button" id="toggleStandard" class="btn btn-sm rounded-pill px-4 py-2 fs-6 active-lab-mode" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
                         <i class="bi bi-shield-check me-1"></i> Standard
                     </button>
-                    <button type="button" id="toggleExperimental" class="btn btn-xs rounded-pill px-3 text-dim" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
+                    <button type="button" id="toggleExperimental" class="btn btn-sm rounded-pill px-4 py-2 text-dim" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
                         <i class="bi bi-flask me-1"></i> Experimental
                     </button>
                 </div>
                 
                 <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
-                    <button type="button" id="toggleEngineAlgorithmic" class="btn btn-xs rounded-pill px-3 active-lab-mode" onclick="setEngineMode('algorithmic')" title="Selection Engine: Pattern-based matching.">
+                    <button type="button" id="toggleEngineAlgorithmic" class="btn btn-sm rounded-pill px-4 py-2 active-lab-mode" onclick="setEngineMode('algorithmic')" title="Selection Engine: Pattern-based matching.">
                         <i class="bi bi-gear-wide-connected me-1"></i> Algorithmic
                     </button>
-                    <button type="button" id="toggleEngineAI" class="btn btn-xs rounded-pill px-3 text-dim" onclick="setEngineMode('ai')" title="Selection Engine: Neural flavor synthesis.">
+                    <button type="button" id="toggleEngineAI" class="btn btn-sm rounded-pill px-4 py-2 text-dim" onclick="setEngineMode('ai')" title="Selection Engine: Neural flavor synthesis.">
                         <i class="bi bi-cpu me-1"></i> AI Neural
                     </button>
                 </div>
