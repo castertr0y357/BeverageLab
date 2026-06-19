@@ -1429,6 +1429,8 @@
                 const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
                 const baseVol = isDryCoffee ? 18.0 : (index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0));
                 amt = baseVol * (bottleScale || 1.0);
+            } else if (currentLabMode !== 'COFFEE') {
+                amt = amt * (bottleScale || 1.0);
             }
             initialTotal += parseFloat(amt);
         });
@@ -1445,6 +1447,8 @@
                 if (!amount) {
                     const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
                     amount = baseVolume * (bottleScale || 1.0);
+                } else {
+                    amount = amount * (bottleScale || 1.0);
                 }
                 amount = amount * expansionFactor;
                 totalSyrup += parseFloat(amount);
@@ -1552,6 +1556,8 @@
                 // Algorithmic Tier Fallback for Soda/Slushie (Target: 160ml total for 1L)
                 const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
                 amount = baseVolume * (bottleScale || 1.0);
+            } else if (currentLabMode !== 'COFFEE') {
+                amount = amount * (bottleScale || 1.0);
             }
             
             // 🧪 Apply Molecular Expansion (Soda/Slushie only)
