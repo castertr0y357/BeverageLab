@@ -970,6 +970,7 @@
         unorthodoxList.innerHTML = '';
         
         const isExperimental = (recommendationMode === 'experimental');
+        const isWaterBaseStep2 = (currentLabMode === 'SLUSHIE' && selectedIngredients.length === 1 && selectedIngredients[0].id === 'virtual_water');
         
         // Temporarily render cards into a hidden element to parse them
         const tempDiv = document.createElement('div');
@@ -980,7 +981,7 @@
         let recommendedCount = 0;
         let unorthodoxCount = 0;
         
-        if (currentLabMode === 'SLUSHIE') {
+        if (currentLabMode === 'SLUSHIE' && !isWaterBaseStep2) {
             const col = document.createElement('div');
             col.className = 'col-md-4 col-sm-6 ingredient-card';
             col.setAttribute('data-type', 'OTHER');
@@ -1026,13 +1027,21 @@
             } else if (currentLabMode === 'COFFEE') {
                 isTypeMatch = (type === 'COFFEE_BEAN');
             } else if (currentLabMode === 'SLUSHIE') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER') && isReadyToDrink;
+                if (isWaterBaseStep2) {
+                    isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER') && !isReadyToDrink;
+                } else {
+                    isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER') && isReadyToDrink;
+                }
             }
             
             const isSystemMatch = systemList.map(s => s.trim()).includes(currentLabMode);
             let shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
             if (currentLabMode === 'SLUSHIE') {
-                shouldShow = shouldShow && isReadyToDrink;
+                if (isWaterBaseStep2) {
+                    shouldShow = shouldShow && !isReadyToDrink;
+                } else {
+                    shouldShow = shouldShow && isReadyToDrink;
+                }
             }
             
             if (shouldShow) {
@@ -1075,7 +1084,10 @@
         document.getElementById('unorthodoxBasesGroup').style.display = unorthodoxCount > 0 ? 'block' : 'none';
         
         // Update titles
-        if (isExperimental) {
+        if (isWaterBaseStep2) {
+            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-gradient-lab me-2"></i>RECOMMENDED SYRUP BASES';
+            unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY SYRUPS';
+        } else if (isExperimental) {
             recommendedTitle.innerHTML = '<i class="bi bi-flask text-experimental me-2"></i>RECOMMENDED UNORTHODOX SUBSTRATES';
             unorthodoxTitle.innerHTML = '<i class="bi bi-shield text-dim me-2"></i>STANDARD / SAFE BASES';
         } else {
@@ -1171,7 +1183,11 @@
         if (ingredientIds.length === 0) {
             stepText = 'Step 1: Select Base Component';
         } else if (ingredientIds.length === 1) {
-            stepText = 'Step 2: Select Complementary Payload';
+            if (currentLabMode === 'SLUSHIE' && selectedIngredients[0].id === 'virtual_water') {
+                stepText = 'Step 2: Select Syrup Base';
+            } else {
+                stepText = 'Step 2: Select Complementary Payload';
+            }
         } else if (ingredientIds.length === 2) {
             stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
         } else if (ingredientIds.length === 3) {
@@ -1184,7 +1200,9 @@
         const container = document.getElementById('recommendationContainer');
         const library = document.getElementById('partitionedBasesContainer');
         
-        if (ingredientIds.length === 0) {
+        const isWaterBaseStep2 = (currentLabMode === 'SLUSHIE' && selectedIngredients.length === 1 && selectedIngredients[0].id === 'virtual_water');
+        
+        if (ingredientIds.length === 0 || isWaterBaseStep2) {
             container.innerHTML = '';
             library.style.display = 'block';
             partitionBases();
