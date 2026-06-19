@@ -13,6 +13,7 @@
 - [x] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Restricted Step 1 base selection in Cryo-Slushie Lab mode to only display ready-to-drink bases (e.g. juices, milk, teas) and a virtual "Water" card, hiding syrups and concentrates. Integrated recommendation support for virtual Water on the backend and filtered it out when saving mixes/recipes.
 - [x] Implemented unified volume-filling base logic using `is_ready_to_drink` flag on ingredients. Dynamically scales liquid bases (juices, milk, tea) to fill the remaining capacity of the container in Soda, Coffee (Espresso base), and Slushie/Cryo labs, hiding virtual water cards and updating batch scaling in details view. Toggles are auto-populated from single and bulk AI analysis and styled with a visible checkmark inside custom neon checkboxes.
 - [x] Rendered Soda carbonated water volume required as a standard card to the left of the base ingredient on both the synthesis page and the recipe details page, updating dynamically upon scale changes.
 - [x] Implement Server-Sent Events (SSE) progress updates for the AI suggestion engine (using Django StreamingHttpResponse) and consume/render these messages dynamically on the Home page.

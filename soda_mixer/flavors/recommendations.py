@@ -16,6 +16,7 @@ CATEGORY_COMPATIBILITY = {
     'sour': ['sweet', 'herbal', 'citrus'],
     'artificial': ['citrus', 'berry', 'sweet', 'tropical'],
     'coffee': ['spice', 'sweet', 'herbal'],
+    'neutral': ['citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee'],
 }
 
 # --- Flavor Bridges ---
@@ -245,7 +246,22 @@ def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, 
     """
     Get tiered recommendations (Secondary or Tertiary) based on selected base and optional secondary.
     """
-    base_ingredient = Ingredient.objects.filter(id=base_id, is_in_inventory=True).first()
+    if base_id == 0 or base_id == 'virtual_water':
+        base_ingredient = Ingredient(
+            id=0,
+            name="Water",
+            category="neutral",
+            ingredient_type="OTHER",
+            intensity=1,
+            sweetness=0,
+            acidity=0,
+            bitterness=0,
+            complexity=0,
+            is_ready_to_drink=True
+        )
+    else:
+        base_ingredient = Ingredient.objects.filter(id=base_id, is_in_inventory=True).first()
+        
     if not base_ingredient:
         return {'recommended': []}
 

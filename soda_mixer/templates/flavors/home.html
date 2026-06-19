@@ -980,10 +980,45 @@
         let recommendedCount = 0;
         let unorthodoxCount = 0;
         
+        if (currentLabMode === 'SLUSHIE') {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6 ingredient-card';
+            col.setAttribute('data-type', 'OTHER');
+            col.setAttribute('data-systems', 'SLUSHIE');
+            col.innerHTML = `
+                <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn"
+                     data-id="virtual_water"
+                     data-type="OTHER"
+                     data-name="Water"
+                     data-intensity="1"
+                     data-sweetness="0"
+                     data-acidity="0"
+                     data-bitterness="0"
+                     data-complexity="0"
+                     data-base-suitability="5.0"
+                     data-accent-suitability="1.0"
+                     data-category="neutral"
+                     data-is-ready-to-drink="true"
+                     data-profile=''>
+                    <span class="fw-bold fs-5 mb-2">Water</span>
+                    <span class="badge-fizz bg-neutral">neutral</span>
+                    <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
+                        <span class="text-gradient-lab font-monospace">B: 5.0</span>
+                        <span class="text-experimental font-monospace">A: 1.0</span>
+                    </div>
+                </div>
+            `;
+            recommendedList.appendChild(col);
+            recommendedCount++;
+        }
+        
         cards.forEach(card => {
             const type = card.getAttribute('data-type');
             const systems = card.getAttribute('data-systems') || "SODA,COFFEE,SLUSHIE";
             const systemList = systems.split(',');
+            
+            const btn = card.querySelector('.select-ingredient-btn');
+            const isReadyToDrink = btn ? btn.getAttribute('data-is-ready-to-drink') === 'true' : false;
             
             let isTypeMatch = false;
             if (currentLabMode === 'SODA') {
@@ -991,11 +1026,14 @@
             } else if (currentLabMode === 'COFFEE') {
                 isTypeMatch = (type === 'COFFEE_BEAN');
             } else if (currentLabMode === 'SLUSHIE') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER');
+                isTypeMatch = (type === 'SODA_SYRUP' || type === 'OTHER') && isReadyToDrink;
             }
             
             const isSystemMatch = systemList.map(s => s.trim()).includes(currentLabMode);
-            const shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
+            let shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
+            if (currentLabMode === 'SLUSHIE') {
+                shouldShow = shouldShow && isReadyToDrink;
+            }
             
             if (shouldShow) {
                 const btn = card.querySelector('.select-ingredient-btn');
@@ -1119,7 +1157,7 @@
         activeProgressQueue = [];
         isProcessingProgressQueue = false;
 
-        const ingredientIds = selectedIngredients.map(i => i.id);
+        const ingredientIds = selectedIngredients.map(i => i.id === 'virtual_water' ? 0 : parseInt(i.id));
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
         
         if (ingredientIds.length >= maxIngredients) {
@@ -1708,15 +1746,17 @@
                 `;
             }
 
-            hiddenInputs += `<input type="hidden" name="ingredient_${ing.id}" value="${ing.id}">`;
-            hiddenInputs += `<input type="hidden" name="amount_${ing.id}" value="${amount}">`;
-            
-            // 🧪 Inject Synthesized Profile Overrides into the form
-            if (ing.profile) {
-                hiddenInputs += `<input type="hidden" name="intensity_${ing.id}" value="${ing.profile.intensity}">`;
-                hiddenInputs += `<input type="hidden" name="sweetness_${ing.id}" value="${ing.profile.sweetness}">`;
-                hiddenInputs += `<input type="hidden" name="acidity_${ing.id}" value="${ing.profile.acidity}">`;
-                hiddenInputs += `<input type="hidden" name="bitterness_${ing.id}" value="${ing.profile.bitterness}">`;
+            if (ing.id !== 'virtual_water') {
+                hiddenInputs += `<input type="hidden" name="ingredient_${ing.id}" value="${ing.id}">`;
+                hiddenInputs += `<input type="hidden" name="amount_${ing.id}" value="${amount}">`;
+                
+                // 🧪 Inject Synthesized Profile Overrides into the form
+                if (ing.profile) {
+                    hiddenInputs += `<input type="hidden" name="intensity_${ing.id}" value="${ing.profile.intensity}">`;
+                    hiddenInputs += `<input type="hidden" name="sweetness_${ing.id}" value="${ing.profile.sweetness}">`;
+                    hiddenInputs += `<input type="hidden" name="acidity_${ing.id}" value="${ing.profile.acidity}">`;
+                    hiddenInputs += `<input type="hidden" name="bitterness_${ing.id}" value="${ing.profile.bitterness}">`;
+                }
             }
         });
         
@@ -1819,32 +1859,35 @@
             coffee_style: coffeeStyle,
             coffee_base_type: coffeeBaseType,
             drink_size_oz: calculatedSizeOz,
-            ingredients: selectedIngredients.map((ing, idx) => {
-                let amount = ing.amount;
-                const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
-                if (currentLabMode === 'COFFEE') {
-                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
-                        amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+            ingredients: selectedIngredients
+                .filter(ing => ing.id !== 'virtual_water')
+                .map((ing) => {
+                    const idx = selectedIngredients.indexOf(ing);
+                    let amount = ing.amount;
+                    const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
+                    if (currentLabMode === 'COFFEE') {
+                        if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                            amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                        } else {
+                            amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                        }
+                        const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
+                        if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    } else if (hasRtdBase && idx === firstRtdIndex) {
+                        amount = rtdBaseAmount;
+                    } else if (!amount) {
+                        const baseVolume = idx === 0 ? 80.0 : (idx === 1 ? 40.0 : 20.0);
+                        amount = baseVolume * bottleScale * expansionFactor;
                     } else {
-                        amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                        amount = amount * bottleScale * expansionFactor;
                     }
-                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
-                    if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                } else if (hasRtdBase && idx === firstRtdIndex) {
-                    amount = rtdBaseAmount;
-                } else if (!amount) {
-                    const baseVolume = idx === 0 ? 80.0 : (idx === 1 ? 40.0 : 20.0);
-                    amount = baseVolume * bottleScale * expansionFactor;
-                } else {
-                    amount = amount * bottleScale * expansionFactor;
-                }
-                
-                return {
-                    id: ing.id,
-                    amount: amount,
-                    profile: ing.profile || null
-                };
-            })
+                    
+                    return {
+                        id: parseInt(ing.id),
+                        amount: amount,
+                        profile: ing.profile || null
+                    };
+                })
         };
 
         const saveBtn = document.getElementById('saveMixBtn');
@@ -1859,6 +1902,9 @@
         oldDynamic.forEach(el => el.remove());
  
         selectedIngredients.forEach((ing, idx) => {
+            if (ing.id === 'virtual_water') {
+                return;
+            }
             let amount = ing.amount;
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             if (currentLabMode === 'COFFEE') {

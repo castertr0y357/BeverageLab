@@ -444,6 +444,7 @@ h1, h2, h3, h4, h5, h6 {
 .bg-sour { background-color: var(--sour-lime) !important; color: #000; }
 .bg-artificial { background-color: var(--fizz-cyan) !important; color: #000; }
 .bg-coffee { background-color: var(--fizz-mocha) !important; }
+.bg-neutral { background-color: hsla(0, 0%, 100%, 0.15) !important; color: var(--text-primary); }
 
 @media (max-width: 768px) {
     .glass-surface { border-radius: 0; }

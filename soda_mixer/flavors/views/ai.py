@@ -85,6 +85,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         ingredient_ids = data.get('ingredient_ids', [])
+        ingredient_ids = [0 if i == 'virtual_water' else int(i) for i in ingredient_ids if str(i).isdigit() or i == 'virtual_water']
         experimental = data.get('mode') == 'experimental' or data.get('experimental', False)
         force_type = data.get('force_type') # e.g. 'ADDITIVE'
         drink_type = data.get('drink_type', 'SODA').upper()
@@ -170,6 +171,7 @@ def generate_name_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         ingredient_ids = data.get('ingredient_ids', [])
+        ingredient_ids = [0 if i == 'virtual_water' else int(i) for i in ingredient_ids if str(i).isdigit() or i == 'virtual_water']
         name = generate_recipe_name(ingredient_ids)
         return JsonResponse({'name': name})
     except json.JSONDecodeError as e:
@@ -184,6 +186,7 @@ def get_category_suggestions_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
         ingredient_ids = data.get('ingredient_ids', [])
+        ingredient_ids = [0 if i == 'virtual_water' else int(i) for i in ingredient_ids if str(i).isdigit() or i == 'virtual_water']
         suggested_names = suggest_categories(ingredient_ids)
         existing = list(RecipeCategory.objects.all().values('id', 'name', 'color'))
         return JsonResponse({'suggested': suggested_names, 'existing': existing})

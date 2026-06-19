@@ -149,6 +149,16 @@ class BeverageLabRecommendationTest(TestCase):
         recs = get_tiered_recommendation(self.ing1.id, self.ing3.id)
         self.assertIn("recommended", recs)
 
+    def test_get_tiered_recommendation_virtual_water(self) -> None:
+        # Base ID = 0 represents virtual water
+        recs = get_tiered_recommendation(0)
+        self.assertIn("recommended", recs)
+        self.assertTrue(len(recs["recommended"]) > 0)
+        
+        # Test tertiary recommendation with virtual water base
+        recs_tertiary = get_tiered_recommendation(0, self.ing3.id)
+        self.assertIn("recommended", recs_tertiary)
+
     def test_calculate_recipe_stats(self) -> None:
         recipe = Recipe.objects.create(name="Test Mix")
         ri1 = RecipeIngredient.objects.create(recipe=recipe, ingredient=self.ing1, amount=10.0)
@@ -317,6 +327,20 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(response_promote.status_code, 200)
         recipe_id = response_promote.json()['recipe_id']
         self.assertTrue(Recipe.objects.filter(id=recipe_id).exists())
+
+    def test_get_recommendations_api_virtual_water(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        response = self.client.post(
+            reverse('get_recommendations_api'),
+            data=json.dumps({
+                'ingredient_ids': ['virtual_water'],
+                'drink_type': 'SLUSHIE'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('recommended', data)
 
     @patch('requests.request')
     def test_ai_suggest_api_force_type(self, mock_request: MagicMock) -> None:
