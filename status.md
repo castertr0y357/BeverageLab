@@ -12,6 +12,7 @@
 - [ ] Implement additional creative AI features as requested by user
 
 ## 🛠️ Completed Tasks
+- [x] Align recipe details layouts & style: moved the recipe type badge directly next to the title (Soda Lab, Coffee Lab, Cryo Lab) with colored gradients and glows matching each lab theme, forced the theme on the page to match the recipe type dynamically, and implemented full interactive coffee selectors (Style, Size, Base) on Coffee recipe detail pages to dynamically scale and update coffee parameters and volumes in real-time.
 - [x] Enlarge recipe details page batch scale buttons: upgraded both Soda and Slushie batch scale selector buttons to `btn-sm px-3 py-1 fs-6` for improved readability and tap target size.
 - [x] Fixed Reagent Registry status pill on ingredients page: corrected missing count by switching to '{{ ingredients|length }}' and replaced the solid white background with a dark, translucent glassmorphic look containing a glowing neon accent dot.
 - [x] Enlarge wizard control buttons on the home page: resized step back, hard reset, analyze compound, and surprise me buttons to 'btn-sm px-3/4 py-1.5/2 fs-6' for better tablet and distant view accessibility.

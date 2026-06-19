@@ -4,13 +4,23 @@
 {% block title %}{{ recipe.name }} - Beverage Laboratory{% endblock %}
 
 {% block content %}
-<div class="mb-4 d-flex justify-content-between align-items-center">
-    <a href="{% url 'recipe_list' %}" class="btn btn-sm btn-outline-secondary border-0 text-dim">
+<script>
+    // Force the correct theme for this recipe type instantly
+    (function() {
+        document.documentElement.classList.remove('theme-coffee', 'theme-slushie');
+        const recipeType = "{{ recipe.drink_type }}";
+        if (recipeType === 'COFFEE') {
+            document.documentElement.classList.add('theme-coffee');
+        } else if (recipeType === 'SLUSHIE') {
+            document.documentElement.classList.add('theme-slushie');
+        }
+    })();
+</script>
+
+<div class="mb-4">
+    <a href="{% url 'recipe_list' %}" class="btn btn-sm btn-outline-secondary border-0 text-dim p-0">
         <i class="bi bi-arrow-left"></i> Archive
     </a>
-    <span class="badge border border-white border-opacity-10 py-2 px-3 text-gradient-lab">
-        {{ recipe.get_drink_type_display }} FORMULA
-    </span>
 </div>
 
 <div class="row">
@@ -18,7 +28,16 @@
         <div class="glass-surface p-4 mb-4">
             <div class="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h2 class="display-5 fw-bold mb-0 text-white">{{ recipe.name }}</h2>
+                    <h2 class="display-5 fw-bold mb-0 text-white d-flex align-items-center gap-3 flex-wrap">
+                        {{ recipe.name }}
+                        {% if recipe.drink_type == 'SODA' %}
+                        <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important; box-shadow: 0 0 10px rgba(164, 230, 76, 0.4); border: 1px solid var(--glass-border); text-transform: uppercase;">Soda Lab</span>
+                        {% elif recipe.drink_type == 'COFFEE' %}
+                        <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); border: 1px solid var(--glass-border); text-transform: uppercase;">Coffee Lab</span>
+                        {% elif recipe.drink_type == 'SLUSHIE' %}
+                        <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; box-shadow: 0 0 10px rgba(14, 165, 233, 0.4); border: 1px solid var(--glass-border); text-transform: uppercase;">Cryo Lab</span>
+                        {% endif %}
+                    </h2>
                     {% if recipe.description %}
                     <p class="text-dim mt-2 lead" style="font-size: 1.1rem; line-height: 1.6;">{{ recipe.description }}</p>
                     {% endif %}
@@ -48,9 +67,37 @@
             {% if recipe.drink_type == 'COFFEE' %}
             <!-- Extraction Parameters (Coffee Specific) -->
             <div class="row g-3 mb-5">
-                {% if recipe.coffee_style or recipe.drink_size_oz or recipe.coffee_base_type %}
-                <!-- Coffee Drink Format Row -->
-                <div class="col-12">
+                <!-- Coffee Drink Format Row (Interactive selectors for screen) -->
+                <div class="col-12 print-hide">
+                    <div class="glass-card p-3 border-white border-opacity-10">
+                        <div class="row g-3">
+                            <div class="col-md-4 col-sm-12">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK STYLE</label>
+                                <div class="btn-group w-100" id="coffeeStyleBtns">
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6 active-lab-mode" id="styleHot" onclick="setCoffeeStyle('hot')">☕ Hot</button>
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="styleIced" onclick="setCoffeeStyle('iced')">❄️ Iced</button>
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="styleShot" onclick="setCoffeeStyle('espresso_shot')">⚡ Shot</button>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-sm-12">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK SIZE</label>
+                                <div class="btn-group w-100" id="coffeeSizeBtns">
+                                    <!-- Populated dynamically via JS -->
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-sm-12">
+                                <label id="coffeeBaseLabel" class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">COFFEE BASE</label>
+                                <div class="btn-group w-100" id="coffeeBaseBtns">
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coffee Drink Format Row (Static fallback for print) -->
+                <div class="col-12 d-none d-print-block">
                     <div class="glass-card p-3 border-white border-opacity-10 d-flex flex-wrap gap-3 align-items-center">
                         {% if recipe.coffee_style %}
                         <div class="text-center">
@@ -77,7 +124,6 @@
                         {% endif %}
                     </div>
                 </div>
-                {% endif %}
                 {% if recipe.brew_method %}
                 <div class="col-md-3">
                     <div class="readout-card text-center">
@@ -135,21 +181,7 @@
                     </div>
                 </div>
                 {% elif recipe.drink_type == 'COFFEE' %}
-                {% if recipe.coffee_style or recipe.drink_size_oz %}
-                <div class="d-flex align-items-center gap-2 print-hide">
-                    {% if recipe.coffee_style %}
-                    <span class="badge border border-white border-opacity-10 py-1 px-2 text-white" style="font-size:0.6rem;">
-                        {% if recipe.coffee_style == 'hot' %}☕{% elif recipe.coffee_style == 'iced' %}❄️{% else %}⚡{% endif %}
-                        {{ recipe.get_coffee_style_display|upper }}
-                    </span>
-                    {% endif %}
-                    {% if recipe.drink_size_oz %}
-                    <span class="badge border border-white border-opacity-10 py-1 px-2 text-white" style="font-size:0.6rem;">
-                        {{ recipe.drink_size_oz|floatformat:0 }}oz
-                    </span>
-                    {% endif %}
-                </div>
-                {% endif %}
+                <!-- Coffee controls are managed inside the interactive format card -->
                 {% endif %}
             </div>
                 
@@ -216,8 +248,8 @@
                         </div>
                     </div>
                 </div>
-                {% if recipe.coffee_style == 'iced' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
-                <div class="col-md-6">
+                {% if recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
+                <div class="col-md-6 animate-fade-in" id="iceCardContainer" style="display: {% if recipe.coffee_style == 'iced' %}block{% else %}none{% endif %};">
                     <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div class="fw-bold fs-5 text-info">Ice <i class="bi bi-snow text-info ms-1"></i></div>
@@ -377,6 +409,158 @@
     let savedSizeOz = parseFloat("{{ recipe.drink_size_oz|default:'' }}") || ("{{ recipe.drink_type }}" === 'SLUSHIE' ? 32.0 : 33.8);
     let drinkType = "{{ recipe.drink_type }}";
 
+    // Coffee-specific state initialization
+    let coffeeStyle = "{{ recipe.coffee_style|default:'hot' }}";
+    let coffeeSizeOz = parseFloat("{{ recipe.drink_size_oz|default:'12' }}");
+    let coffeeBaseType = "{{ recipe.coffee_base_type|default:'espresso' }}";
+    let coffeeBaseAmount = 2;
+
+    const savedCoffeeStyle = "{{ recipe.coffee_style|default:'hot' }}";
+    const savedCoffeeBaseType = "{{ recipe.coffee_base_type|default:'espresso' }}";
+
+    function setCoffeeStyle(style) {
+        coffeeStyle = style;
+        
+        // Update style button states
+        ['styleHot', 'styleIced', 'styleShot'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active-lab-mode');
+        });
+        const styleMap = { hot: 'styleHot', iced: 'styleIced', espresso_shot: 'styleShot' };
+        const activeBtn = document.getElementById(styleMap[style]);
+        if (activeBtn) activeBtn.classList.add('active-lab-mode');
+
+        // Re-render size options based on style
+        const shotMode = (style === 'espresso_shot');
+        const sizeBtns = document.getElementById('coffeeSizeBtns');
+        if (sizeBtns) {
+            if (shotMode) {
+                sizeBtns.innerHTML = `
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
+                `;
+                // Force coffee base type to espresso for shots
+                coffeeBaseType = 'espresso';
+                const baseEsp = document.getElementById('baseEspresso');
+                if (baseEsp) baseEsp.classList.add('active-lab-mode');
+                const baseStd = document.getElementById('baseStandardBrew');
+                if (baseStd) baseStd.classList.remove('active-lab-mode');
+                setCoffeeSize(2);
+            } else {
+                const prev = coffeeSizeOz;
+                const defaultSize = [8,12,16,20].includes(prev) ? prev : 12;
+                sizeBtns.innerHTML = `
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size8oz"  onclick="setCoffeeSize(8)">8oz</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size16oz" onclick="setCoffeeSize(16)">16oz</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size20oz" onclick="setCoffeeSize(20)">20oz</button>
+                `;
+                setCoffeeSize(defaultSize);
+            }
+        }
+
+        // Show/hide Coffee Base Type selector based on style (shots are always espresso)
+        const baseLabel = document.getElementById('coffeeBaseLabel');
+        const baseBtns = document.getElementById('coffeeBaseBtns');
+        if (baseLabel) baseLabel.style.display = shotMode ? 'none' : '';
+        if (baseBtns) baseBtns.style.display = shotMode ? 'none' : '';
+
+        recalculateCoffeeBaseAmount();
+        updateAmounts();
+    }
+
+    function setCoffeeSize(oz) {
+        coffeeSizeOz = parseFloat(oz);
+        
+        // Mark the active button
+        const sizeContainer = document.getElementById('coffeeSizeBtns');
+        if (sizeContainer) {
+            sizeContainer.querySelectorAll('button').forEach(btn => {
+                btn.classList.remove('active-lab-mode');
+            });
+            sizeContainer.querySelectorAll('button').forEach(btn => {
+                const match = btn.getAttribute('onclick');
+                if (match && match.includes('(' + oz + ')')) {
+                    btn.classList.add('active-lab-mode');
+                }
+            });
+        }
+        
+        recalculateCoffeeBaseAmount();
+        updateAmounts();
+    }
+
+    function setCoffeeBaseType(type) {
+        coffeeBaseType = type;
+        const baseEsp = document.getElementById('baseEspresso');
+        if (baseEsp) baseEsp.classList.toggle('active-lab-mode', type === 'espresso');
+        const baseStd = document.getElementById('baseStandardBrew');
+        if (baseStd) baseStd.classList.toggle('active-lab-mode', type === 'standard_brew');
+
+        recalculateCoffeeBaseAmount();
+        updateAmounts();
+    }
+
+    function getIceAmountOz(sizeOz) {
+        if (sizeOz === 8) return 3;
+        if (sizeOz === 12) return 5;
+        if (sizeOz === 16) return 6;
+        if (sizeOz === 20) return 8;
+        return Math.round(sizeOz * 0.4);
+    }
+
+    function recalculateCoffeeBaseAmount() {
+        if (coffeeBaseType === 'espresso') {
+            if (coffeeStyle === 'espresso_shot') {
+                if (coffeeSizeOz === 1) {
+                    coffeeBaseAmount = 1;
+                } else {
+                    coffeeBaseAmount = 2;
+                }
+            } else { // hot or iced
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 1;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 2;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 3;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 4;
+                } else {
+                    coffeeBaseAmount = 2;
+                }
+            }
+        } else { // standard_brew
+            if (coffeeStyle === 'espresso_shot') {
+                coffeeBaseAmount = 2;
+            } else if (coffeeStyle === 'iced') {
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 4;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 5;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 8;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 10;
+                } else {
+                    coffeeBaseAmount = 6;
+                }
+            } else { // hot
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 6;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 8;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 12;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 16;
+                } else {
+                    coffeeBaseAmount = 8;
+                }
+            }
+        }
+    }
+
     function setBottleScale(targetScale, btnId) {
         let savedScale = 1.0;
         if (drinkType === 'SODA') {
@@ -407,73 +591,56 @@
             const drinkType = el.getAttribute('data-drink-type');
             const ingredientType = el.getAttribute('data-ingredient-type');
             const isCoffee = drinkType === 'COFFEE';
-            const scaledAmount = originalAmount * currentScale;
             
-            if (isCoffee && ingredientType === 'COFFEE_BEAN') {
-                const baseType = el.getAttribute('data-coffee-base-type');
-                const style = el.getAttribute('data-coffee-style');
-                const sizeOz = parseFloat(el.getAttribute('data-drink-size-oz') || '12');
-                
-                if (baseType && style && !isNaN(sizeOz)) {
-                    let baseAmount = 2;
-                    if (baseType === 'espresso') {
-                        if (style === 'espresso_shot') {
-                            baseAmount = (sizeOz === 1) ? 1 : 2;
-                        } else {
-                            if (sizeOz === 8) baseAmount = 1;
-                            else if (sizeOz === 12) baseAmount = 2;
-                            else if (sizeOz === 16) baseAmount = 3;
-                            else if (sizeOz === 20) baseAmount = 4;
-                            else baseAmount = 2;
-                        }
-                    } else { // standard_brew
-                        if (style === 'espresso_shot') {
-                            baseAmount = 2;
-                        } else if (style === 'iced') {
-                            if (sizeOz === 8) baseAmount = 4;
-                            else if (sizeOz === 12) baseAmount = 5;
-                            else if (sizeOz === 16) baseAmount = 8;
-                            else if (sizeOz === 20) baseAmount = 10;
-                            else baseAmount = 6;
-                        } else { // hot
-                            if (sizeOz === 8) baseAmount = 6;
-                            else if (sizeOz === 12) baseAmount = 8;
-                            else if (sizeOz === 16) baseAmount = 12;
-                            else if (sizeOz === 20) baseAmount = 16;
-                            else baseAmount = 8;
-                        }
-                    }
-                    
-                    const scaledBaseAmount = baseAmount * currentScale;
-                    if (baseType === 'espresso') {
-                        const roundedBase = Math.round(scaledBaseAmount * 10) / 10;
-                        el.innerHTML = `${roundedBase} shot${roundedBase !== 1 ? 's' : ''}`;
+            if (isCoffee) {
+                let amount = originalAmount;
+                if (ingredientType === 'COFFEE_BEAN') {
+                    if (coffeeBaseType === 'espresso') {
+                        amount = 18.0 * coffeeBaseAmount;
+                        el.innerHTML = `${coffeeBaseAmount} shot${coffeeBaseAmount !== 1 ? 's' : ''} / ~${Math.round(amount)}g`;
                     } else {
-                        const roundedBase = Math.round(scaledBaseAmount * 10) / 10;
-                        el.innerHTML = `${roundedBase}oz`;
+                        amount = Math.round((7.0 / 6.0) * coffeeBaseAmount);
+                        el.innerHTML = `${coffeeBaseAmount}oz brew / ~${amount}g`;
                     }
                 } else {
-                    el.innerHTML = `${scaledAmount.toFixed(1)} g`;
+                    let scaleFactor = coffeeSizeOz / savedSizeOz;
+                    
+                    if (coffeeStyle === 'iced' && savedCoffeeStyle !== 'iced') {
+                        scaleFactor *= 0.6;
+                    } else if (coffeeStyle !== 'iced' && savedCoffeeStyle === 'iced') {
+                        scaleFactor *= (1.0 / 0.6);
+                    }
+                    
+                    if (coffeeStyle === 'espresso_shot') {
+                        amount = (ingredientType === 'DAIRY' || ingredientType === 'ADDITIVE') ? 10.0 : 8.0;
+                    } else if (coffeeBaseType === 'espresso' && ingredientType === 'DAIRY') {
+                        const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(coffeeSizeOz) : 0;
+                        const shots = coffeeBaseAmount;
+                        const remainingOz = coffeeSizeOz - iceOz - shots;
+                        amount = Math.max(30.0, Math.round(remainingOz * 29.5735));
+                    } else {
+                        amount = originalAmount * scaleFactor;
+                    }
+                    
+                    const displayVolume = Math.round(amount);
+                    el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
                 }
             } else {
+                const scaledAmount = originalAmount * currentScale;
                 const displayVolume = Math.round(scaledAmount);
                 el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(scaledAmount)}`;
             }
         });
 
         const iceDetailEl = document.getElementById('iceDetailVolume');
+        const iceCard = document.getElementById('iceCardContainer');
+        if (iceCard) {
+            iceCard.style.display = (coffeeStyle === 'iced') ? 'block' : 'none';
+        }
         if (iceDetailEl) {
-            const baseSize = parseFloat(iceDetailEl.getAttribute('data-size') || '12');
-            let iceOz = 5;
-            if (baseSize === 8) iceOz = 3;
-            else if (baseSize === 12) iceOz = 5;
-            else if (baseSize === 16) iceOz = 6;
-            else if (baseSize === 20) iceOz = 8;
-            else iceOz = Math.round(baseSize * 0.4);
-            
-            const scaledIceOz = iceOz * currentScale;
-            const scaledIceMl = Math.round(scaledIceOz * 29.5735);
-            iceDetailEl.innerHTML = `${scaledIceOz.toFixed(1).replace('.0', '')} oz / ~${scaledIceMl} ml`;
+            const iceOz = getIceAmountOz(coffeeSizeOz);
+            const iceMl = Math.round(iceOz * 29.5735);
+            iceDetailEl.innerHTML = `${iceOz} oz / ~${iceMl} ml`;
         }
 
         const waterDetailEl = document.getElementById('waterDetailVolume');
@@ -512,6 +679,10 @@
             } else {
                 setBottleScale(1.0, 'scale32oz');
             }
+        } else if (drinkType === 'COFFEE') {
+            setCoffeeStyle(coffeeStyle);
+            setCoffeeBaseType(coffeeBaseType);
+            setCoffeeSize(coffeeSizeOz);
         } else {
             updateAmounts();
         }
