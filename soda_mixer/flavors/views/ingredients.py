@@ -32,6 +32,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     complexity = request.POST.get('complexity', 3)
     base_suitability = request.POST.get('base_suitability', 3.0)
     accent_suitability = request.POST.get('accent_suitability', 3.0)
+    is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     
     systems = request.POST.getlist('compatible_systems')
     compatible_systems = ",".join(systems) if systems else "SODA,COFFEE,SLUSHIE"
@@ -53,6 +54,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 base_suitability=base_suitability,
                 accent_suitability=accent_suitability,
                 compatible_systems=compatible_systems,
+                is_ready_to_drink=is_ready_to_drink,
                 is_in_inventory=True
             )
             logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name} ({brand})")
@@ -80,6 +82,7 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         
     ingredient.description = request.POST.get('description', ingredient.description)
     ingredient.ai_notes = request.POST.get('ai_notes', ingredient.ai_notes)
+    ingredient.is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     
     systems = request.POST.getlist('compatible_systems')
     if systems:

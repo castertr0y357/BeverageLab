@@ -115,6 +115,10 @@ class Ingredient(models.Model):
         default=True,
         help_text="Whether this ingredient is currently in your bar/lab"
     )
+    is_ready_to_drink = models.BooleanField(
+        default=False,
+        help_text="Whether this ingredient is a ready-to-drink liquid (e.g. juices, milk, tea) that can serve as a primary volume filler."
+    )
     description = models.TextField(blank=True, null=True)
     ai_notes = models.TextField(
         blank=True,
@@ -220,6 +224,11 @@ class Recipe(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def has_ready_to_drink(self) -> bool:
+        """Returns True if the recipe contains at least one ready-to-drink ingredient."""
+        return self.recipe_ingredients.filter(ingredient__is_ready_to_drink=True).exists()
 
     @property
     def water_temp_f(self):

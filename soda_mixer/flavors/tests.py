@@ -1467,3 +1467,67 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         # Should be able to find self.ing_soda (compatible only with SODA) in results
         self.assertTrue(any(ing.id == self.ing_soda.id for ing in rec_ingredients_exp))
 
+    def test_ready_to_drink_attributes_and_recipe_property(self) -> None:
+        """Verify is_ready_to_drink field on Ingredient and has_ready_to_drink property on Recipe."""
+        ing_rtd = Ingredient.objects.create(
+            name="Apple Juice",
+            ingredient_type="OTHER",
+            category="sweet",
+            is_ready_to_drink=True,
+            is_in_inventory=True
+        )
+        ing_not_rtd = Ingredient.objects.create(
+            name="Toasted Marshmallow Syrup",
+            ingredient_type="ADDITIVE",
+            category="sweet",
+            is_ready_to_drink=False,
+            is_in_inventory=True
+        )
+        
+        recipe = Recipe.objects.create(
+            name="Slushie test recipe",
+            drink_type="SLUSHIE",
+            drink_size_oz=16.0
+        )
+        RecipeIngredient.objects.create(recipe=recipe, ingredient=ing_not_rtd, amount=20.0)
+        
+        # Initially, recipe should not have ready-to-drink ingredients
+        self.assertFalse(recipe.has_ready_to_drink)
+        
+        # Add ready-to-drink ingredient
+        RecipeIngredient.objects.create(recipe=recipe, ingredient=ing_rtd, amount=100.0)
+        
+        # Recipe should now have ready-to-drink ingredient
+        self.assertTrue(recipe.has_ready_to_drink)
+
+    @patch('requests.request')
+    def test_bulk_analyze_saves_is_ready_to_drink(self, mock_request: MagicMock) -> None:
+        """Verify that bulk AI analysis updates the is_ready_to_drink attribute."""
+        self.client.login(username="director", password="secure_password_123")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{
+                "message": {
+                    "content": '[{"name": "Apple Juice", "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2, "base_suitability": 4.5, "accent_suitability": 1.5, "category": "sweet", "ingredient_type": "OTHER", "is_ready_to_drink": true, "compatible_systems": "SLUSHIE", "ai_notes": "Perfect slushie base"}]'
+                }
+            }]
+        }
+        mock_request.return_value = mock_response
+
+        # Clear existing to prevent duplicate key
+        Ingredient.objects.filter(name="Apple Juice").delete()
+
+        ing = Ingredient.objects.create(
+            name="Apple Juice",
+            ingredient_type="OTHER",
+            is_ready_to_drink=False,
+            is_in_inventory=True
+        )
+
+        response = self.client.post(reverse('ai_bulk_analyze_api'))
+        self.assertEqual(response.status_code, 200)
+        
+        ing.refresh_from_db()
+        self.assertTrue(ing.is_ready_to_drink)
+

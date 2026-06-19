@@ -107,6 +107,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'complexity': r['ingredient'].complexity,
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
+                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': 'suggestions'
@@ -127,6 +128,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'complexity': r['ingredient'].complexity,
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
+                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'secondary')
@@ -147,6 +149,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'complexity': r['ingredient'].complexity,
                     'base_suitability': r['ingredient'].base_suitability,
                     'accent_suitability': r['ingredient'].accent_suitability,
+                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'score': r['score'],
                     'reason': r['reason'],
                     'tier': r.get('tier', 'tertiary')
@@ -363,7 +366,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             registry = []
             for ing in all_ingredients:
                 ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
+                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink})")
             inventory_context = "\n".join(registry)
 
             yield send_progress("Locating matching flavor affinity groups...")
@@ -444,6 +447,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 'complexity': target_obj.complexity,
                                 'base_suitability': target_obj.base_suitability,
                                 'accent_suitability': target_obj.accent_suitability,
+                                'is_ready_to_drink': target_obj.is_ready_to_drink,
                                 'resonance': round(min(resonance, 99.8), 1),
                                 'reason': item.get('reason', 'Molecular Affinity Match'),
                                 'amount': amount,
@@ -584,6 +588,9 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                             if systems_list:
                                 match.compatible_systems = ",".join(systems_list)
                                 
+                        if 'is_ready_to_drink' in res:
+                            match.is_ready_to_drink = bool(res.get('is_ready_to_drink'))
+                            
                         match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
                         total_analyzed += 1
@@ -721,6 +728,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 'complexity': ing.complexity,
                 'base_suitability': ing.base_suitability,
                 'accent_suitability': ing.accent_suitability,
+                'is_ready_to_drink': ing.is_ready_to_drink,
                 'amount': item['amount']
             })
             

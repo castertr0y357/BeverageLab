@@ -186,7 +186,7 @@
             </div>
                 
             <div class="row g-3 mb-5">
-                {% if recipe.drink_type == 'SLUSHIE' %}
+                {% if recipe.drink_type == 'SLUSHIE' and not recipe.has_ready_to_drink %}
                 <div class="col-md-6">
                     <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -202,7 +202,7 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if recipe.drink_type == 'SODA' %}
+                {% if recipe.drink_type == 'SODA' and not recipe.has_ready_to_drink %}
                 <div class="col-md-6">
                     <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -243,7 +243,8 @@
                                      data-ingredient-type="{{ ri.ingredient.ingredient_type }}"
                                      data-coffee-base-type="{{ recipe.coffee_base_type }}"
                                      data-coffee-style="{{ recipe.coffee_style }}"
-                                     data-drink-size-oz="{{ recipe.drink_size_oz }}">
+                                     data-drink-size-oz="{{ recipe.drink_size_oz }}"
+                                     data-is-ready-to-drink="{{ ri.ingredient.is_ready_to_drink|yesno:'true,false' }}">
                                     {% if recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
                                         {{ ri.amount|floatformat:1 }} g
                                     {% else %}
@@ -599,8 +600,34 @@
     }
 
     function updateAmounts() {
-        const amountDisplays = document.querySelectorAll('.amount-display');
-        amountDisplays.forEach(el => {
+        const amountDisplays = Array.from(document.querySelectorAll('.amount-display'));
+        const hasRtdBase = amountDisplays.some(el => el.getAttribute('data-is-ready-to-drink') === 'true');
+        const firstRtdIndex = amountDisplays.findIndex(el => el.getAttribute('data-is-ready-to-drink') === 'true');
+
+        let savedScale = 1.0;
+        if (drinkType === 'SODA') {
+            if (savedSizeOz === 12.0) savedScale = 0.355;
+            else if (savedSizeOz === 16.9) savedScale = 0.5;
+            else savedScale = 1.0;
+        } else if (drinkType === 'SLUSHIE') {
+            savedScale = savedSizeOz / 32.0;
+        }
+        const activeScale = currentScale * savedScale;
+        const bottleCapacity = (drinkType === 'SODA') ? (activeScale * 1000) : (activeScale * 946.35);
+
+        // Pre-calculate non-filler total volume for Soda/Slushie modes
+        let nonFillerTotal = 0;
+        amountDisplays.forEach((el, idx) => {
+            if (idx !== firstRtdIndex) {
+                const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
+                if (!isNaN(originalAmount)) {
+                    nonFillerTotal += originalAmount * currentScale;
+                }
+            }
+        });
+        const fillerAmount = Math.max(0, bottleCapacity - nonFillerTotal);
+
+        amountDisplays.forEach((el, idx) => {
             const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
             if (isNaN(originalAmount)) return;
             
@@ -627,9 +654,11 @@
                         scaleFactor *= (1.0 / 0.6);
                     }
                     
+                    const isVolumeFiller = (hasRtdBase ? (idx === firstRtdIndex) : (ingredientType === 'DAIRY'));
+                    
                     if (coffeeStyle === 'espresso_shot') {
-                        amount = (ingredientType === 'DAIRY' || ingredientType === 'ADDITIVE') ? 10.0 : 8.0;
-                    } else if (coffeeBaseType === 'espresso' && ingredientType === 'DAIRY') {
+                        amount = (isVolumeFiller || ingredientType === 'ADDITIVE') ? 10.0 : 8.0;
+                    } else if (coffeeBaseType === 'espresso' && isVolumeFiller) {
                         const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(coffeeSizeOz) : 0;
                         const shots = coffeeBaseAmount;
                         const remainingOz = coffeeSizeOz - iceOz - shots;
@@ -642,9 +671,14 @@
                     el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
                 }
             } else {
-                const scaledAmount = originalAmount * currentScale;
-                const displayVolume = Math.round(scaledAmount);
-                el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(scaledAmount)}`;
+                let amount;
+                if (hasRtdBase && idx === firstRtdIndex) {
+                    amount = fillerAmount;
+                } else {
+                    amount = originalAmount * currentScale;
+                }
+                const displayVolume = Math.round(amount);
+                el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
             }
         });
 

@@ -218,6 +218,18 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 0 10px var(--lab-accent);
 }
 
+.neon-check:checked::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--bg-deep);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
 /* =============================================
    🧪 Experimental / Accent Utility Classes
    ============================================= */
