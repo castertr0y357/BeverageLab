@@ -212,7 +212,7 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         registry: List[str] = []
         for ing in all_ingredients:
             ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-            registry.append(f"{ing_display} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)")
+            registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         prompt = user_message + lab_context
@@ -357,7 +357,7 @@ def ai_suggest_api(request: HttpRequest) -> JsonResponse:
         registry = []
         for ing in all_ingredients:
             ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-            registry.append(f"{ing_display} ({ing.get_ingredient_type_display()}, {ing.category.title() if ing.category else 'Misc'}, Intensity: {ing.intensity}/5)")
+            registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         raw_suggestion = ""
@@ -598,7 +598,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
         status = AIAssistant.check_status()
         if status == 'synchronized':
             inventory_context = [
-                f"{i.name} (Category: {i.category}, Type: {i.get_ingredient_type_display()})"
+                f"{i.name} (Type: {i.ingredient_type}, Category: {i.category})"
                 for i in all_compatible
             ]
             
