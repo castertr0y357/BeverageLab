@@ -282,6 +282,36 @@
     let recommendationMode = 'standard';
     let selectedIngredients = []; 
     let bottleScale = 1.0; 
+
+    // 🧪 Progress updates queue variables
+    let activeProgressTimer = null;
+    let activeProgressQueue = [];
+    let isProcessingProgressQueue = false;
+
+    async function processActiveProgressQueue() {
+        if (isProcessingProgressQueue) return;
+        isProcessingProgressQueue = true;
+        
+        while (activeProgressQueue.length > 0) {
+            const nextMsg = activeProgressQueue.shift();
+            const textEl = document.getElementById('recommendationProgressText');
+            if (textEl) {
+                textEl.style.opacity = '0';
+                await new Promise(resolve => {
+                    activeProgressTimer = setTimeout(resolve, 200);
+                });
+                textEl.textContent = nextMsg;
+                textEl.style.opacity = '1';
+                await new Promise(resolve => {
+                    activeProgressTimer = setTimeout(resolve, 750);
+                });
+            } else {
+                break;
+            }
+        }
+        isProcessingProgressQueue = false;
+    }
+
     let allIngredientsHtml = ''; 
     let originalRecipesHtml = '';
     const themeStats = JSON.parse('{{ stats_json|escapejs }}');
@@ -1054,6 +1084,13 @@
     }
 
     async function fetchRecommendations() {
+        if (activeProgressTimer) {
+            clearTimeout(activeProgressTimer);
+            activeProgressTimer = null;
+        }
+        activeProgressQueue = [];
+        isProcessingProgressQueue = false;
+
         const ingredientIds = selectedIngredients.map(i => i.id);
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
         
@@ -1088,7 +1125,7 @@
             return;
         }
 
-        container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim">Computing molecular affinity...</p></div>';
+        container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
         library.style.display = 'none'; // Hide library when focused on recommendations
 
         const isAiEngine = engineMode === 'ai';
@@ -1135,10 +1172,8 @@
                             try {
                                 const parsed = JSON.parse(jsonStr);
                                 if (parsed.status === 'progress') {
-                                    const textEl = document.getElementById('recommendationProgressText');
-                                    if (textEl) {
-                                        textEl.textContent = parsed.message;
-                                    }
+                                    activeProgressQueue.push(parsed.message);
+                                    processActiveProgressQueue();
                                 } else if (parsed.status === 'success') {
                                     data = parsed;
                                 } else if (parsed.status === 'error') {
@@ -1149,6 +1184,10 @@
                             }
                         }
                     }
+                }
+                // Wait for progress queue processing to complete
+                while (isProcessingProgressQueue || activeProgressQueue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
             } else {
                 data = await r.json();
