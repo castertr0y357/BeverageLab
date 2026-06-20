@@ -14,6 +14,10 @@
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
 
 ## 🛠️ Completed Tasks
+- [x] Implemented consistent espresso shot volume adjustments, including a virtual "Hot Water" card in water dilution mode and shot count scaling in shots mode across the wizard and recipe detail views.
+- [x] Added auto-reanalysis to trigger AI/chemistry re-evaluation immediately when style, size, or coffee base is updated after an analysis has been initiated.
+- [x] Enforced mix sealing: blocked adding further steps or ingredients, and hid the step selection UI and base library until step back or reset is clicked.
+- [x] Handled duplicate ingredient selections by merging volumes on the existing card and setting `isUserOverridden`/`aiRatio` to protect the modified quantity from neural AI rebalancing.
 - [x] Fixed coffee wizard UI to display chemistry-aligned volume adjustments, rename clashing modifiers, show warning banners, and resize ingredients dynamically when style, size, or base changes.
 - [x] Implemented Coffee Chemistry Engine: created a REST API endpoint `/api/coffee/chemistry/` verifying multi-base blending protocols, aggregate metrics, body dilution dairy penalties, flavor note clashes, category volumetric budget rules, espresso vs. standard brew processing guardrails, and flavor hierarchy protocols with modifier cap enforcement. Added 10 verification test cases.
 - [x] Implemented dry ingredient weight-based scaling and units: Added `is_dry` Boolean property to the `Ingredient` model, exposed it in form modals and AI analysis pipelines, and formatted it in grams (`g`) across the synthesis wizard, catalog page, recipe detail views, edit/create pages, and history logs. Excluded dry ingredients from liquid total capacity and ready-to-drink displacement volume checks while scaling them cleanly by batch scale size.

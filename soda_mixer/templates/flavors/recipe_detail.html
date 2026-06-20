@@ -92,6 +92,13 @@
                                     <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
                                 </div>
                             </div>
+                            <div class="col-md-12 mt-3 animate-fade-in" id="espressoHotModeContainer" style="display: none;">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO VOLUME ADJUSTMENT</label>
+                                <div class="btn-group w-100" id="espressoHotModeBtns">
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6 active-lab-mode" id="hotModeWater" onclick="setEspressoHotMode('water')">💧 Inject Hot Water (Americano Style)</button>
+                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="hotModeShots" onclick="setEspressoHotMode('shots')">☕ Add Shots (Strong Extraction)</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -281,6 +288,20 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-md-6 animate-fade-in" id="hotWaterCardContainer" style="display: none;">
+                    <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="fw-bold fs-5 text-info">Hot Water <i class="bi bi-droplets text-info ms-1"></i></div>
+                            <span class="badge-fizz bg-info text-dark">Base Modifier</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-auto gap-2">
+                            <div class="readout-card p-1 ps-2 border-info border-opacity-50 flex-grow-1">
+                                <div class="readout-label" style="font-size: 0.6rem;">VOLUME</div>
+                                <div class="fw-bold text-info" id="hotWaterDetailVolume"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
                 {% empty %}
                 <div class="col-12"><p class="text-dim">No base components identified in formula.</p></div>
@@ -442,6 +463,31 @@
     let coffeeSizeOz = parseFloat("{{ recipe.drink_size_oz|default:'12' }}");
     let coffeeBaseType = "{{ recipe.coffee_base_type|default:'espresso' }}";
     let coffeeBaseAmount = 2;
+    let coffeeEspressoHotMode = localStorage.getItem('coffee_espresso_hot_mode') || 'water';
+
+    function setEspressoHotMode(mode) {
+        coffeeEspressoHotMode = mode;
+        localStorage.setItem('coffee_espresso_hot_mode', mode);
+        const waterBtn = document.getElementById('hotModeWater');
+        const shotsBtn = document.getElementById('hotModeShots');
+        if (waterBtn) waterBtn.classList.toggle('active-lab-mode', mode === 'water');
+        if (shotsBtn) shotsBtn.classList.toggle('active-lab-mode', mode === 'shots');
+        
+        recalculateCoffeeBaseAmount();
+        updateAmounts();
+    }
+
+    function updateEspressoHotModeContainer() {
+        const showHotEspressoAdj = (drinkType === 'COFFEE' && coffeeStyle === 'hot' && coffeeBaseType === 'espresso');
+        const adjContainer = document.getElementById('espressoHotModeContainer');
+        if (adjContainer) adjContainer.style.display = showHotEspressoAdj ? 'block' : 'none';
+        
+        // Sync active class on hot/water buttons
+        const waterBtn = document.getElementById('hotModeWater');
+        const shotsBtn = document.getElementById('hotModeShots');
+        if (waterBtn) waterBtn.classList.toggle('active-lab-mode', coffeeEspressoHotMode === 'water');
+        if (shotsBtn) shotsBtn.classList.toggle('active-lab-mode', coffeeEspressoHotMode === 'shots');
+    }
 
     const savedCoffeeStyle = "{{ recipe.coffee_style|default:'hot' }}";
     const savedCoffeeBaseType = "{{ recipe.coffee_base_type|default:'espresso' }}";
@@ -494,6 +540,7 @@
         if (baseBtns) baseBtns.style.display = shotMode ? 'none' : '';
 
         recalculateCoffeeBaseAmount();
+        updateEspressoHotModeContainer();
         updateAmounts();
     }
 
@@ -515,6 +562,7 @@
         }
         
         recalculateCoffeeBaseAmount();
+        updateEspressoHotModeContainer();
         updateAmounts();
     }
 
@@ -526,6 +574,7 @@
         if (baseStd) baseStd.classList.toggle('active-lab-mode', type === 'standard_brew');
 
         recalculateCoffeeBaseAmount();
+        updateEspressoHotModeContainer();
         updateAmounts();
     }
 
@@ -546,16 +595,20 @@
                     coffeeBaseAmount = 2;
                 }
             } else { // hot or iced
-                if (coffeeSizeOz === 8) {
-                    coffeeBaseAmount = 1;
-                } else if (coffeeSizeOz === 12) {
-                    coffeeBaseAmount = 2;
-                } else if (coffeeSizeOz === 16) {
-                    coffeeBaseAmount = 3;
-                } else if (coffeeSizeOz === 20) {
-                    coffeeBaseAmount = 4;
+                if (coffeeStyle === 'hot' && coffeeEspressoHotMode === 'shots') {
+                    coffeeBaseAmount = Math.round(coffeeSizeOz * 0.30);
                 } else {
-                    coffeeBaseAmount = 2;
+                    if (coffeeSizeOz === 8) {
+                        coffeeBaseAmount = 1;
+                    } else if (coffeeSizeOz === 12) {
+                        coffeeBaseAmount = 2;
+                    } else if (coffeeSizeOz === 16) {
+                        coffeeBaseAmount = 3;
+                    } else if (coffeeSizeOz === 20) {
+                        coffeeBaseAmount = 4;
+                    } else {
+                        coffeeBaseAmount = 2;
+                    }
                 }
             }
         } else { // standard_brew
@@ -714,6 +767,18 @@
             iceDetailEl.innerHTML = `${iceOz} oz / ~${iceMl} ml`;
         }
 
+        const showHotWater = (drinkType === 'COFFEE' && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water');
+        const hotWaterCard = document.getElementById('hotWaterCardContainer');
+        if (hotWaterCard) {
+            hotWaterCard.style.display = showHotWater ? 'block' : 'none';
+        }
+        const hotWaterDetailEl = document.getElementById('hotWaterDetailVolume');
+        if (hotWaterDetailEl) {
+            const hotWaterOz = (coffeeSizeOz * 0.40).toFixed(1);
+            const hotWaterMl = Math.round(hotWaterOz * 29.5735);
+            hotWaterDetailEl.innerHTML = `${hotWaterOz} oz / ~${hotWaterMl} ml`;
+        }
+
         const waterDetailEl = document.getElementById('waterDetailVolume');
         if (waterDetailEl) {
             let totalSyrup = 0;
@@ -795,6 +860,7 @@
                 body: JSON.stringify({
                     drink_category: drinkCategory,
                     cup_size_oz: coffeeSizeOz,
+                    espresso_hot_mode: coffeeEspressoHotMode,
                     ingredients: ingredients.map(ing => {
                         const copy = { ...ing };
                         if (copy.ingredient_type === 'COFFEE_BEAN') {

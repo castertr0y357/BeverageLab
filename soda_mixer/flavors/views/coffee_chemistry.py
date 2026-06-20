@@ -24,9 +24,31 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     drink_category = data.get('drink_category', 'Hot Coffee').strip()
     cup_size_oz = float(data.get('cup_size_oz', 12.0))
     ingredients_input = data.get('ingredients', [])
+    espresso_hot_mode = data.get('espresso_hot_mode', 'shots').strip().lower()
+
+    drink_cat_lower = drink_category.lower()
+
+    # Determine is_espresso_base early
+    is_espresso_base = True
+    if "standard" in drink_cat_lower or "brew" in drink_cat_lower:
+        is_espresso_base = False
+    
+    for ing in ingredients_input:
+        itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
+        if itype == 'COFFEE_BEAN':
+            base_type = str(ing.get('coffee_base_type', '')).lower()
+            if 'standard' in base_type or 'brew' in base_type:
+                is_espresso_base = False
+                break
+
+    # Route Pure Espresso / Short Milk
+    is_short_milk = "pure espresso" in drink_cat_lower or "short milk" in drink_cat_lower or "cortado" in drink_cat_lower or "cappuccino" in drink_cat_lower
+
+    hot_water_vol = 0.0
+    if is_espresso_base and not is_short_milk and "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
+        hot_water_vol = round(cup_size_oz * 0.40, 2)
 
     # 1. Volumetric Budget Rules
-    drink_cat_lower = drink_category.lower()
     if "iced" in drink_cat_lower:
         ice_volume_oz = round(cup_size_oz * 0.40, 2)
         liquid_budget_oz = round(cup_size_oz * 0.60, 2)
@@ -214,50 +236,45 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             mod_scores.sort(key=lambda x: (x[0], -x[1]), reverse=True)
             dominant_idx = mod_scores[0][1]
 
-            # Dominant modifier gets 60%
-            dominant_budget = modifier_budget * 0.60
-            accent_budget_total = modifier_budget * 0.40
-            accent_count = len(modified_list) - 1
-            accent_budget_each = accent_budget_total / accent_count if accent_count > 0 else 0.0
+            if has_modifier_amounts and requested_modifier_total > 0.0:
+                for idx, m in enumerate(modified_list):
+                    amt = float(m.get('amount', 0.0))
+                    vol = (amt / requested_modifier_total) * modifier_budget
+                    role = "(Dominant)" if idx == dominant_idx else "(Accent)"
+                    modifiers_output.append({
+                        "name": f"{m.get('name', 'Syrup')} {role}",
+                        "volume_oz": round(vol, 2),
+                        "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
+                    })
+            else:
+                # Dominant modifier gets 60%
+                dominant_budget = modifier_budget * 0.60
+                accent_budget_total = modifier_budget * 0.40
+                accent_count = len(modified_list) - 1
+                accent_budget_each = accent_budget_total / accent_count if accent_count > 0 else 0.0
 
-            for idx, m in enumerate(modified_list):
-                name = m.get('name', 'Syrup')
-                if idx == dominant_idx:
-                    vol = dominant_budget
-                    role = "(Dominant)"
-                else:
-                    vol = accent_budget_each
-                    role = "(Accent)"
-                
-                modifiers_output.append({
-                    "name": f"{name} {role}",
-                    "volume_oz": round(vol, 2),
-                    "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
-                })
+                for idx, m in enumerate(modified_list):
+                    name = m.get('name', 'Syrup')
+                    if idx == dominant_idx:
+                        vol = dominant_budget
+                        role = "(Dominant)"
+                    else:
+                        vol = accent_budget_each
+                        role = "(Accent)"
+                    
+                    modifiers_output.append({
+                        "name": f"{name} {role}",
+                        "volume_oz": round(vol, 2),
+                        "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
+                    })
 
     # 4. Base-Specific Processing Guardrails
-    is_espresso_base = True
-    # If standard brew keyword is in category or standard brew option is checked/detected
-    if "standard" in drink_cat_lower or "brew" in drink_cat_lower:
-        is_espresso_base = False
-    
-    # Or if coffee inputs explicitly specify standard brew base type
-    for c in coffee_inputs:
-        base_type = str(c.get('coffee_base_type', '')).lower()
-        if 'standard' in base_type or 'brew' in base_type:
-            is_espresso_base = False
-            break
-
-    # Route Pure Espresso / Short Milk
-    is_short_milk = "pure espresso" in drink_cat_lower or "short milk" in drink_cat_lower or "cortado" in drink_cat_lower or "cappuccino" in drink_cat_lower
-
     if is_short_milk:
         if not is_espresso_base:
             recipe_validation = "Warning"
             validation_notes = "Warning: Standard Brew is incompatible with Pure Espresso / Short Milk format."
         
         # Espresso Shots only.
-        # Volumetric split for short milk: if dairy is present, coffee is 40% and dairy is 60%.
         if dairy_inputs:
             coffee_base_pct = 40.0
         else:
@@ -265,7 +282,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     else:
         if is_espresso_base:
             # Route A: Espresso concentrate
-            coffee_base_pct = 30.0 # Midpoint of 25%-35%
+            if "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
+                coffee_base_pct = 18.0
+            else:
+                coffee_base_pct = 30.0 # Midpoint of 25%-35%
         else:
             # Route B: Standard Brew
             if "iced" in drink_cat_lower:
@@ -276,7 +296,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     coffee_base_vol = liquid_budget_oz * (coffee_base_pct / 100.0)
     
     # Calculate secondary liquid (dairy/filler)
-    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget
+    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget - hot_water_vol
     if secondary_liquid_vol < 0.0:
         secondary_liquid_vol = 0.0
 
@@ -304,6 +324,13 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             "name": c.get('name', 'Coffee'),
             "volume_oz": round(vol, 2),
             "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
+        })
+
+    if hot_water_vol > 0.0:
+        coffee_base_mix_output.append({
+            "name": "Hot Water",
+            "volume_oz": round(hot_water_vol, 2),
+            "percentage_of_liquid": round((hot_water_vol / liquid_budget_oz) * 100, 2)
         })
 
     # Dairy or Filler formatting
@@ -337,6 +364,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         },
         "ice_volume_oz": ice_volume_oz,
         "liquid_budget_oz": liquid_budget_oz,
+        "hot_water_volume_oz": round(hot_water_vol, 2),
         "ingredients": {
             "coffee_base_mix": coffee_base_mix_output,
             "dairy_or_filler": dairy_output,

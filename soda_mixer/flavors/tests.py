@@ -1947,4 +1947,32 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         self.assertEqual(caramel_mod['volume_oz'], 0.9)
         self.assertEqual(strawberry_mod['volume_oz'], 0.6)
 
+    def test_hot_coffee_espresso_water_dilution(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'espresso_hot_mode': 'water',
+                'ingredients': [
+                    {
+                        'name': 'Espresso Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'amount': 18.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['hot_water_volume_oz'], 4.8)
+        base_mix = data['ingredients']['coffee_base_mix']
+        self.assertEqual(len(base_mix), 2)
+        bean_part = next(c for c in base_mix if c['name'] == 'Espresso Bean')
+        water_part = next(c for c in base_mix if c['name'] == 'Hot Water')
+        self.assertEqual(bean_part['volume_oz'], 2.16)
+        self.assertEqual(water_part['volume_oz'], 4.8)
+
+
 
