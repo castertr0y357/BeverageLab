@@ -287,6 +287,121 @@
     let recommendationMode = 'standard';
     let selectedIngredients = []; 
     let bottleScale = 1.0; 
+    let latestCoffeeChemistryData = null;
+
+    function getChemistryAlignedIngredient(ing, idx) {
+        if (!latestCoffeeChemistryData || !latestCoffeeChemistryData.ingredients) {
+            return null;
+        }
+        
+        const type = (ing.type || ing.ingredient_type || '').toUpperCase();
+        
+        let itypeCategory = 'modifier';
+        if (type === 'COFFEE_BEAN') {
+            itypeCategory = 'coffee';
+        } else if (type === 'DAIRY') {
+            itypeCategory = 'dairy';
+        } else if (type === 'ADDITIVE' || type === 'OTHER' || type === 'SODA_SYRUP') {
+            itypeCategory = 'modifier';
+        } else {
+            const nameLower = (ing.name || '').toLowerCase();
+            if (nameLower.includes('milk') || nameLower.includes('oat') || nameLower.includes('almond') || nameLower.includes('soy') || nameLower.includes('dairy')) {
+                itypeCategory = 'dairy';
+            } else if (nameLower.includes('syrup') || nameLower.includes('sauce') || nameLower.includes('honey') || nameLower.includes('sugar')) {
+                itypeCategory = 'modifier';
+            } else {
+                itypeCategory = 'modifier';
+            }
+        }
+        
+        let countInCat = 0;
+        for (let i = 0; i < idx; i++) {
+            const otherIng = selectedIngredients[i];
+            const otherType = (otherIng.type || otherIng.ingredient_type || '').toUpperCase();
+            let otherCat = 'modifier';
+            if (otherType === 'COFFEE_BEAN') {
+                otherCat = 'coffee';
+            } else if (otherType === 'DAIRY') {
+                otherCat = 'dairy';
+            } else if (otherType === 'ADDITIVE' || otherType === 'OTHER' || otherType === 'SODA_SYRUP') {
+                otherCat = 'modifier';
+            } else {
+                const otherNameLower = (otherIng.name || '').toLowerCase();
+                if (otherNameLower.includes('milk') || otherNameLower.includes('oat') || otherNameLower.includes('almond') || otherNameLower.includes('soy') || otherNameLower.includes('dairy')) {
+                    otherCat = 'dairy';
+                } else if (otherNameLower.includes('syrup') || otherNameLower.includes('sauce') || otherNameLower.includes('honey') || otherNameLower.includes('sugar')) {
+                    otherCat = 'modifier';
+                } else {
+                    otherCat = 'modifier';
+                }
+            }
+            if (otherCat === itypeCategory) {
+                countInCat++;
+            }
+        }
+        
+        if (itypeCategory === 'coffee') {
+            const list = latestCoffeeChemistryData.ingredients.coffee_base_mix || [];
+            if (countInCat < list.length) {
+                return list[countInCat];
+            }
+        } else if (itypeCategory === 'dairy') {
+            const item = latestCoffeeChemistryData.ingredients.dairy_or_filler;
+            if (item && item.name !== 'None') {
+                return item;
+            }
+        } else if (itypeCategory === 'modifier') {
+            const list = latestCoffeeChemistryData.ingredients.modifiers || [];
+            if (countInCat < list.length) {
+                return list[countInCat];
+            }
+        }
+        return null;
+    }
+
+    async function updateCoffeeChemistryWizard() {
+        if (currentLabMode !== 'COFFEE' || selectedIngredients.length === 0) {
+            latestCoffeeChemistryData = null;
+            return;
+        }
+
+        let drinkCategory = "Hot Coffee";
+        if (coffeeStyle === 'iced') {
+            drinkCategory = "Iced Coffee";
+        } else if (coffeeStyle === 'espresso_shot') {
+            drinkCategory = "Pure Espresso / Short Milk";
+        }
+
+        try {
+            const r = await fetch('/api/coffee/chemistry/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    drink_category: drinkCategory,
+                    cup_size_oz: coffeeSizeOz,
+                    ingredients: selectedIngredients.map((ing, idx) => {
+                        const ingCopy = { ...ing };
+                        if (ingCopy.type === 'COFFEE_BEAN') {
+                            ingCopy.coffee_base_type = coffeeBaseType;
+                        }
+                        let amount = ing.amount;
+                        if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                            amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                        } else {
+                            amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                        }
+                        ingCopy.amount = amount;
+                        ingCopy.ingredient_type = ing.type;
+                        return ingCopy;
+                    })
+                })
+            });
+            const data = await r.json();
+            latestCoffeeChemistryData = data;
+        } catch (err) {
+            console.error("Error updating coffee chemistry wizard:", err);
+        }
+    } 
 
     // 🧪 Progress updates queue variables
     let activeProgressTimer = null;
@@ -462,7 +577,9 @@
         if (coffeeStyleField) coffeeStyleField.value = style;
         
         recalculateCoffeeBaseAmount();
-        updateSelectedArea();
+        updateCoffeeChemistryWizard().then(() => {
+            updateSelectedArea();
+        });
     }
 
     function setCoffeeSize(oz) {
@@ -483,7 +600,9 @@
         if (drinkSizeOzField) drinkSizeOzField.value = coffeeSizeOz;
         
         recalculateCoffeeBaseAmount();
-        updateSelectedArea();
+        updateCoffeeChemistryWizard().then(() => {
+            updateSelectedArea();
+        });
     }
 
     function setCoffeeBaseType(type) {
@@ -495,7 +614,9 @@
         if (coffeeBaseTypeField) coffeeBaseTypeField.value = type;
 
         recalculateCoffeeBaseAmount();
-        updateSelectedArea();
+        updateCoffeeChemistryWizard().then(() => {
+            updateSelectedArea();
+        });
     }
 
     function getIceAmountOz(sizeOz) {
@@ -851,15 +972,27 @@
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
         const isDone = selectedIngredients.length >= maxIngredients;
         
-        updateSelectedArea(isDone);
-        
-        if (!silent) {
-            if (isDone) {
-                document.getElementById('stepContainer').style.display = 'none';
-                triggerFlavorSynthesis();
-            } else {
-                fetchRecommendations();
-                triggerProactiveSuggestion();
+        if (currentLabMode === 'COFFEE' && !silent) {
+            updateCoffeeChemistryWizard().then(() => {
+                updateSelectedArea(isDone);
+                if (isDone) {
+                    document.getElementById('stepContainer').style.display = 'none';
+                    triggerFlavorSynthesis();
+                } else {
+                    fetchRecommendations();
+                    triggerProactiveSuggestion();
+                }
+            });
+        } else {
+            updateSelectedArea(isDone);
+            if (!silent) {
+                if (isDone) {
+                    document.getElementById('stepContainer').style.display = 'none';
+                    triggerFlavorSynthesis();
+                } else {
+                    fetchRecommendations();
+                    triggerProactiveSuggestion();
+                }
             }
         }
     }
@@ -912,6 +1045,11 @@
                 }
                 
                 // Fetch recommendations and trigger exactly ONE synthesis report
+                if (currentLabMode === 'COFFEE') {
+                    await updateCoffeeChemistryWizard();
+                }
+                const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
+                updateSelectedArea(selectedIngredients.length >= maxIngredients);
                 fetchRecommendations();
                 if (selectedIngredients.length > 0) {
                     triggerFlavorSynthesis();
@@ -1292,6 +1430,7 @@
     function resetMixer() {
         selectedIngredients = [];
         bottleScale = 1.0;
+        latestCoffeeChemistryData = null;
         
         // Reset soda/slushie scale UI
         ['scale1L', 'scale05L', 'scale12oz'].forEach(id => {
@@ -1330,11 +1469,23 @@
         selectedIngredients.pop();
         document.getElementById('stepContainer').style.display = 'block';
         document.getElementById('synthesisReportContainer').style.display = 'none';
-        updateSelectedArea();
-        fetchRecommendations();
         
-        if (selectedIngredients.length === 0) {
-            resetMixer();
+        if (currentLabMode === 'COFFEE') {
+            updateCoffeeChemistryWizard().then(() => {
+                updateSelectedArea();
+                fetchRecommendations();
+                
+                if (selectedIngredients.length === 0) {
+                    resetMixer();
+                }
+            });
+        } else {
+            updateSelectedArea();
+            fetchRecommendations();
+            
+            if (selectedIngredients.length === 0) {
+                resetMixer();
+            }
         }
     }
 
@@ -1755,7 +1906,23 @@
             });
         }
 
-        let html = '<div class="row g-2 mb-3">';
+        let warningBannerHtml = '';
+        if (currentLabMode === 'COFFEE' && latestCoffeeChemistryData && latestCoffeeChemistryData.recipe_validation && latestCoffeeChemistryData.recipe_validation !== 'Pass') {
+            let alertClass = 'alert-warning border-warning text-warning';
+            let iconClass = 'bi-exclamation-triangle-fill';
+            if (latestCoffeeChemistryData.recipe_validation.toLowerCase().includes('fail')) {
+                alertClass = 'alert-danger border-danger text-danger';
+                iconClass = 'bi-x-circle-fill';
+            }
+            warningBannerHtml = `
+                <div class="alert ${alertClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3 py-2 rounded-3 w-100">
+                    <i class="bi ${iconClass}"></i>
+                    <div class="fw-bold small">${latestCoffeeChemistryData.recipe_validation}</div>
+                </div>
+            `;
+        }
+
+        let html = warningBannerHtml + '<div class="row g-2 mb-3">';
         let hiddenInputs = '';
 
         // 💧 Inject virtual Water card for Slushie mode to the left of the base ingredient
@@ -1851,66 +2018,101 @@
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
             const ingUnit = (isDry || isDryCoffee) ? 'g' : 'ml';
 
-            // ☕ Always recalculate coffee amounts from current settings
-            // This ensures changing Style/Size/Base immediately updates the display.
+            let alignedItem = null;
+            let displayVolume;
+            let dualLabel;
+            let mainName = ing.name;
+            let renameWarningHtml = '';
+
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
-                    amount = Math.round(coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                alignedItem = getChemistryAlignedIngredient(ing, index);
+                if (alignedItem) {
+                    if (isDryCoffee) {
+                        amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                    } else {
+                        // Convert fluid ounces back to ml
+                        amount = alignedItem.volume_oz * 29.5735;
+                    }
+                    
+                    let engineName = alignedItem.name.replace(/\s+\((Dominant|Accent)\)$/i, '');
+                    if (engineName.toLowerCase() !== ing.name.toLowerCase() && !isDryCoffee && ing.type !== 'DAIRY') {
+                        mainName = engineName;
+                        renameWarningHtml = `
+                            <div class="text-warning small mt-1 font-monospace" style="font-size: 0.65rem;">
+                                <i class="bi bi-exclamation-triangle-fill"></i> ${ing.name} &rarr; ${engineName}
+                            </div>
+                        `;
+                    }
                 } else {
-                    amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                        amount = Math.round(coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                    } else {
+                        amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                    }
+                    const isDryCoffee2 = ing.type === 'COFFEE_BEAN';
+                    const maxVal = isDryCoffee2 ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
+                    if (amount > maxVal) {
+                        amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                    }
                 }
-            } else if (hasRtdBase && index === firstRtdIndex) {
-                amount = rtdBaseAmount;
-            } else if (isDry) {
-                if (!amount) {
-                    amount = 15.0 * (bottleScale || 1.0);
+
+                displayVolume = isDryCoffee ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0);
+
+                if (alignedItem) {
+                    if (isDryCoffee) {
+                        if (coffeeBaseType === 'espresso') {
+                            dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''} (${alignedItem.volume_oz}oz extraction)`;
+                        } else {
+                            dualLabel = `${coffeeBaseAmount}oz (${alignedItem.volume_oz}oz extraction)`;
+                        }
+                    } else {
+                        dualLabel = `${displayVolume}${ingUnit} / ${alignedItem.volume_oz}oz`;
+                    }
                 } else {
-                    amount = amount * (bottleScale || 1.0);
+                    if (isDryCoffee) {
+                        if (coffeeBaseType === 'espresso') {
+                            dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''}`;
+                        } else {
+                            dualLabel = `${coffeeBaseAmount}oz`;
+                        }
+                    } else {
+                        dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
+                    }
                 }
-            } else if (!amount) {
-                // Algorithmic Tier Fallback for Soda/Slushie (Target: 160ml total for 1L)
-                const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
-                amount = baseVolume * (bottleScale || 1.0) * expansionFactor;
             } else {
-                amount = amount * (bottleScale || 1.0) * expansionFactor;
-            }
-            
-            // Clamp coffee mode only to sensible maximums
-            if (currentLabMode === 'COFFEE') {
-                const isDryCoffee2 = ing.type === 'COFFEE_BEAN';
-                const maxVal = isDryCoffee2 ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
-                if (amount > maxVal) {
-                    console.warn(`Coffee amount clamped: ${ing.name} was ${amount}`);
-                    amount = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                if (hasRtdBase && index === firstRtdIndex) {
+                    amount = rtdBaseAmount;
+                } else if (isDry) {
+                    if (!amount) {
+                        amount = 15.0 * (bottleScale || 1.0);
+                    } else {
+                        amount = amount * (bottleScale || 1.0);
+                    }
+                } else if (!amount) {
+                    const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
+                    amount = baseVolume * (bottleScale || 1.0) * expansionFactor;
+                } else {
+                    amount = amount * (bottleScale || 1.0) * expansionFactor;
                 }
-            }
-            
-            const displayVolume = (currentLabMode === 'COFFEE') 
-                ? (isDryCoffee ? (amount * bottleScale).toFixed(1) : (amount * (bottleScale || 1.0)).toFixed(0))
-                : (isDry ? amount.toFixed(1) : amount.toFixed(0));
-            
-            if ((currentLabMode === 'SLUSHIE' || currentLabMode === 'SODA') && !isDry) {
-                totalSyrup += parseFloat(amount);
+                displayVolume = isDry ? amount.toFixed(1) : amount.toFixed(0);
+
+                if (isDry) {
+                    dualLabel = `${displayVolume} g`;
+                } else {
+                    dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
+                }
             }
 
-            let dualLabel;
-            if (isDryCoffee) {
-                if (coffeeBaseType === 'espresso') {
-                    dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''}`;
-                } else {
-                    dualLabel = `${coffeeBaseAmount}oz`;
-                }
-            } else if (isDry) {
-                dualLabel = `${displayVolume} g`;
-            } else {
-                dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
+            if ((currentLabMode === 'SLUSHIE' || currentLabMode === 'SODA') && !isDry) {
+                totalSyrup += parseFloat(amount);
             }
             
             html += `
                 <div class="col-auto">
                     <div class="glass-card p-2 text-center px-4 ${ing.isAiBalanced ? 'border-neural glow-neural' : ''}" style="min-width: 150px; position: relative;">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">${role}</span>
-                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">${ing.name} ${balanceIndicator}</div>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">${mainName} ${balanceIndicator}</div>
+                        ${renameWarningHtml}
                         <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${dualLabel}</div>
                         
                         <!-- 🧪 Synthesized Profile Display -->
@@ -2083,14 +2285,28 @@
                     let amount = ing.amount;
                     const isDry = ing.isDry === true || ing.isDry === 'true';
                     const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
+                    
+                    let alignedItem = null;
                     if (currentLabMode === 'COFFEE') {
-                        if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
-                            amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                        alignedItem = getChemistryAlignedIngredient(ing, idx);
+                    }
+
+                    if (currentLabMode === 'COFFEE') {
+                        if (alignedItem) {
+                            if (isDryCoffee) {
+                                amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                            } else {
+                                amount = alignedItem.volume_oz * 29.5735;
+                            }
                         } else {
-                            amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                            if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                                amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                            } else {
+                                amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                            }
+                            const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
+                            if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                         }
-                        const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
-                        if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                     } else if (hasRtdBase && idx === firstRtdIndex) {
                         amount = rtdBaseAmount;
                     } else if (isDry) {
@@ -2132,14 +2348,28 @@
             let amount = ing.amount;
             const isDry = ing.isDry === true || ing.isDry === 'true';
             const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
+            
+            let alignedItem = null;
             if (currentLabMode === 'COFFEE') {
-                if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
-                    amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                alignedItem = getChemistryAlignedIngredient(ing, idx);
+            }
+
+            if (currentLabMode === 'COFFEE') {
+                if (alignedItem) {
+                    if (isDryCoffee) {
+                        amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    } else {
+                        amount = alignedItem.volume_oz * 29.5735;
+                    }
                 } else {
-                    amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                        amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                    } else {
+                        amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    }
+                    const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
+                    if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
                 }
-                const maxVal = isDryCoffee ? 40.0 : (ing.type === 'DAIRY' ? 300.0 : 120.0);
-                if (amount > maxVal) amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
             } else if (hasRtdBase && idx === firstRtdIndex) {
                 amount = rtdBaseAmount;
             } else if (isDry) {
