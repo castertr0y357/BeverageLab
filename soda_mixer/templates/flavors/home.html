@@ -211,6 +211,9 @@
                                  data-category="{{ ingredient.category }}"
                                  data-is-ready-to-drink="{{ ingredient.is_ready_to_drink|yesno:'true,false' }}"
                                  data-is-dry="{{ ingredient.is_dry|yesno:'true,false' }}"
+                                 data-roast-level="{{ ingredient.roast_level|default:'' }}"
+                                 data-flavor-notes="{{ ingredient.flavor_notes|default:'' }}"
+                                 data-is-decaf="{% if 'decaf' in ingredient.name|lower %}true{% else %}false{% endif %}"
                                  data-profile=''>
                                 <span class="fw-bold fs-5 mb-2">{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}</span>
                                 <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
@@ -791,7 +794,7 @@
         // No-op in single-window mode
     }
 
-    function selectIngredient(id, name, intensity, category, profile = null, silent = false, amount = null, sweetness = 0, acidity = 0, bitterness = 0, complexity = 0, type = null, isReadyToDrink = false, isDry = false) {
+    function selectIngredient(id, name, intensity, category, profile = null, silent = false, amount = null, sweetness = 0, acidity = 0, bitterness = 0, complexity = 0, type = null, isReadyToDrink = false, isDry = false, roastLevel = null, flavorNotes = '', isDecaf = false) {
         console.log("Integrating reagent:", name);
         // Prevent molecular duplication in a single mix
         if (selectedIngredients.some(ing => ing.id == id)) {
@@ -811,6 +814,17 @@
             aiRatio = standard > 0 ? (parsedAmount / standard) : 1.0;
         }
 
+        let parsedNotes = [];
+        if (flavorNotes) {
+            parsedNotes = flavorNotes.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+        } else if (profileObj && profileObj.flavor_notes) {
+            if (Array.isArray(profileObj.flavor_notes)) {
+                parsedNotes = profileObj.flavor_notes;
+            } else {
+                parsedNotes = profileObj.flavor_notes.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+            }
+        }
+
         selectedIngredients.push({
             id: id,
             name: name,
@@ -826,6 +840,12 @@
             aiRatio: aiRatio,
             isReadyToDrink: isReadyToDrink || (profileObj && (profileObj.is_ready_to_drink === true || profileObj.is_ready_to_drink === 'true')),
             isDry: isDry || (profileObj && (profileObj.is_dry === true || profileObj.is_dry === 'true')),
+            roast_level: roastLevel || (profileObj ? profileObj.roast_level : null),
+            body_intensity: profileObj ? profileObj.intensity : parseInt(intensity),
+            acidity_score: profileObj ? profileObj.acidity : parseInt(acidity),
+            bitterness_score: profileObj ? profileObj.bitterness : parseInt(bitterness),
+            flavor_notes: parsedNotes,
+            is_decaf: isDecaf || (profileObj ? (profileObj.is_decaf === true || profileObj.is_decaf === 'true') : false) || name.toLowerCase().includes('decaf'),
             profile: profileObj
         });
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
@@ -916,23 +936,173 @@
         reportBody.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div><span class="ms-2 small text-dim">Compiling synthesis report...</span></div>';
 
         try {
-            const r = await fetch('/api/ai/synthesize/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify({
-                    ingredients: selectedIngredients,
-                    drink_type: currentLabMode
-                })
-            });
-            const data = await r.json();
+            if (currentLabMode === 'COFFEE') {
+                let drinkCategory = "Hot Coffee";
+                if (coffeeStyle === 'iced') {
+                    drinkCategory = "Iced Coffee";
+                } else if (coffeeStyle === 'espresso_shot') {
+                    drinkCategory = "Pure Espresso / Short Milk";
+                }
 
-            if (data.status === 'success') {
-                reportBody.innerHTML = `<div style="white-space:pre-line;">${data.summary}</div>`;
-                // Scroll to report
-                reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                const r = await fetch('/api/coffee/chemistry/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        drink_category: drinkCategory,
+                        cup_size_oz: coffeeSizeOz,
+                        ingredients: selectedIngredients.map((ing, idx) => {
+                            const ingCopy = { ...ing };
+                            if (ingCopy.type === 'COFFEE_BEAN') {
+                                ingCopy.coffee_base_type = coffeeBaseType;
+                            }
+                            let amount = ing.amount;
+                            if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                                amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                            } else {
+                                amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                            }
+                            ingCopy.amount = amount;
+                            ingCopy.ingredient_type = ing.type;
+                            return ingCopy;
+                        })
+                    })
+                });
+                const data = await r.json();
+
+                if (data.recipe_validation) {
+                    let validationClass = "bg-success border-success text-success";
+                    let validationIcon = "bi-check-circle-fill";
+                    if (data.recipe_validation.toLowerCase().includes("warning")) {
+                        validationClass = "bg-warning border-warning text-warning";
+                        validationIcon = "bi-exclamation-triangle-fill";
+                    } else if (data.recipe_validation.toLowerCase().includes("fail")) {
+                        validationClass = "bg-danger border-danger text-danger";
+                        validationIcon = "bi-x-circle-fill";
+                    }
+
+                    let notesHtml = '';
+                    if (data.aggregate_base_metrics && data.aggregate_base_metrics.combined_notes && data.aggregate_base_metrics.combined_notes.length > 0) {
+                        notesHtml = data.aggregate_base_metrics.combined_notes.map(n => `<span class="badge-fizz bg-secondary text-white me-1 mb-1">${n}</span>`).join('');
+                    } else {
+                        notesHtml = '<span class="text-dim">None</span>';
+                    }
+
+                    let baseMixHtml = '';
+                    if (data.ingredients && data.ingredients.coffee_base_mix && data.ingredients.coffee_base_mix.length > 0) {
+                        baseMixHtml = data.ingredients.coffee_base_mix.map(c => `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${c.name}</span>
+                                <span>${c.volume_oz} oz (${c.percentage_of_liquid}%)</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        baseMixHtml = '<div class="text-dim">None</div>';
+                    }
+
+                    let dairyHtml = '';
+                    if (data.ingredients && data.ingredients.dairy_or_filler) {
+                        const df = data.ingredients.dairy_or_filler;
+                        dairyHtml = `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${df.name}</span>
+                                <span>${df.volume_oz} oz (${df.percentage_of_liquid}%)</span>
+                            </div>
+                        `;
+                    }
+
+                    let modifiersHtml = '';
+                    if (data.ingredients && data.ingredients.modifiers && data.ingredients.modifiers.length > 0) {
+                        modifiersHtml = data.ingredients.modifiers.map(m => `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${m.name}</span>
+                                <span>${m.volume_oz} oz (${m.percentage_of_liquid}%)</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        modifiersHtml = '<div class="text-dim">None</div>';
+                    }
+
+                    reportBody.innerHTML = `
+                        <div class="card bg-dark bg-opacity-50 border-white border-opacity-10 rounded-3 mb-3">
+                            <div class="card-body p-3">
+                                <div class="alert ${validationClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3">
+                                    <i class="bi ${validationIcon}"></i>
+                                    <div class="fw-bold small">${data.recipe_validation}</div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">CHEMISTRY METRICS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Body Intensity</span> <span class="fw-bold">${data.aggregate_base_metrics.calculated_body}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Acidity Score</span> <span class="fw-bold">${data.aggregate_base_metrics.calculated_acidity}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Bitterness Score</span> <span class="fw-bold">${data.aggregate_base_metrics.calculated_bitterness}/5.0</span></div>
+                                            <div class="mt-2">
+                                                <span class="d-block text-dim mb-1" style="font-size: 0.65rem;">COMBINED FLAVOR NOTES</span>
+                                                <div class="d-flex flex-wrap">${notesHtml}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Drink Category</span> <span class="fw-bold">${drinkCategory}</span></div>
+                                            <div class="d-flex justify-content-between"><span>Target Cup Size</span> <span class="fw-bold">${coffeeSizeOz} oz</span></div>
+                                            <div class="d-flex justify-content-between"><span>Liquid Budget</span> <span class="fw-bold">${data.liquid_budget_oz} oz</span></div>
+                                            <div class="d-flex justify-content-between"><span>Ice Volume</span> <span class="fw-bold">${data.ice_volume_oz} oz</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3 mb-3">
+                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTION RATIOS</h6>
+                                    <div class="small">
+                                        <div class="mb-2">
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">COFFEE BASE MIX</span>
+                                            ${baseMixHtml}
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">DAIRY / FILLER</span>
+                                            ${dairyHtml}
+                                        </div>
+                                        <div>
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">FLAVOR MODIFIERS</span>
+                                            ${modifiersHtml}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">BARISTA RECOMMENDATIONS</h6>
+                                    <p class="mb-0 italic small text-dim">"${data.barista_notes}"</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Scroll to report
+                    reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
+                }
             } else {
-                reportBody.innerHTML = `<div class="text-warning small">Laboratory Error: ${data.error || 'Synthesis report failed.'}</div>
-                                       <button class="btn btn-xs btn-outline-warning mt-2 w-100" onclick="triggerFlavorSynthesis()">Retry Synthesis</button>`;
+                const r = await fetch('/api/ai/synthesize/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        ingredients: selectedIngredients,
+                        drink_type: currentLabMode
+                    })
+                });
+                const data = await r.json();
+
+                if (data.status === 'success') {
+                    reportBody.innerHTML = `<div style="white-space:pre-line;">${data.summary}</div>`;
+                    // Scroll to report
+                    reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    reportBody.innerHTML = `<div class="text-warning small">Laboratory Error: ${data.error || 'Synthesis report failed.'}</div>
+                                           <button class="btn btn-xs btn-outline-warning mt-2 w-100" onclick="triggerFlavorSynthesis()">Retry Synthesis</button>`;
+                }
             }
         } catch (err) {
             reportBody.innerHTML = `<div class="text-danger small">Connectivity Error: Could not reach the synthesis substrate.</div>
@@ -959,7 +1129,10 @@
                 btn.dataset.complexity || 0,
                 btn.dataset.type || null,
                 btn.dataset.isReadyToDrink === 'true',
-                btn.dataset.isDry === 'true'
+                btn.dataset.isDry === 'true',
+                btn.dataset.roastLevel || null,
+                btn.dataset.flavorNotes || '',
+                btn.dataset.isDecaf === 'true'
             );
         }
     });

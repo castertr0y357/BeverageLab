@@ -288,30 +288,40 @@
             </div>
 
             <div class="glass-card mb-4 p-4 border-white border-opacity-10 bg-primary bg-opacity-5">
-                <h5 class="text-gradient-lab mb-4">Extraction Analysis</h5>
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <label class="readout-label mb-2">Sweetness</label>
-                        <div class="fs-4 fw-bold text-white mb-2">{{ stats.sweetness }}/5.0</div>
-                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
-                            <div class="progress-bar" role="progressbar" style="--p-width: {% widthratio stats.sweetness 5 100 %}%; width: var(--p-width); background: var(--berry-punch); box-shadow: 0 0 10px var(--berry-punch);"></div>
+                {% if recipe.drink_type == 'COFFEE' %}
+                    <h5 class="text-gradient-lab mb-4">Coffee Chemistry & Extraction Analysis</h5>
+                    <div id="coffeeChemistryAnalysis">
+                        <div class="text-center py-2">
+                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                            <span class="ms-2 small text-dim">Analyzing chemistry...</span>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="readout-label mb-2">Acidity</label>
-                        <div class="fs-4 fw-bold text-white mb-2">{{ stats.acidity }}/5.0</div>
-                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
-                            <div class="progress-bar" role="progressbar" style="--p-width: {% widthratio stats.acidity 5 100 %}%; width: var(--p-width); background: var(--citrus-yellow); box-shadow: 0 0 10px var(--citrus-yellow);"></div>
+                {% else %}
+                    <h5 class="text-gradient-lab mb-4">Extraction Analysis</h5>
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <label class="readout-label mb-2">Sweetness</label>
+                            <div class="fs-4 fw-bold text-white mb-2">{{ stats.sweetness }}/5.0</div>
+                            <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                                <div class="progress-bar" role="progressbar" style="--p-width: {% widthratio stats.sweetness 5 100 %}%; width: var(--p-width); background: var(--berry-punch); box-shadow: 0 0 10px var(--berry-punch);"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="readout-label mb-2">Acidity</label>
+                            <div class="fs-4 fw-bold text-white mb-2">{{ stats.acidity }}/5.0</div>
+                            <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                                <div class="progress-bar" role="progressbar" style="--p-width: {% widthratio stats.acidity 5 100 %}%; width: var(--p-width); background: var(--citrus-yellow); box-shadow: 0 0 10px var(--citrus-yellow);"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="readout-label mb-2">Bitterness</label>
+                            <div class="fs-4 fw-bold text-white mb-2">{{ stats.bitterness }}/5.0</div>
+                            <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                                <div class="progress-bar bg-dark" role="progressbar" style="--p-width: {% widthratio stats.bitterness 5 100 %}%; width: var(--p-width);"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="readout-label mb-2">Bitterness</label>
-                        <div class="fs-4 fw-bold text-white mb-2">{{ stats.bitterness }}/5.0</div>
-                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
-                            <div class="progress-bar bg-dark" role="progressbar" style="--p-width: {% widthratio stats.bitterness 5 100 %}%; width: var(--p-width);"></div>
-                        </div>
-                    </div>
-                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -739,6 +749,136 @@
             const bottleCapacity = activeScale * 1000;
             const waterMl = Math.max(0, bottleCapacity - totalSyrup);
             sodaWaterDetailEl.innerHTML = `${Math.round(waterMl)} ml / ${formatImperialVolume(waterMl)}`;
+        }
+
+        if (drinkType === 'COFFEE') {
+            fetchCoffeeChemistry();
+        }
+    }
+
+    async function fetchCoffeeChemistry() {
+        if (drinkType !== 'COFFEE') return;
+        
+        const chemistryContainer = document.getElementById('coffeeChemistryAnalysis');
+        if (!chemistryContainer) return;
+        
+        const ingredients = [];
+        {% for ri in recipe.recipe_ingredients.all %}
+            ingredients.push({
+                id: "{{ ri.ingredient.id }}",
+                name: "{{ ri.ingredient.name }}",
+                ingredient_type: "{{ ri.ingredient.ingredient_type }}",
+                intensity: {{ ri.ingredient.intensity }},
+                acidity: {{ ri.ingredient.acidity }},
+                bitterness: {{ ri.ingredient.bitterness }},
+                complexity: {{ ri.ingredient.complexity }},
+                body_intensity: {{ ri.ingredient.intensity }},
+                acidity_score: {{ ri.ingredient.acidity }},
+                bitterness_score: {{ ri.ingredient.bitterness }},
+                flavor_notes: "{{ ri.ingredient.flavor_notes }}",
+                is_decaf: {% if 'decaf' in ri.ingredient.name|lower %}true{% else %}false{% endif %},
+                amount: parseFloat("{{ ri.amount }}")
+            });
+        {% endfor %}
+
+        let drinkCategory = "Hot Coffee";
+        if (coffeeStyle === 'iced') {
+            drinkCategory = "Iced Coffee";
+        } else if (coffeeStyle === 'espresso_shot') {
+            drinkCategory = "Pure Espresso / Short Milk";
+        }
+
+        try {
+            const r = await fetch('/api/coffee/chemistry/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    drink_category: drinkCategory,
+                    cup_size_oz: coffeeSizeOz,
+                    ingredients: ingredients.map(ing => {
+                        const copy = { ...ing };
+                        if (copy.ingredient_type === 'COFFEE_BEAN') {
+                            copy.coffee_base_type = coffeeBaseType;
+                        }
+                        return copy;
+                    })
+                })
+            });
+            const data = await r.json();
+
+            let validationBadge = '';
+            if (data.recipe_validation) {
+                let badgeClass = "bg-success bg-opacity-10 border-success text-success";
+                if (data.recipe_validation.toLowerCase().includes("warning")) {
+                    badgeClass = "bg-warning bg-opacity-10 border-warning text-warning";
+                } else if (data.recipe_validation.toLowerCase().includes("fail")) {
+                    badgeClass = "bg-danger bg-opacity-10 border-danger text-danger";
+                }
+                validationBadge = `
+                    <div class="alert ${badgeClass} border small py-2 d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        <span class="fw-bold">${data.recipe_validation}</span>
+                    </div>
+                `;
+            }
+
+            const metrics = data.aggregate_base_metrics || {};
+            const notesHtml = (metrics.combined_notes || []).map(n => `<span class="badge-fizz bg-secondary text-white me-1 mb-1">${n}</span>`).join('');
+
+            chemistryContainer.innerHTML = `
+                ${validationBadge}
+                
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <label class="readout-label mb-1">Calculated Body</label>
+                        <div class="fs-4 fw-bold text-white mb-2">${metrics.calculated_body || 0}/5.0</div>
+                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                            <div class="progress-bar" style="width: ${(metrics.calculated_body || 0)/5 * 100}%; background: var(--fizz-amber); box-shadow: 0 0 10px var(--fizz-amber);"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="readout-label mb-1">Calculated Acidity</label>
+                        <div class="fs-4 fw-bold text-white mb-2">${metrics.calculated_acidity || 0}/5.0</div>
+                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                            <div class="progress-bar" style="width: ${(metrics.calculated_acidity || 0)/5 * 100}%; background: var(--citrus-yellow); box-shadow: 0 0 10px var(--citrus-yellow);"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="readout-label mb-1">Calculated Bitterness</label>
+                        <div class="fs-4 fw-bold text-white mb-2">${metrics.calculated_bitterness || 0}/5.0</div>
+                        <div class="progress bg-white bg-opacity-5" style="height: 6px; border-radius: 100px;">
+                            <div class="progress-bar" style="width: ${(metrics.calculated_bitterness || 0)/5 * 100}%; background: #4e342e; box-shadow: 0 0 10px #4e342e;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="readout-card p-2">
+                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">LIQUID BUDGET</span>
+                            <div class="fw-bold fs-5 text-white">${data.liquid_budget_oz} oz</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="readout-card p-2">
+                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">ICE VOLUME</span>
+                            <div class="fw-bold fs-5 text-white">${data.ice_volume_oz} oz</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pt-2 border-top border-white border-opacity-5">
+                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">COMBINED FLAVOR NOTES</span>
+                    <div class="d-flex flex-wrap">${notesHtml || '<span class="text-dim">None</span>'}</div>
+                </div>
+
+                <div class="pt-2 border-top border-white border-opacity-5">
+                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">BARISTA RECOMMENDATION</span>
+                    <p class="mb-0 small text-dim italic">"${data.barista_notes}"</p>
+                </div>
+            `;
+        } catch (err) {
+            console.error("Error fetching coffee chemistry:", err);
         }
     }
 

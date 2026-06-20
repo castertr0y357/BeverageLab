@@ -11,6 +11,7 @@
 - [x] Position dairy as the secondary ingredient in Coffee Lab surprise mixes, and revert all creamers/creams in the database to ADDITIVE status.
 - [x] Upgraded the mixology AI agent to automatically suggest both a base profile (category), ingredient type, and system compatibility in individual material editing and bulk analysis. Implemented system compatibility checks in Standard Mode (filtering cards and recommendation candidates by compatible systems) while allowing any ingredient to be shown or recommended in Experimental Mode.
 - [x] Implement additional creative AI features as requested by user
+- [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` and recipe detail views in `recipe_detail.html` (rendering validation badges, aggregate base metrics, calculated volumes, and barista notes).
 
 ## 🛠️ Completed Tasks
 - [x] Implemented Coffee Chemistry Engine: created a REST API endpoint `/api/coffee/chemistry/` verifying multi-base blending protocols, aggregate metrics, body dilution dairy penalties, flavor note clashes, category volumetric budget rules, espresso vs. standard brew processing guardrails, and flavor hierarchy protocols with modifier cap enforcement. Added 10 verification test cases.
