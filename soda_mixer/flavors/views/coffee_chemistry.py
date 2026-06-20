@@ -45,8 +45,6 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     is_short_milk = "pure espresso" in drink_cat_lower or "short milk" in drink_cat_lower or "cortado" in drink_cat_lower or "cappuccino" in drink_cat_lower
 
     hot_water_vol = 0.0
-    if is_espresso_base and not is_short_milk and "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
-        hot_water_vol = round(cup_size_oz * 0.40, 2)
 
     # 1. Volumetric Budget Rules
     if "iced" in drink_cat_lower:
@@ -236,64 +234,60 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             mod_scores.sort(key=lambda x: (x[0], -x[1]), reverse=True)
             dominant_idx = mod_scores[0][1]
 
-            if has_modifier_amounts and requested_modifier_total > 0.0:
-                for idx, m in enumerate(modified_list):
-                    amt = float(m.get('amount', 0.0))
-                    vol = (amt / requested_modifier_total) * modifier_budget
-                    role = "(Dominant)" if idx == dominant_idx else "(Accent)"
-                    modifiers_output.append({
-                        "name": f"{m.get('name', 'Syrup')} {role}",
-                        "volume_oz": round(vol, 2),
-                        "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
-                    })
-            else:
-                # Dominant modifier gets 60%
-                dominant_budget = modifier_budget * 0.60
-                accent_budget_total = modifier_budget * 0.40
-                accent_count = len(modified_list) - 1
-                accent_budget_each = accent_budget_total / accent_count if accent_count > 0 else 0.0
+            # Dominant modifier gets 60%
+            dominant_budget = modifier_budget * 0.60
+            accent_budget_total = modifier_budget * 0.40
+            accent_count = len(modified_list) - 1
+            accent_budget_each = accent_budget_total / accent_count if accent_count > 0 else 0.0
 
-                for idx, m in enumerate(modified_list):
-                    name = m.get('name', 'Syrup')
-                    if idx == dominant_idx:
-                        vol = dominant_budget
-                        role = "(Dominant)"
-                    else:
-                        vol = accent_budget_each
-                        role = "(Accent)"
-                    
-                    modifiers_output.append({
-                        "name": f"{name} {role}",
-                        "volume_oz": round(vol, 2),
-                        "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
-                    })
+            for idx, m in enumerate(modified_list):
+                name = m.get('name', 'Syrup')
+                if idx == dominant_idx:
+                    vol = dominant_budget
+                    role = "(Dominant)"
+                else:
+                    vol = accent_budget_each
+                    role = "(Accent)"
+                
+                modifiers_output.append({
+                    "name": f"{name} {role}",
+                    "volume_oz": round(vol, 2),
+                    "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
+                })
 
     # 4. Base-Specific Processing Guardrails
-    if is_short_milk:
-        if not is_espresso_base:
+    if is_espresso_base:
+        if is_short_milk:
+            # For pure espresso/short milk, compute shots from bean amount (18g/shot)
+            total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
+            shot_count = max(1, int(round(total_bean_grams / 18.0)))
+            coffee_base_vol = round(shot_count * 0.9, 2)
+            hot_water_vol = 0.0
+        else:
+            # Standard espresso base
+            total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
+            shot_count = max(1, int(round(total_bean_grams / 18.0)))
+            espresso_volume = round(shot_count * 0.9, 2)
+            
+            if "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
+                coffee_base_vol = espresso_volume
+                coffee_total_target = round(cup_size_oz * 0.30, 2)
+                hot_water_vol = max(0.0, round(coffee_total_target - coffee_base_vol, 2))
+            else:
+                coffee_base_vol = espresso_volume
+                hot_water_vol = 0.0
+    else:
+        # Route B: Standard Brew
+        if is_short_milk:
             recipe_validation = "Warning"
             validation_notes = "Warning: Standard Brew is incompatible with Pure Espresso / Short Milk format."
         
-        # Espresso Shots only.
-        if dairy_inputs:
-            coffee_base_pct = 40.0
+        if "iced" in drink_cat_lower:
+            coffee_base_pct = 80.0
         else:
-            coffee_base_pct = 100.0
-    else:
-        if is_espresso_base:
-            # Route A: Espresso concentrate
-            if "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
-                coffee_base_pct = 18.0
-            else:
-                coffee_base_pct = 30.0 # Midpoint of 25%-35%
-        else:
-            # Route B: Standard Brew
-            if "iced" in drink_cat_lower:
-                coffee_base_pct = 80.0 # Midpoint of 75%-80%
-            else:
-                coffee_base_pct = 90.0 # Midpoint of 85%-95%
-
-    coffee_base_vol = liquid_budget_oz * (coffee_base_pct / 100.0)
+            coffee_base_pct = 90.0
+        coffee_base_vol = liquid_budget_oz * (coffee_base_pct / 100.0)
+        hot_water_vol = 0.0
     
     # Calculate secondary liquid (dairy/filler)
     secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget - hot_water_vol

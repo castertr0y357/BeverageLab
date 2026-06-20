@@ -754,7 +754,9 @@
         if (baseType === 'espresso' && isVolumeFiller) {
             const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(sizeOz) : 0;
             const shots = coffeeBaseAmount; // number of shots
-            const remainingOz = sizeOz - iceOz - shots;
+            const espressoVol = shots * 0.9;
+            const hotWaterOz = (coffeeStyle === 'hot' && coffeeEspressoHotMode === 'water') ? Math.max(0, (sizeOz * 0.30) - espressoVol) : 0;
+            const remainingOz = sizeOz - iceOz - espressoVol - hotWaterOz;
             const targetAdditiveMl = remainingOz * 29.5735;
             return Math.max(30.0, Math.round(targetAdditiveMl));
         }
@@ -2284,7 +2286,7 @@
 
             // 💧 Inject virtual Hot Water card right next to the coffee base for hot espresso in water mode
             if (currentLabMode === 'COFFEE' && isDryCoffee && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water') {
-                const hotWaterOz = (coffeeSizeOz * 0.40).toFixed(1);
+                const hotWaterOz = Math.max(0, (coffeeSizeOz * 0.30) - (coffeeBaseAmount * 0.9)).toFixed(1);
                 const hotWaterMl = Math.round(hotWaterOz * 29.5735);
                 html += `
                     <div class="col-auto">
