@@ -44,13 +44,13 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     # Route Pure Espresso / Short Milk
     is_short_milk = "pure espresso" in drink_cat_lower or "short milk" in drink_cat_lower or "cortado" in drink_cat_lower or "cappuccino" in drink_cat_lower
 
-    hot_water_vol = 0.0
-
-    # 1. Volumetric Budget Rules
+    # 1. Volumetric Space Allocation & Budget
     if "iced" in drink_cat_lower:
+        style_str = "Iced"
         ice_volume_oz = round(cup_size_oz * 0.40, 2)
         liquid_budget_oz = round(cup_size_oz * 0.60, 2)
     else:
+        style_str = "Hot"
         ice_volume_oz = 0.0
         liquid_budget_oz = cup_size_oz
 
@@ -60,7 +60,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     modifier_inputs = []
 
     for ing in ingredients_input:
-        itype = str(ing.get('ingredient_type', '')).upper()
+        itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
         if itype == 'COFFEE_BEAN':
             coffee_inputs.append(ing)
         elif itype == 'DAIRY':
@@ -82,6 +82,22 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         logger.warning("CoffeeChemistry - Warning - No coffee base components provided.")
         return JsonResponse({
             "recipe_validation": "Fail: No coffee base components provided.",
+            "drink_metrics": {
+                "style": style_str,
+                "cup_size_oz": cup_size_oz,
+                "ice_space_reserved_oz": ice_volume_oz,
+                "total_liquid_budget_oz": liquid_budget_oz
+            },
+            "ingredients": {
+                "coffee_base": {"name": "None", "shots": 0, "volume_oz": 0.0},
+                "base_modifiers": [],
+                "payload_filler": {"name": "None", "volume_oz": 0.0},
+                "flavor_modifiers": [],
+                "coffee_base_mix": [],
+                "dairy_or_filler": {"name": "None", "volume_oz": 0.0, "percentage_of_liquid": 0.0},
+                "modifiers": []
+            },
+            "barista_notes": "Decommissioned: Formula lacks active extraction baseline.",
             "aggregate_base_metrics": {
                 "calculated_body": 0.0,
                 "calculated_acidity": 0.0,
@@ -90,12 +106,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             },
             "ice_volume_oz": ice_volume_oz,
             "liquid_budget_oz": liquid_budget_oz,
-            "ingredients": {
-                "coffee_base_mix": [],
-                "dairy_or_filler": {"name": "None", "volume_oz": 0.0, "percentage_of_liquid": 0.0},
-                "modifiers": []
-            },
-            "barista_notes": "Decommissioned: Formula lacks active extraction baseline."
+            "hot_water_volume_oz": 0.0
         })
 
     # Blending Ratios
@@ -178,7 +189,6 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         validation_notes = "Warning: High-acidity blend may clash with caramelized syrups. Modifiers adjusted to neutral profiles."
 
     # 3. Flavor Balancing & "Modifier Crowding" Rules
-    # Sum modifier requested volumes, default to 10% of liquid budget if not specified
     requested_modifier_total = 0.0
     has_modifier_amounts = False
     for m in modified_list:
@@ -188,30 +198,25 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             has_modifier_amounts = True
 
     if not has_modifier_amounts:
-        # Default to 10% of liquid budget total
         modifier_budget = liquid_budget_oz * 0.10 if modified_list else 0.0
     else:
         modifier_budget = requested_modifier_total
 
-    # Strict Cap at 15% maximum
+    # Strict Cap at 15% maximum of Liquid Space
     max_modifier_cap = liquid_budget_oz * 0.15
     if modifier_budget > max_modifier_cap:
         modifier_budget = max_modifier_cap
 
-    # Execute the Flavor Hierarchy Protocol if there are multiple syrups
-    modifiers_output = []
+    # Re-calculate exact modifier budget shares (60% dominant, 40% accent split)
+    flavor_modifiers_output = []
     if modified_list:
         if len(modified_list) == 1:
-            # Only one syrup, gets 100% of budget
             name = modified_list[0].get('name', 'Syrup')
-            modifiers_output.append({
+            flavor_modifiers_output.append({
                 "name": f"{name} (Dominant)",
-                "volume_oz": round(modifier_budget, 2),
-                "percentage_of_liquid": round((modifier_budget / liquid_budget_oz) * 100, 2)
+                "volume_oz": round(modifier_budget, 2)
             })
         else:
-            # Score compatibility against aggregate profile
-            # Dark/Chocolaty aggregates
             group_dark_chocolaty = {'chocolate', 'dark', 'cocoa', 'nutty', 'roasted', 'smoky', 'caramel', 'sweet'}
             is_dark_base = any(note in group_dark_chocolaty for note in combined_notes)
             is_earthy_base = has_earthy_herbal
@@ -230,11 +235,9 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                 
                 mod_scores.append((score, idx))
 
-            # Sort by score descending, breaking ties by index (first in list)
             mod_scores.sort(key=lambda x: (x[0], -x[1]), reverse=True)
             dominant_idx = mod_scores[0][1]
 
-            # Dominant modifier gets 60%
             dominant_budget = modifier_budget * 0.60
             accent_budget_total = modifier_budget * 0.40
             accent_count = len(modified_list) - 1
@@ -249,53 +252,42 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                     vol = accent_budget_each
                     role = "(Accent)"
                 
-                modifiers_output.append({
+                flavor_modifiers_output.append({
                     "name": f"{name} {role}",
-                    "volume_oz": round(vol, 2),
-                    "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
+                    "volume_oz": round(vol, 2)
                 })
 
     # 4. Base-Specific Processing Guardrails
+    total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
+    
     if is_espresso_base:
+        shot_count = max(1, int(round(total_bean_grams / 18.0)))
+        coffee_base_vol = round(shot_count * 0.9, 2)
+        
         if is_short_milk:
-            # For pure espresso/short milk, compute shots from bean amount (18g/shot)
-            total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
-            shot_count = max(1, int(round(total_bean_grams / 18.0)))
-            coffee_base_vol = round(shot_count * 0.9, 2)
             hot_water_vol = 0.0
         else:
-            # Standard espresso base
-            total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
-            shot_count = max(1, int(round(total_bean_grams / 18.0)))
-            espresso_volume = round(shot_count * 0.9, 2)
-            
             if "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
-                coffee_base_vol = espresso_volume
-                coffee_total_target = round(cup_size_oz * 0.30, 2)
-                hot_water_vol = max(0.0, round(coffee_total_target - coffee_base_vol, 2))
+                hot_water_vol = coffee_base_vol  # 1:1 dilution ratio
             else:
-                coffee_base_vol = espresso_volume
                 hot_water_vol = 0.0
     else:
         # Route B: Standard Brew
+        shot_count = 0
+        coffee_base_vol = round(total_bean_grams * (6.0 / 7.0), 2)
+        coffee_base_vol = min(coffee_base_vol, liquid_budget_oz)
+        hot_water_vol = 0.0
         if is_short_milk:
             recipe_validation = "Warning"
             validation_notes = "Warning: Standard Brew is incompatible with Pure Espresso / Short Milk format."
-        
-        if "iced" in drink_cat_lower:
-            coffee_base_pct = 80.0
-        else:
-            coffee_base_pct = 90.0
-        coffee_base_vol = liquid_budget_oz * (coffee_base_pct / 100.0)
-        hot_water_vol = 0.0
-    
-    # Calculate secondary liquid (dairy/filler)
+
+    # 5. Dynamic Whole Milk / Dairy Payload (Floating Filler Rule)
     secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget - hot_water_vol
     if secondary_liquid_vol < 0.0:
         secondary_liquid_vol = 0.0
 
-    # Apply Route A thermal dilution factor (Iced Espresso only)
-    if is_espresso_base and "iced" in drink_cat_lower and not is_short_milk:
+    # Apply Melt-Tax Protocol (Category A: Iced only)
+    if "iced" in drink_cat_lower and not is_short_milk:
         secondary_liquid_vol = secondary_liquid_vol * 0.9
 
     # Apply Body Dilution penalty (reduce total dairy volume by 10%)
@@ -305,37 +297,23 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             recipe_validation = "Warning"
             validation_notes = "Warning: Low aggregate body intensity (< 3.5). Dairy threshold reduced to prevent masking."
 
-    # Round volumes
+    # Round final volumes
     coffee_base_vol = round(coffee_base_vol, 2)
     secondary_liquid_vol = round(secondary_liquid_vol, 2)
+    hot_water_vol = round(hot_water_vol, 2)
 
-    # Assign individual coffee component volumes
-    coffee_base_mix_output = []
-    for idx, c in enumerate(coffee_inputs):
-        ratio = ratios[idx]
-        vol = coffee_base_vol * ratio
-        coffee_base_mix_output.append({
-            "name": c.get('name', 'Coffee'),
-            "volume_oz": round(vol, 2),
-            "percentage_of_liquid": round((vol / liquid_budget_oz) * 100, 2)
-        })
-
+    # Base Modifiers format
+    base_modifiers_output = []
     if hot_water_vol > 0.0:
-        coffee_base_mix_output.append({
-            "name": "Hot Water",
-            "volume_oz": round(hot_water_vol, 2),
-            "percentage_of_liquid": round((hot_water_vol / liquid_budget_oz) * 100, 2)
+        base_modifiers_output.append({
+            "name": "Hot Water (Americano Toggle)",
+            "volume_oz": hot_water_vol
         })
 
     # Dairy or Filler formatting
     dairy_name = dairy_inputs[0].get('name', 'Whole Milk') if dairy_inputs else ("Hot Water" if not is_espresso_base and not dairy_inputs else "Whole Milk")
-    dairy_output = {
-        "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
-        "volume_oz": round(secondary_liquid_vol, 2),
-        "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2)
-    }
-
-    # 5. Barista Notes
+    
+    # Barista Notes
     barista_notes = "Extraction and chemistry parameters are balanced. Serve and enjoy!"
     if "iced" in drink_cat_lower:
         if is_espresso_base:
@@ -347,9 +325,58 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     elif body_dilution:
         barista_notes = "Low aggregate body intensity detected. Dairy volume penalized by 10% to preserve coffee flavor definition."
 
-    # Final response structure
+    # Construct final v3.0 JSON output format
     res_data = {
         "recipe_validation": validation_notes if validation_notes else recipe_validation,
+        "drink_metrics": {
+            "style": style_str,
+            "cup_size_oz": cup_size_oz,
+            "ice_space_reserved_oz": ice_volume_oz,
+            "total_liquid_budget_oz": liquid_budget_oz
+        },
+        "ingredients": {
+            "coffee_base": {
+                "name": coffee_inputs[0].get('name', 'Espresso Extraction') if coffee_inputs else "Espresso Extraction",
+                "shots": shot_count,
+                "volume_oz": coffee_base_vol
+            },
+            "base_modifiers": base_modifiers_output,
+            "payload_filler": {
+                "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
+                "volume_oz": secondary_liquid_vol
+            },
+            "flavor_modifiers": flavor_modifiers_output,
+            # backward compatibility keys for UI:
+            "coffee_base_mix": [
+                {
+                    "name": coffee_inputs[idx].get('name', 'Coffee'),
+                    "volume_oz": round(coffee_base_vol * ratios[idx], 2),
+                    "percentage_of_liquid": round((coffee_base_vol * ratios[idx] / liquid_budget_oz) * 100, 2)
+                }
+                for idx in range(len(coffee_inputs))
+            ] + ([
+                {
+                    "name": "Hot Water",
+                    "volume_oz": hot_water_vol,
+                    "percentage_of_liquid": round((hot_water_vol / liquid_budget_oz) * 100, 2)
+                }
+            ] if hot_water_vol > 0.0 else []),
+            "dairy_or_filler": {
+                "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
+                "volume_oz": secondary_liquid_vol,
+                "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2)
+            },
+            "modifiers": [
+                {
+                    "name": m["name"],
+                    "volume_oz": m["volume_oz"],
+                    "percentage_of_liquid": round((m["volume_oz"] / liquid_budget_oz) * 100, 2)
+                }
+                for m in flavor_modifiers_output
+            ]
+        },
+        "barista_notes": barista_notes,
+        # backward compatibility keys for UI:
         "aggregate_base_metrics": {
             "calculated_body": calculated_body,
             "calculated_acidity": calculated_acidity,
@@ -358,13 +385,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         },
         "ice_volume_oz": ice_volume_oz,
         "liquid_budget_oz": liquid_budget_oz,
-        "hot_water_volume_oz": round(hot_water_vol, 2),
-        "ingredients": {
-            "coffee_base_mix": coffee_base_mix_output,
-            "dairy_or_filler": dairy_output,
-            "modifiers": modifiers_output
-        },
-        "barista_notes": barista_notes
+        "hot_water_volume_oz": hot_water_vol
     }
 
     return JsonResponse(res_data)

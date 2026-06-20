@@ -1869,10 +1869,12 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         data = response.json()
         self.assertEqual(data['ice_volume_oz'], 0.0)
         self.assertEqual(data['liquid_budget_oz'], 16.0)
-        # Route B Standard Brew: 90% of liquid budget = 16.0 * 0.9 = 14.4oz
-        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 14.4)
-        # Secondary liquid: 16.0 - 14.4 = 1.6oz
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 1.6)
+        # Standard Brew: 18g * (6/7) = 15.43oz
+        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 15.43)
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 15.43)
+        # Secondary liquid: 16.0 - 15.43 = 0.57oz
+        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 0.57)
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 0.57)
 
     def test_iced_coffee_standard_brew_budget(self) -> None:
         response = self.client.post(
@@ -1901,10 +1903,12 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         # Iced Coffee: 40% ice = 4.0oz, 60% liquid = 6.0oz
         self.assertEqual(data['ice_volume_oz'], 4.0)
         self.assertEqual(data['liquid_budget_oz'], 6.0)
-        # Route B Standard Brew in Iced: 80% of liquid budget = 6.0 * 0.8 = 4.8oz
-        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 4.8)
-        # Secondary liquid: 6.0 - 4.8 = 1.2oz
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 1.2)
+        # Standard Brew capped at 6.0oz liquid budget
+        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 6.0)
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 6.0)
+        # Secondary liquid: 6.0 - 6.0 = 0.0oz
+        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 0.0)
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 0.0)
 
     def test_modifier_hierarchy(self) -> None:
         response = self.client.post(
@@ -1966,13 +1970,13 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['hot_water_volume_oz'], 2.7)
+        self.assertEqual(data['hot_water_volume_oz'], 0.9)
         base_mix = data['ingredients']['coffee_base_mix']
         self.assertEqual(len(base_mix), 2)
         bean_part = next(c for c in base_mix if c['name'] == 'Espresso Bean')
         water_part = next(c for c in base_mix if c['name'] == 'Hot Water')
         self.assertEqual(bean_part['volume_oz'], 0.9)
-        self.assertEqual(water_part['volume_oz'], 2.7)
+        self.assertEqual(water_part['volume_oz'], 0.9)
 
 
 

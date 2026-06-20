@@ -729,12 +729,33 @@
                     if (coffeeStyle === 'espresso_shot') {
                         amount = (isVolumeFiller || ingredientType === 'ADDITIVE') ? 10.0 : 8.0;
                     } else if (coffeeBaseType === 'espresso' && isVolumeFiller) {
-                        const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(coffeeSizeOz) : 0;
-                        const shots = coffeeBaseAmount;
-                        const espressoVol = shots * 0.9;
-                        const hotWaterOz = (coffeeStyle === 'hot' && coffeeEspressoHotMode === 'water') ? Math.max(0, (coffeeSizeOz * 0.30) - espressoVol) : 0;
-                        const remainingOz = coffeeSizeOz - iceOz - espressoVol - hotWaterOz;
-                        amount = Math.max(30.0, Math.round(remainingOz * 29.5735));
+                        const liquidBudget = (coffeeStyle === 'iced') ? coffeeSizeOz * 0.6 : coffeeSizeOz;
+                        const espressoVol = coffeeBaseAmount * 0.9;
+                        const hotWaterVol = (coffeeStyle !== 'iced' && coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
+                        
+                        let modifierVolOz = 0;
+                        amountDisplays.forEach((otherEl) => {
+                            const otherIngType = otherEl.getAttribute('data-ingredient-type');
+                            const otherIsDry = otherEl.getAttribute('data-is-dry') === 'true';
+                            if (otherIngType !== 'COFFEE_BEAN' && otherIngType !== 'DAIRY' && !otherIsDry) {
+                                const otherOrigAmt = parseFloat(otherEl.getAttribute('data-original-amount'));
+                                if (!isNaN(otherOrigAmt)) {
+                                    let otherAmt = otherOrigAmt * scaleFactor;
+                                    modifierVolOz += otherAmt / 29.5735;
+                                }
+                            }
+                        });
+                        const maxModifiersOz = liquidBudget * 0.15;
+                        if (modifierVolOz > maxModifiersOz) {
+                            modifierVolOz = maxModifiersOz;
+                        }
+                        
+                        let dairyVol = liquidBudget - espressoVol - modifierVolOz - hotWaterVol;
+                        if (dairyVol < 0.0) dairyVol = 0.0;
+                        if (coffeeStyle === 'iced') {
+                            dairyVol = dairyVol * 0.9;
+                        }
+                        amount = Math.max(30.0, Math.round(dairyVol * 29.5735));
                     } else {
                         amount = originalAmount * scaleFactor;
                     }
@@ -776,7 +797,7 @@
         }
         const hotWaterDetailEl = document.getElementById('hotWaterDetailVolume');
         if (hotWaterDetailEl) {
-            const hotWaterOz = Math.max(0, (coffeeSizeOz * 0.30) - (coffeeBaseAmount * 0.9)).toFixed(1);
+            const hotWaterOz = (coffeeBaseAmount * 0.9).toFixed(1);
             const hotWaterMl = Math.round(hotWaterOz * 29.5735);
             hotWaterDetailEl.innerHTML = `${hotWaterOz} oz / ~${hotWaterMl} ml`;
         }

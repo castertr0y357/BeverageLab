@@ -348,19 +348,42 @@
         }
         
         if (itypeCategory === 'coffee') {
-            const list = latestCoffeeChemistryData.ingredients.coffee_base_mix || [];
-            if (countInCat < list.length) {
-                return list[countInCat];
+            const cb = latestCoffeeChemistryData.ingredients.coffee_base;
+            if (cb) {
+                const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+                const totalAmt = coffeeBeans.reduce((sum, x) => sum + parseFloat(x.amount || 0), 0);
+                const thisAmt = parseFloat(ing.amount || 0);
+                const ratio = totalAmt > 0 ? (thisAmt / totalAmt) : 1.0;
+                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                const pct = budget > 0 ? (((cb.volume_oz * ratio) / budget) * 100).toFixed(1) : '0';
+                return {
+                    name: cb.name,
+                    volume_oz: cb.volume_oz * ratio,
+                    percentage_of_liquid: pct
+                };
             }
         } else if (itypeCategory === 'dairy') {
-            const item = latestCoffeeChemistryData.ingredients.dairy_or_filler;
-            if (item && item.name !== 'None') {
-                return item;
+            const pf = latestCoffeeChemistryData.ingredients.payload_filler;
+            if (pf && pf.name !== 'None') {
+                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                const pct = budget > 0 ? ((pf.volume_oz / budget) * 100).toFixed(1) : '0';
+                return {
+                    name: pf.name,
+                    volume_oz: pf.volume_oz,
+                    percentage_of_liquid: pct
+                };
             }
         } else if (itypeCategory === 'modifier') {
-            const list = latestCoffeeChemistryData.ingredients.modifiers || [];
+            const list = latestCoffeeChemistryData.ingredients.flavor_modifiers || [];
             if (countInCat < list.length) {
-                return list[countInCat];
+                const fm = list[countInCat];
+                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                const pct = budget > 0 ? ((fm.volume_oz / budget) * 100).toFixed(1) : '0';
+                return {
+                    name: fm.name,
+                    volume_oz: fm.volume_oz,
+                    percentage_of_liquid: pct
+                };
             }
         }
         return null;
@@ -752,12 +775,30 @@
 
         // Scale ready-to-drink volume filler to fill remaining volume for espresso bases
         if (baseType === 'espresso' && isVolumeFiller) {
-            const iceOz = (coffeeStyle === 'iced') ? getIceAmountOz(sizeOz) : 0;
-            const shots = coffeeBaseAmount; // number of shots
-            const espressoVol = shots * 0.9;
-            const hotWaterOz = (coffeeStyle === 'hot' && coffeeEspressoHotMode === 'water') ? Math.max(0, (sizeOz * 0.30) - espressoVol) : 0;
-            const remainingOz = sizeOz - iceOz - espressoVol - hotWaterOz;
-            const targetAdditiveMl = remainingOz * 29.5735;
+            const liquidBudget = (coffeeStyle === 'iced') ? sizeOz * 0.6 : sizeOz;
+            const espressoVol = coffeeBaseAmount * 0.9;
+            const hotWaterVol = (coffeeStyle !== 'iced' && coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
+            
+            let modifierVolOz = 0;
+            selectedIngredients.forEach((otherIng) => {
+                const otherType = (otherIng.type || otherIng.ingredient_type || '').toUpperCase();
+                if (otherType !== 'COFFEE_BEAN' && otherType !== 'DAIRY' && !otherIng.isReadyToDrink) {
+                    const scale = (sizeOz / 12.0) * (coffeeStyle === 'iced' ? 0.6 : 1.0);
+                    const volMl = 30.0 * scale;
+                    modifierVolOz += volMl / 29.5735;
+                }
+            });
+            const maxModifiersOz = liquidBudget * 0.15;
+            if (modifierVolOz > maxModifiersOz) {
+                modifierVolOz = maxModifiersOz;
+            }
+            
+            let dairyVol = liquidBudget - espressoVol - modifierVolOz - hotWaterVol;
+            if (dairyVol < 0.0) dairyVol = 0.0;
+            if (coffeeStyle === 'iced') {
+                dairyVol = dairyVol * 0.9;
+            }
+            const targetAdditiveMl = dairyVol * 29.5735;
             return Math.max(30.0, Math.round(targetAdditiveMl));
         }
 
@@ -1230,35 +1271,53 @@
                         notesHtml = '<span class="text-dim">None</span>';
                     }
 
+                    const budget = data.drink_metrics.total_liquid_budget_oz || 1.0;
+                    const getPct = (vol) => budget > 0 ? ((vol / budget) * 100).toFixed(1) : '0';
+
                     let baseMixHtml = '';
-                    if (data.ingredients && data.ingredients.coffee_base_mix && data.ingredients.coffee_base_mix.length > 0) {
-                        baseMixHtml = data.ingredients.coffee_base_mix.map(c => `
+                    if (data.ingredients && data.ingredients.coffee_base) {
+                        const cb = data.ingredients.coffee_base;
+                        const shotsText = cb.shots > 0 ? ` (${cb.shots} shot${cb.shots !== 1 ? 's' : ''})` : '';
+                        baseMixHtml += `
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold">${c.name}</span>
-                                <span>${c.volume_oz} oz (${c.percentage_of_liquid}%)</span>
+                                <span class="fw-bold">${cb.name}${shotsText}</span>
+                                <span>${cb.volume_oz} oz (${getPct(cb.volume_oz)}%)</span>
+                            </div>
+                        `;
+                    }
+                    if (data.ingredients && data.ingredients.base_modifiers && data.ingredients.base_modifiers.length > 0) {
+                        baseMixHtml += data.ingredients.base_modifiers.map(bm => `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${bm.name}</span>
+                                <span>${bm.volume_oz} oz (${getPct(bm.volume_oz)}%)</span>
                             </div>
                         `).join('');
-                    } else {
+                    }
+                    if (!baseMixHtml) {
                         baseMixHtml = '<div class="text-dim">None</div>';
                     }
 
                     let dairyHtml = '';
-                    if (data.ingredients && data.ingredients.dairy_or_filler) {
-                        const df = data.ingredients.dairy_or_filler;
-                        dairyHtml = `
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold">${df.name}</span>
-                                <span>${df.volume_oz} oz (${df.percentage_of_liquid}%)</span>
-                            </div>
-                        `;
+                    if (data.ingredients && data.ingredients.payload_filler) {
+                        const pf = data.ingredients.payload_filler;
+                        if (pf.name !== 'None') {
+                            dairyHtml = `
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold">${pf.name}</span>
+                                    <span>${pf.volume_oz} oz (${getPct(pf.volume_oz)}%)</span>
+                                </div>
+                            `;
+                        } else {
+                            dairyHtml = '<div class="text-dim">None</div>';
+                        }
                     }
 
                     let modifiersHtml = '';
-                    if (data.ingredients && data.ingredients.modifiers && data.ingredients.modifiers.length > 0) {
-                        modifiersHtml = data.ingredients.modifiers.map(m => `
+                    if (data.ingredients && data.ingredients.flavor_modifiers && data.ingredients.flavor_modifiers.length > 0) {
+                        modifiersHtml = data.ingredients.flavor_modifiers.map(m => `
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <span class="fw-bold">${m.name}</span>
-                                <span>${m.volume_oz} oz (${m.percentage_of_liquid}%)</span>
+                                <span>${m.volume_oz} oz (${getPct(m.volume_oz)}%)</span>
                             </div>
                         `).join('');
                     } else {
@@ -2286,7 +2345,7 @@
 
             // 💧 Inject virtual Hot Water card right next to the coffee base for hot espresso in water mode
             if (currentLabMode === 'COFFEE' && isDryCoffee && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water') {
-                const hotWaterOz = Math.max(0, (coffeeSizeOz * 0.30) - (coffeeBaseAmount * 0.9)).toFixed(1);
+                const hotWaterOz = (coffeeBaseAmount * 0.9).toFixed(1);
                 const hotWaterMl = Math.round(hotWaterOz * 29.5735);
                 html += `
                     <div class="col-auto">
