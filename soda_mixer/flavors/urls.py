@@ -52,6 +52,7 @@ urlpatterns = [
     path('api/ai/analyze-ingredient/', views.ai_analyze_ingredient_api, name='ai_analyze_ingredient_api'),
     path('api/ai/bulk-analyze/', views.ai_bulk_analyze_api, name='ai_bulk_analyze_api'),
     path('api/random-pairing/', views.random_pairing_api, name='random_pairing_api'),
+    path('api/coffee/chemistry/', views.coffee_chemistry_api, name='coffee_chemistry_api'),
     
     # Auth
     path('login/', views.login_view, name='login'),

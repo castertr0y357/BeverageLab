@@ -21,6 +21,7 @@ from .ai import (
 )
 from .auth import login_view, login_api, logout_api
 from .settings import settings_view, save_settings_api, export_data, import_data
+from .coffee_chemistry import coffee_chemistry_api
 
 __all__ = [
     'home', 'ingredient_list', 'ingredient_detail', 'recipe_list', 'recipe_detail', 'mix_history_list',
@@ -33,6 +34,7 @@ __all__ = [
     'ai_chat_api', 'save_llm_provider_api', 'delete_llm_provider_api',
     'fetch_provider_models_api', 'discover_provider_models_api', 'ai_suggest_api',
     'ai_synthesize_api', 'ai_analyze_ingredient_api', 'ai_bulk_analyze_api', 'random_pairing_api',
+    'coffee_chemistry_api',
     'login_view', 'login_api', 'logout_api',
     'settings_view', 'save_settings_api', 'export_data', 'import_data'
 ]

@@ -1614,3 +1614,337 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         ing.refresh_from_db()
         self.assertTrue(ing.is_dry)
 
+
+class BeverageLabCoffeeChemistryTest(TestCase):
+    """Test suite for the new Coffee Chemistry Engine API."""
+
+    def setUp(self) -> None:
+        from django.contrib.auth.models import User
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
+
+    def test_empty_ingredients(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': []
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Fail", data['recipe_validation'])
+        self.assertEqual(data['ingredients']['coffee_base_mix'], [])
+
+    def test_single_base_metrics(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Kenya AA',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 3.0,
+                        'acidity_score': 5.0,
+                        'bitterness_score': 2.0,
+                        'flavor_notes': ['citrus', 'blackcurrant'],
+                        'is_decaf': False,
+                        'amount': 18.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        metrics = data['aggregate_base_metrics']
+        self.assertEqual(metrics['calculated_body'], 3.0)
+        self.assertEqual(metrics['calculated_acidity'], 5.0)
+        self.assertEqual(metrics['calculated_bitterness'], 2.0)
+        self.assertEqual(metrics['combined_notes'], ['blackcurrant', 'citrus'])
+
+    def test_multi_base_metrics(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Coffee A',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 4.0,
+                        'acidity_score': 2.0,
+                        'bitterness_score': 3.0,
+                        'flavor_notes': ['chocolate'],
+                        'ratio': 1.0
+                    },
+                    {
+                        'name': 'Coffee B',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 2.0,
+                        'acidity_score': 4.0,
+                        'bitterness_score': 3.0,
+                        'flavor_notes': ['floral'],
+                        'ratio': 3.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        metrics = data['aggregate_base_metrics']
+        # Weighted body = (1*4 + 3*2) / 4 = 2.5
+        # Weighted acidity = (1*2 + 3*4) / 4 = 3.5
+        # Weighted bitterness = (1*3 + 3*3) / 4 = 3.0
+        self.assertEqual(metrics['calculated_body'], 2.5)
+        self.assertEqual(metrics['calculated_acidity'], 3.5)
+        self.assertEqual(metrics['calculated_bitterness'], 3.0)
+        self.assertEqual(metrics['combined_notes'], ['chocolate', 'floral'])
+
+    def test_body_dilution_dairy_penalty(self) -> None:
+        # Low body (2.5) triggers body dilution -> dairy threshold penalized by 10%
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 10.0,
+                'ingredients': [
+                    {
+                        'name': 'Light Blend',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 2.5,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Oat Milk',
+                        'ingredient_type': 'DAIRY',
+                        'amount': 5.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Warning", data['recipe_validation'])
+        # Hot coffee (espresso base default): budget 10.0oz
+        # Espresso base = 3.0oz (30% of 10.0)
+        # Modifiers = 0.0oz
+        # Dairy pre-penalty volume = 10.0 - 3.0 - 0.0 = 7.0oz
+        # Body dilution penalty = 7.0 * 0.9 = 6.3oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 6.3)
+
+    def test_flavor_clashing_and_renaming(self) -> None:
+        # Earthy + Citrus clashing
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Coffee A',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'flavor_notes': ['earthy'],
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Coffee B',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'flavor_notes': ['citrus'],
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Caramel Sauce',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 1.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Warning", data['recipe_validation'])
+        self.assertIn("High-acidity blend may clash", data['recipe_validation'])
+        # Carriage check: caramel modifier renamed to "Vanilla Syrup (Dominant)" or neutral equivalent
+        mods = data['ingredients']['modifiers']
+        self.assertEqual(len(mods), 1)
+        self.assertEqual(mods[0]['name'], "Vanilla Syrup (Dominant)")
+
+    def test_pure_espresso_short_milk_budget(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Pure Espresso / Short Milk',
+                'cup_size_oz': 8.0,
+                'ingredients': [
+                    {
+                        'name': 'Espresso Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 4.5,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY',
+                        'amount': 4.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['ice_volume_oz'], 0.0)
+        self.assertEqual(data['liquid_budget_oz'], 8.0)
+        # Short milk with dairy: 40% coffee base, 60% dairy
+        # Coffee base volume = 8.0 * 0.4 = 3.2oz
+        # Dairy volume = 8.0 * 0.6 = 4.8oz
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 3.2)
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 4.8)
+
+    def test_iced_coffee_espresso_budget_and_thermal_dilution(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Iced Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Espresso Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 4.0,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY'
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Iced Coffee: 40% ice, 60% liquid
+        self.assertEqual(data['ice_volume_oz'], 4.8)
+        self.assertEqual(data['liquid_budget_oz'], 7.2)
+        # Espresso base in hot/iced: 30% of liquid budget = 7.2 * 0.3 = 2.16oz
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 2.16)
+        # Secondary liquid before thermal dilution: 7.2 - 2.16 = 5.04oz
+        # Thermal dilution reduction: 5.04 * 0.9 = 4.536 -> ~4.54oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 4.54)
+
+    def test_hot_coffee_standard_brew_budget(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 16.0,
+                'ingredients': [
+                    {
+                        'name': 'Drip Blend',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'coffee_base_type': 'standard_brew',
+                        'amount': 18.0,
+                        'body_intensity': 4.0
+                    },
+                    {
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY'
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['ice_volume_oz'], 0.0)
+        self.assertEqual(data['liquid_budget_oz'], 16.0)
+        # Route B Standard Brew: 90% of liquid budget = 16.0 * 0.9 = 14.4oz
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 14.4)
+        # Secondary liquid: 16.0 - 14.4 = 1.6oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 1.6)
+
+    def test_iced_coffee_standard_brew_budget(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Iced Coffee',
+                'cup_size_oz': 10.0,
+                'ingredients': [
+                    {
+                        'name': 'Brew Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'coffee_base_type': 'standard_brew',
+                        'amount': 18.0,
+                        'body_intensity': 4.0
+                    },
+                    {
+                        'name': 'Oat Milk',
+                        'ingredient_type': 'DAIRY'
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Iced Coffee: 40% ice = 4.0oz, 60% liquid = 6.0oz
+        self.assertEqual(data['ice_volume_oz'], 4.0)
+        self.assertEqual(data['liquid_budget_oz'], 6.0)
+        # Route B Standard Brew in Iced: 80% of liquid budget = 6.0 * 0.8 = 4.8oz
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 4.8)
+        # Secondary liquid: 6.0 - 4.8 = 1.2oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 1.2)
+
+    def test_modifier_hierarchy(self) -> None:
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Dark Roast',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'flavor_notes': ['chocolate'],
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Caramel Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 1.0
+                    },
+                    {
+                        'name': 'Strawberry Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 0.5
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        mods = data['ingredients']['modifiers']
+        # Total modifier budget: 1.0 + 0.5 = 1.5oz.
+        # Max modifier cap: 12.0 * 0.15 = 1.8oz (1.5oz is within cap).
+        # Caramel Syrup matches Dark Roast (chocolate) perfectly -> Dominant (60% of 1.5 = 0.9oz)
+        # Strawberry Syrup is Accent (40% of 1.5 = 0.6oz)
+        caramel_mod = next(m for m in mods if "Caramel" in m['name'])
+        strawberry_mod = next(m for m in mods if "Strawberry" in m['name'])
+        self.assertIn("Dominant", caramel_mod['name'])
+        self.assertIn("Accent", strawberry_mod['name'])
+        self.assertEqual(caramel_mod['volume_oz'], 0.9)
+        self.assertEqual(strawberry_mod['volume_oz'], 0.6)
+
+
