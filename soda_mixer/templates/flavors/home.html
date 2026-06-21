@@ -2040,6 +2040,12 @@
             if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
                 console.log("Applying Neural Re-balancing:", data.rebalancing);
                 selectedIngredients.forEach((ing, index) => {
+                    // Coffee beans are governed by the shot/gram budget system, never by AI rebalancing
+                    const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
+                    if (ingType === 'COFFEE_BEAN') {
+                        console.log(`Skipping neural re-balancing for coffee bean (chemistry-managed): ${ing.name}`);
+                        return;
+                    }
                     if (ing.isUserOverridden) {
                         console.log(`Skipping neural re-balancing for user-overridden ingredient: ${ing.name}`);
                         return;

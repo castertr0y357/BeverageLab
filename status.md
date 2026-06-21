@@ -14,6 +14,7 @@
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
 
 ## 🛠️ Completed Tasks
+- [x] Added a type guard in the AI neural re-balancing loop to unconditionally skip `COFFEE_BEAN` ingredients, preventing the AI engine from overriding bean split amounts after a blend. Coffee bean amounts are exclusively managed by the shot/gram chemistry budget system.
 - [x] Fixed coffee bean split amount card readout display bug by updating the `dualLabel` calculation when `alignedItem` is present to dynamically display the split bean's individual shots/volume and weight instead of the total coffee budget of the drink, and added formatting to resolve trailing decimals.
 - [x] Fixed coffee bean split preservation bug in `selectIngredient` by ensuring coffee base shot/gram splits are only redistributed when a new coffee bean is added, protecting existing user splits and override flags when adding other ingredient classes (dairy, accents, etc.) to the mix.
 - [x] Enforced that the coffee lab wizard steps and ingredient role displays correctly adapt to blended coffee beans, ensuring that adding a blended coffee bean does not skip the milk/dairy step (Step 2) and correctly forces recommendations of DAIRY type.
