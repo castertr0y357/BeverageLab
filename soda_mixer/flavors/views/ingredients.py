@@ -38,6 +38,9 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     # Coffee fields
     roast_level = request.POST.get('roast_level', 'MEDIUM')
     is_decaf = request.POST.get('is_decaf') == 'on'
+    origin = request.POST.get('origin', '').strip() or None
+    roaster = request.POST.get('roaster', '').strip() or None
+    process = request.POST.get('process', '').strip() or None
     try:
         body_intensity = int(request.POST.get('body_intensity', 3))
         acidity_score = int(request.POST.get('acidity_score', 3))
@@ -76,7 +79,10 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 body_intensity=body_intensity,
                 acidity_score=acidity_score,
                 bitterness_score=bitterness_score,
-                flavor_notes=flavor_notes
+                flavor_notes=flavor_notes,
+                origin=origin,
+                roaster=roaster,
+                process=process
             )
             logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name} ({brand})")
         except IntegrityError:
@@ -109,6 +115,12 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
     # Coffee fields
     ingredient.roast_level = request.POST.get('roast_level', ingredient.roast_level)
     ingredient.is_decaf = request.POST.get('is_decaf') == 'on'
+    if 'origin' in request.POST:
+        ingredient.origin = request.POST.get('origin', '').strip() or None
+    if 'roaster' in request.POST:
+        ingredient.roaster = request.POST.get('roaster', '').strip() or None
+    if 'process' in request.POST:
+        ingredient.process = request.POST.get('process', '').strip() or None
     try:
         ingredient.body_intensity = int(request.POST.get('body_intensity', ingredient.body_intensity))
         ingredient.acidity_score = int(request.POST.get('acidity_score', ingredient.acidity_score))

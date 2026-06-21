@@ -123,7 +123,7 @@
             </div>
 
             {% if ingredient.ingredient_type == 'COFFEE_BEAN' %}
-            <div class="mb-3 small text-dim border-start border-lab ps-2 bg-white bg-opacity-5 py-1">
+            <div class="mb-3 small text-dim border-start border-lab ps-2 bg-dark bg-opacity-25 py-1">
                 <i class="bi bi-geo-alt"></i> {{ ingredient.origin|default:"Unknown Origin" }}<br>
                 <i class="bi bi-shop"></i> {{ ingredient.roaster|default:"Local Roaster" }}
             </div>
@@ -158,6 +158,9 @@
                         data-systems="{{ ingredient.compatible_systems }}"
                         data-description="{{ ingredient.description }}"
                         data-ai-notes="{{ ingredient.ai_notes|default_if_none:'' }}"
+                        data-origin="{{ ingredient.origin|default:'' }}"
+                        data-roaster="{{ ingredient.roaster|default:'' }}"
+                        data-process="{{ ingredient.process|default:'' }}"
                         data-roast-level="{{ ingredient.roast_level|default:'MEDIUM' }}"
                         data-is-decaf="{{ ingredient.is_decaf|yesno:'true,false' }}"
                         data-body-intensity="{{ ingredient.body_intensity|default:3 }}"
@@ -248,6 +251,16 @@
                     <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-gradient-lab"></i> Coffee Material Specs</h6>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Origin</label>
+                            <input type="text" name="origin" id="addOrigin" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Ethiopia, Colombia">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Roaster</label>
+                            <input type="text" name="roaster" id="addRoaster" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Blue Bottle, Local Roaster">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-5">
                             <label class="form-label text-white fw-bold small">Roast Level</label>
                             <select name="roast_level" id="addRoastLevel" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
                                 <option value="LIGHT">Light</option>
@@ -255,10 +268,20 @@
                                 <option value="DARK">Dark</option>
                             </select>
                         </div>
-                        <div class="col-6 d-flex align-items-center mt-4">
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small">Process</label>
+                            <select name="process" id="addProcess" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
+                                <option value="" selected>None/Other</option>
+                                <option value="washed">Washed</option>
+                                <option value="natural">Natural</option>
+                                <option value="honey">Honey</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-3 d-flex align-items-center mt-4">
                             <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
                                 <input class="neon-check" type="checkbox" name="is_decaf" id="addIsDecaf">
-                                <label class="form-label text-white fw-bold small mb-0" for="addIsDecaf">Is Decaf?</label>
+                                <label class="form-label text-white fw-bold small mb-0" for="addIsDecaf">Decaf?</label>
                             </div>
                         </div>
                     </div>
@@ -423,6 +446,16 @@
                     <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-warning"></i> Coffee Material Specs</h6>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Origin</label>
+                            <input type="text" name="origin" id="editOrigin" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Ethiopia, Colombia">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Roaster</label>
+                            <input type="text" name="roaster" id="editRoaster" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Blue Bottle, Local Roaster">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-5">
                             <label class="form-label text-white fw-bold small">Roast Level</label>
                             <select name="roast_level" id="editRoastLevel" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
                                 <option value="LIGHT">Light</option>
@@ -430,10 +463,20 @@
                                 <option value="DARK">Dark</option>
                             </select>
                         </div>
-                        <div class="col-6 d-flex align-items-center mt-4">
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small">Process</label>
+                            <select name="process" id="editProcess" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
+                                <option value="">None/Other</option>
+                                <option value="washed">Washed</option>
+                                <option value="natural">Natural</option>
+                                <option value="honey">Honey</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-3 d-flex align-items-center mt-4">
                             <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
                                 <input class="neon-check" type="checkbox" name="is_decaf" id="editIsDecaf">
-                                <label class="form-label text-white fw-bold small mb-0" for="editIsDecaf">Is Decaf?</label>
+                                <label class="form-label text-white fw-bold small mb-0" for="editIsDecaf">Decaf?</label>
                             </div>
                         </div>
                     </div>
@@ -660,6 +703,9 @@
                 document.getElementById('editIsDry').checked = d.isDry === 'true';
                 
                 // Coffee fields populator
+                document.getElementById('editOrigin').value = d.origin || '';
+                document.getElementById('editRoaster').value = d.roaster || '';
+                document.getElementById('editProcess').value = d.process || '';
                 document.getElementById('editRoastLevel').value = d.roastLevel || 'MEDIUM';
                 document.getElementById('editIsDecaf').checked = d.isDecaf === 'true';
                 document.getElementById('editBodyIntensity').value = d.bodyIntensity || 3;
@@ -840,14 +886,19 @@
                     'BodyIntensity': profile.body_intensity || 3,
                     'AcidityScore': profile.acidity_score || 3,
                     'BitternessScore': profile.bitterness_score || 3,
-                    'FlavorNotes': profile.flavor_notes || ''
+                    'FlavorNotes': profile.flavor_notes || '',
+                    'Origin': profile.origin || '',
+                    'Roaster': profile.roaster || '',
+                    'Process': profile.process || ''
                 };
                 for (const [suffix, value] of Object.entries(coffeeFields)) {
                     const el = document.getElementById(prefix + suffix);
                     if (el) {
                         if (suffix === 'RoastLevel') {
                             el.value = value.toUpperCase();
-                        } else if (suffix === 'FlavorNotes') {
+                        } else if (suffix === 'Process') {
+                            el.value = value.toLowerCase();
+                        } else if (suffix === 'FlavorNotes' || suffix === 'Origin' || suffix === 'Roaster') {
                             el.value = value;
                         } else {
                             el.value = Math.round(value);
