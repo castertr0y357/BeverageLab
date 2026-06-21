@@ -574,7 +574,7 @@
             const otherBeans = coffeeBeans.filter(x => x.id != id);
             
             // Calculate how much we need to subtract/add from other beans
-            let remainingChange = -change;
+            let remainingChange = Math.abs(change);
             
             if (change > 0) {
                 // We are increasing target bean. We need to decrease other beans.
@@ -592,7 +592,7 @@
                 // We are decreasing target bean. We need to increase other beans.
                 // We add it to the first other bean.
                 const firstOtherShots = Math.round(parseFloat(otherBeans[0].amount || 0) / 18.0);
-                otherBeans[0].amount = (firstOtherShots + 1) * 18.0;
+                otherBeans[0].amount = (firstOtherShots + Math.abs(change)) * 18.0;
                 otherBeans[0].isUserOverridden = true;
                 remainingChange = 0;
             }
@@ -610,7 +610,7 @@
             if (newGrams < 0 || newGrams > totalGrams) return;
             
             const otherBeans = coffeeBeans.filter(x => x.id != id);
-            let remainingChange = -change;
+            let remainingChange = Math.abs(change);
             
             if (change > 0) {
                 // Decrease other beans
@@ -626,7 +626,7 @@
                 }
             } else {
                 // Increase other beans (add it to the first other bean)
-                otherBeans[0].amount = parseFloat(otherBeans[0].amount || 0) + 1;
+                otherBeans[0].amount = parseFloat(otherBeans[0].amount || 0) + Math.abs(change);
                 otherBeans[0].isUserOverridden = true;
                 remainingChange = 0;
             }
