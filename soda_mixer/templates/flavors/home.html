@@ -2515,9 +2515,10 @@
                 if (alignedItem) {
                     if (isDryCoffee) {
                         if (coffeeBaseType === 'espresso') {
-                            dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''} (${alignedItem.volume_oz}oz extraction)`;
+                            const shots = Math.round(parseFloat(amount || 0) / 18.0);
+                            dualLabel = `${shots} shot${shots !== 1 ? 's' : ''} (${alignedItem.volume_oz.toFixed(2)}oz extraction)`;
                         } else {
-                            dualLabel = `${coffeeBaseAmount}oz (${alignedItem.volume_oz}oz extraction)`;
+                            dualLabel = `${alignedItem.volume_oz.toFixed(1)}oz (${parseFloat(amount).toFixed(1)}g)`;
                         }
                     } else {
                         dualLabel = `${displayVolume}${ingUnit} / ${alignedItem.volume_oz}oz`;

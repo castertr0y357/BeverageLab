@@ -14,6 +14,7 @@
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
 
 ## 🛠️ Completed Tasks
+- [x] Fixed coffee bean split amount card readout display bug by updating the `dualLabel` calculation when `alignedItem` is present to dynamically display the split bean's individual shots/volume and weight instead of the total coffee budget of the drink, and added formatting to resolve trailing decimals.
 - [x] Fixed coffee bean split preservation bug in `selectIngredient` by ensuring coffee base shot/gram splits are only redistributed when a new coffee bean is added, protecting existing user splits and override flags when adding other ingredient classes (dairy, accents, etc.) to the mix.
 - [x] Enforced that the coffee lab wizard steps and ingredient role displays correctly adapt to blended coffee beans, ensuring that adding a blended coffee bean does not skip the milk/dairy step (Step 2) and correctly forces recommendations of DAIRY type.
 - [x] Fixed coffee bean shot-split accounting math bug in the synthesis wizard, ensuring that increasing or decreasing split beans correctly updates target and adjacent bean amounts without exceeding the total coffee budget.
