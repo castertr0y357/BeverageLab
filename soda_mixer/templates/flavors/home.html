@@ -100,10 +100,10 @@
                                 </div>
                             </div>
                             <div class="col-md-12 mt-3 animate-fade-in" id="espressoHotModeContainer" style="display: none;">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO VOLUME ADJUSTMENT</label>
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO STYLE</label>
                                 <div class="btn-group w-100" id="espressoHotModeBtns">
-                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="hotModeWater" onclick="setEspressoHotMode('water')">💧 Inject Hot Water (Americano Style)</button>
-                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="hotModeShots" onclick="setEspressoHotMode('shots')">☕ Add Shots (Strong Extraction)</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="hotModeShots" onclick="setEspressoHotMode('shots')">Espresso</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="hotModeWater" onclick="setEspressoHotMode('water')">Americano</button>
                                 </div>
                             </div>
                         </div>
@@ -472,7 +472,7 @@
     let coffeeSizeOz = 12;           // oz: 8, 12, 16, 20, 1, 2
     let coffeeBaseType = 'espresso'; // 'espresso' | 'standard_brew'
     let coffeeBaseAmount = 2;        // shots (1/2/3) for espresso; oz (4/8/12/16) for standard_brew
-    let coffeeEspressoHotMode = localStorage.getItem('coffee_espresso_hot_mode') || 'water';
+    let coffeeEspressoHotMode = localStorage.getItem('coffee_espresso_hot_mode') || 'shots';
     let isMixSealed = false;
 
     function setEspressoHotMode(mode) {
