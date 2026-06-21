@@ -1321,9 +1321,10 @@
             profile: profileObj
         });
 
-        // Split grams budget equally among all coffee beans in the mix
+        // Split grams budget equally among all coffee beans in the mix only if the new ingredient is a coffee bean
+        const isNewIngredientCoffeeBean = (type || '').toUpperCase() === 'COFFEE_BEAN';
         const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
-        if (coffeeBeans.length > 0) {
+        if (isNewIngredientCoffeeBean && coffeeBeans.length > 0) {
             const totalGrams = getTotalCoffeeBeansGrams();
             const isEspresso = (coffeeBaseType === 'espresso');
             const count = coffeeBeans.length;
