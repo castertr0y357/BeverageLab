@@ -14,6 +14,7 @@
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
 
 ## 🛠️ Completed Tasks
+- [x] Implemented coffee ingredient metadata schema expansion (adding roast_level, is_decaf, body_intensity, acidity_score, bitterness_score, and flavor_notes to the Ingredient registry) and created database migration. Enabled full metadata synchronization with the mixology AI suggestion and rebalancing engine, and added blend/mixing range sliders to the Coffee Lab wizard interface to allow split bean coffee base formulations.
 - [x] Simplified espresso options so shot sizes start at 1 and increase by 1: 1 shot (1oz), 2 shots (2oz), 3 shots (3oz), and 4 shots (4oz). Enforced linear shot mapping (1 shot for 8oz, 2 shots for 12oz, 3 shots for 16oz, 4 shots for 20oz) for all espresso options in home and recipe detail views.
 - [x] Implemented consistent espresso shot volume adjustments, including a virtual "Hot Water" card in water dilution mode and shot count scaling in shots mode across the wizard and recipe detail views.
 - [x] Added auto-reanalysis to trigger AI/chemistry re-evaluation immediately when style, size, or coffee base is updated after an analysis has been initiated.
