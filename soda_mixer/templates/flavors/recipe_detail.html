@@ -697,6 +697,26 @@
         const activeScale = currentScale * savedScale;
         const bottleCapacity = (drinkType === 'SODA') ? (activeScale * 1000) : (activeScale * 946.35);
 
+        // Pre-calculate soda syrup/additive expansion factor if not hasRtdBase and SODA mode
+        let sodaExpansionFactor = 1.0;
+        if (drinkType === 'SODA' && !hasRtdBase) {
+            const limit = 160.0 * activeScale;
+            let linearTotal = 0;
+            amountDisplays.forEach((el, idx) => {
+                const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
+                const isDry = el.getAttribute('data-is-dry') === 'true';
+                if (!isNaN(originalAmount) && !isDry) {
+                    linearTotal += originalAmount * currentScale;
+                }
+            });
+            if (linearTotal > 0) {
+                const isSodaLiters = (Math.abs(activeScale - 1.0) < 0.01 || Math.abs(activeScale - 0.5) < 0.01);
+                if (isSodaLiters || linearTotal < limit) {
+                    sodaExpansionFactor = limit / linearTotal;
+                }
+            }
+        }
+
         // Pre-calculate non-filler total volume for Soda/Slushie modes
         let nonFillerTotal = 0;
         amountDisplays.forEach((el, idx) => {
@@ -813,6 +833,9 @@
                     amount = fillerAmount;
                 } else {
                     amount = originalAmount * currentScale;
+                    if (drinkType === 'SODA' && !isDry) {
+                        amount = amount * sodaExpansionFactor;
+                    }
                 }
                 el.setAttribute('data-calculated-amount', amount);
                 if (isDry) {
@@ -871,7 +894,11 @@
                 const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
                 const isDry = el.getAttribute('data-is-dry') === 'true';
                 if (!isNaN(originalAmount) && !isDry) {
-                    totalSyrup += originalAmount * currentScale;
+                    let amt = originalAmount * currentScale;
+                    if (drinkType === 'SODA' && !hasRtdBase) {
+                        amt = amt * sodaExpansionFactor;
+                    }
+                    totalSyrup += amt;
                 }
             });
             let savedScale = 1.0;

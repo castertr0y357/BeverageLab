@@ -2322,8 +2322,11 @@
         }
 
         let expansionFactor = 1.0;
-        if (!hasRtdBase && initialTotal < limit && initialTotal > 0 && currentLabMode !== 'COFFEE') {
-            expansionFactor = limit / initialTotal;
+        if (!hasRtdBase && initialTotal > 0 && currentLabMode !== 'COFFEE') {
+            const isSodaLiters = (currentLabMode === 'SODA' && (Math.abs(bottleScale - 1.0) < 0.01 || Math.abs(bottleScale - 0.5) < 0.01));
+            if (isSodaLiters || initialTotal < limit) {
+                expansionFactor = limit / initialTotal;
+            }
         }
 
         // Calculate volumes for all ingredients
