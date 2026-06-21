@@ -245,6 +245,17 @@
                             <div class="readout-card p-1 ps-2 border-primary border-opacity-50 flex-grow-1">
                                 <div class="readout-label" style="font-size: 0.6rem;">UNIT MASS</div>
                                 <div class="fw-bold amount-display" 
+                                     data-id="{{ ri.ingredient.id }}"
+                                     data-name="{{ ri.ingredient.name }}"
+                                     data-intensity="{{ ri.ingredient.intensity }}"
+                                     data-acidity="{{ ri.ingredient.acidity }}"
+                                     data-bitterness="{{ ri.ingredient.bitterness }}"
+                                     data-complexity="{{ ri.ingredient.complexity }}"
+                                     data-is-decaf="{{ ri.ingredient.is_decaf|yesno:'true,false' }}"
+                                     data-body-intensity="{{ ri.ingredient.body_intensity|default:3 }}"
+                                     data-acidity-score="{{ ri.ingredient.acidity_score|default:3 }}"
+                                     data-bitterness-score="{{ ri.ingredient.bitterness_score|default:3 }}"
+                                     data-flavor-notes="{{ ri.ingredient.flavor_notes|default:'' }}"
                                      data-original-amount="{{ ri.amount }}" 
                                      data-drink-type="{{ recipe.drink_type }}" 
                                      data-ingredient-type="{{ ri.ingredient.ingredient_type }}"
@@ -699,6 +710,21 @@
         });
         const fillerAmount = Math.max(0, bottleCapacity - nonFillerTotal);
 
+        // Pre-calculate coffee bean budget split
+        const coffeeBeanEls = amountDisplays.filter(el => el.getAttribute('data-ingredient-type') === 'COFFEE_BEAN');
+        let totalOriginalBeans = 0;
+        coffeeBeanEls.forEach(el => {
+            const orig = parseFloat(el.getAttribute('data-original-amount'));
+            if (!isNaN(orig)) totalOriginalBeans += orig;
+        });
+
+        let totalBaseGrams = 0;
+        if (coffeeBaseType === 'espresso') {
+            totalBaseGrams = 18.0 * coffeeBaseAmount;
+        } else {
+            totalBaseGrams = Math.round((7.0 / 6.0) * coffeeBaseAmount);
+        }
+
         amountDisplays.forEach((el, idx) => {
             const originalAmount = parseFloat(el.getAttribute('data-original-amount'));
             if (isNaN(originalAmount)) return;
@@ -711,16 +737,26 @@
             if (isCoffee) {
                 let amount = originalAmount;
                 if (ingredientType === 'COFFEE_BEAN') {
+                    const ratio = totalOriginalBeans > 0 ? (originalAmount / totalOriginalBeans) : 1.0;
+                    amount = totalBaseGrams * ratio;
+                    el.setAttribute('data-calculated-amount', amount);
                     if (coffeeBaseType === 'espresso') {
-                        amount = 18.0 * coffeeBaseAmount;
-                        el.innerHTML = `${coffeeBaseAmount} shot${coffeeBaseAmount !== 1 ? 's' : ''} / ~${Math.round(amount)}g`;
+                        if (coffeeBeanEls.length > 1) {
+                            el.innerHTML = `${(coffeeBaseAmount * ratio).toFixed(2)} shot${(coffeeBaseAmount * ratio) !== 1 ? 's' : ''} / ~${amount.toFixed(1)}g`;
+                        } else {
+                            el.innerHTML = `${coffeeBaseAmount} shot${coffeeBaseAmount !== 1 ? 's' : ''} / ~${Math.round(amount)}g`;
+                        }
                     } else {
-                        amount = Math.round((7.0 / 6.0) * coffeeBaseAmount);
-                        el.innerHTML = `${coffeeBaseAmount}oz brew / ~${amount}g`;
+                        if (coffeeBeanEls.length > 1) {
+                            el.innerHTML = `${(coffeeBaseAmount * ratio).toFixed(1)}oz brew / ~${amount.toFixed(1)}g`;
+                        } else {
+                            el.innerHTML = `${coffeeBaseAmount}oz brew / ~${amount.toFixed(0)}g`;
+                        }
                     }
                 } else if (isDry) {
                     const scaleFactor = coffeeSizeOz / savedSizeOz;
                     amount = originalAmount * scaleFactor;
+                    el.setAttribute('data-calculated-amount', amount);
                     el.innerHTML = `${amount.toFixed(1)} g`;
                 } else {
                     let scaleFactor = coffeeSizeOz / savedSizeOz;
@@ -767,6 +803,7 @@
                         amount = originalAmount * scaleFactor;
                     }
                     
+                    el.setAttribute('data-calculated-amount', amount);
                     const displayVolume = Math.round(amount);
                     el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
                 }
@@ -777,6 +814,7 @@
                 } else {
                     amount = originalAmount * currentScale;
                 }
+                el.setAttribute('data-calculated-amount', amount);
                 if (isDry) {
                     el.innerHTML = `${amount.toFixed(1)} g`;
                 } else {
@@ -858,23 +896,26 @@
         if (!chemistryContainer) return;
         
         const ingredients = [];
-        {% for ri in recipe.recipe_ingredients.all %}
+        document.querySelectorAll('.amount-display').forEach(el => {
+            const id = el.getAttribute('data-id');
+            if (!id) return;
+            
             ingredients.push({
-                id: "{{ ri.ingredient.id }}",
-                name: "{{ ri.ingredient.name }}",
-                ingredient_type: "{{ ri.ingredient.ingredient_type }}",
-                intensity: {{ ri.ingredient.intensity }},
-                acidity: {{ ri.ingredient.acidity }},
-                bitterness: {{ ri.ingredient.bitterness }},
-                complexity: {{ ri.ingredient.complexity }},
-                body_intensity: {{ ri.ingredient.intensity }},
-                acidity_score: {{ ri.ingredient.acidity }},
-                bitterness_score: {{ ri.ingredient.bitterness }},
-                flavor_notes: "{{ ri.ingredient.flavor_notes }}",
-                is_decaf: {% if 'decaf' in ri.ingredient.name|lower %}true{% else %}false{% endif %},
-                amount: parseFloat("{{ ri.amount }}")
+                id: id,
+                name: el.getAttribute('data-name'),
+                ingredient_type: el.getAttribute('data-ingredient-type'),
+                intensity: parseInt(el.getAttribute('data-intensity')),
+                acidity: parseInt(el.getAttribute('data-acidity')),
+                bitterness: parseInt(el.getAttribute('data-bitterness')),
+                complexity: parseInt(el.getAttribute('data-complexity')),
+                body_intensity: parseInt(el.getAttribute('data-body-intensity') || 3),
+                acidity_score: parseInt(el.getAttribute('data-acidity-score') || 3),
+                bitterness_score: parseInt(el.getAttribute('data-bitterness-score') || 3),
+                flavor_notes: el.getAttribute('data-flavor-notes') || '',
+                is_decaf: el.getAttribute('data-is-decaf') === 'true',
+                amount: parseFloat(el.getAttribute('data-calculated-amount') || el.getAttribute('data-original-amount'))
             });
-        {% endfor %}
+        });
 
         let drinkCategory = "Hot Coffee";
         if (coffeeStyle === 'iced') {

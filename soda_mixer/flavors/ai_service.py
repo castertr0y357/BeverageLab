@@ -65,7 +65,13 @@ class AIAssistant:
     "is_ready_to_drink": boolean (true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false if it is a concentrated syrup, bean, or powder that needs to be diluted/brewed),
     "is_dry": boolean (true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false if it is a liquid like syrup, juice, milk, water),
     "compatible_systems": string (comma-separated list of systems, e.g., 'SODA,SLUSHIE' or 'COFFEE'),
-    "ai_notes": string
+    "ai_notes": string,
+    "roast_level": string (must be one of: 'LIGHT', 'MEDIUM', 'DARK', or null if not a coffee bean),
+    "is_decaf": boolean,
+    "body_intensity": integer (1 to 5, default 3),
+    "acidity_score": integer (1 to 5, default 3),
+    "bitterness_score": integer (1 to 5, default 3),
+    "flavor_notes": string (comma-separated descriptors, e.g. 'earthy, chocolatey')
 }"""
 
     @classmethod
@@ -170,7 +176,13 @@ class AIAssistant:
                     "is_ready_to_drink": False,
                     "is_dry": False,
                     "compatible_systems": "SODA,SLUSHIE",
-                    "ai_notes": "Mock notes for batch analysis."
+                    "ai_notes": "Mock notes for batch analysis.",
+                    "roast_level": "MEDIUM",
+                    "is_decaf": False,
+                    "body_intensity": 3,
+                    "acidity_score": 3,
+                    "bitterness_score": 3,
+                    "flavor_notes": "earthy, herbal"
                 })
             if not results:
                 results.append({
@@ -187,7 +199,13 @@ class AIAssistant:
                     "is_ready_to_drink": False,
                     "is_dry": False,
                     "compatible_systems": "SODA,SLUSHIE",
-                    "ai_notes": "Mock notes for default ingredient."
+                    "ai_notes": "Mock notes for default ingredient.",
+                    "roast_level": "MEDIUM",
+                    "is_decaf": False,
+                    "body_intensity": 3,
+                    "acidity_score": 3,
+                    "bitterness_score": 3,
+                    "flavor_notes": "earthy, herbal"
                 })
             return json.dumps(results)
         elif "Analyze this ingredient" in user_prompt:
@@ -204,7 +222,13 @@ class AIAssistant:
                 "is_ready_to_drink": False,
                 "is_dry": False,
                 "compatible_systems": "SODA,SLUSHIE",
-                "ai_notes": "Mock notes for single analysis."
+                "ai_notes": "Mock notes for single analysis.",
+                "roast_level": "MEDIUM",
+                "is_decaf": False,
+                "body_intensity": 3,
+                "acidity_score": 3,
+                "bitterness_score": 3,
+                "flavor_notes": "citrus, sweet"
             })
         else:
             return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
@@ -386,6 +410,30 @@ class AIAssistant:
         exclude_context = f" Exclude these previously suggested items: {', '.join(exclude)}." if exclude else ""
         retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
+        # Look up detailed metadata for ingredients currently in the mix
+        current_compound_details = []
+        from .models import Ingredient
+        from django.db.models import Q
+        
+        for ing_name in ingredients:
+            db_ing = Ingredient.objects.filter(Q(name__iexact=ing_name) | Q(brand__iexact=ing_name)).first()
+            if not db_ing:
+                # Try cleaning up brand suffixes (e.g. "Vanilla (Monin)" -> "Vanilla")
+                cleaned_name = re.sub(r'\s*\([^)]*\)', '', ing_name).strip()
+                db_ing = Ingredient.objects.filter(Q(name__iexact=cleaned_name) | Q(brand__iexact=cleaned_name)).first()
+            
+            if db_ing:
+                ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
+                if db_ing.ingredient_type == 'COFFEE_BEAN':
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Roast: {db_ing.roast_level}, Decaf: {db_ing.is_decaf}, Body: {db_ing.body_intensity}/5, Acidity: {db_ing.acidity_score}/5, Bitterness: {db_ing.bitterness_score}/5, Flavor Notes: {db_ing.flavor_notes}"
+                else:
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Sweetness: {db_ing.sweetness}/5, Acidity: {db_ing.acidity}/5, Bitterness: {db_ing.bitterness}/5, Complexity: {db_ing.complexity}/5"
+                current_compound_details.append(f"{ing_display} ({details})")
+            else:
+                current_compound_details.append(ing_name)
+                
+        current_compound_str = ", ".join(current_compound_details)
+        
         if drink_type == 'COFFEE':
             force_rule = ""
             if force_type:
@@ -393,20 +441,20 @@ class AIAssistant:
                 force_rule = f"\n6. MANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
             
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
-
-Current Compound: {', '.join(ingredients)}
+ 
+Current Compound: {current_compound_str}
 Lab Type: COFFEE (Espresso Extraction)
 Lab Mode: {tone}{exclude_context}
-
+ 
 Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
-
+ 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.{force_rule}
-
+ 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
@@ -421,25 +469,25 @@ JSON OUTPUT FORMAT:
     "seal_resonance": 95,
     "reasoning": "Brief overview of the coffee balance strategy"
 }}
-
+ 
 Inventory Registry for Selection:
 """
         elif drink_type == 'SLUSHIE':
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
-
-Current Compound: {', '.join(ingredients)}
+ 
+Current Compound: {current_compound_str}
 Lab Type: SLUSHIE (Cryo Lab)
 Lab Mode: {tone}{exclude_context}
-
+ 
 Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
-
+ 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-
+ 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
@@ -453,25 +501,25 @@ JSON OUTPUT FORMAT:
     "seal_resonance": 95,
     "reasoning": "Brief overview of the cryo freezing and displacement strategy"
 }}
-
+ 
 Inventory Registry for Selection:
 """
         else:
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
-
-Current Compound: {', '.join(ingredients)}
+ 
+Current Compound: {current_compound_str}
 Lab Type: SODA (Soda Lab)
 Lab Mode: {tone}{exclude_context}
-
+ 
 Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
-
+ 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
 2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-
+ 
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
@@ -485,7 +533,7 @@ JSON OUTPUT FORMAT:
     "seal_resonance": 95,
     "reasoning": "Brief overview of the carbonation and dilution strategy"
 }}
-
+ 
 Inventory Registry for Selection:
 """
         response = cls.chat(prompt, context=inventory)
@@ -570,11 +618,39 @@ Inventory Registry for Selection:
         """
         drink_type = drink_type.upper()
         drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
-        ingredient_list = ', '.join(f"{i['name']} (Intensity {i.get('intensity', '?')}/5)" for i in ingredients)
+        
+        enriched_list = []
+        for i in ingredients:
+            name = i.get('name', 'Unknown Reagent')
+            itype = str(i.get('type', i.get('ingredient_type', ''))).upper()
+            amt = i.get('amount')
+            amt_str = f" ({amt}g)" if itype == 'COFFEE_BEAN' else (f" ({amt}ml)" if amt else "")
+            
+            if itype == 'COFFEE_BEAN':
+                roast = i.get('roast_level', 'MEDIUM')
+                decaf = "Decaf" if i.get('is_decaf') or i.get('is_decaf') == 'true' or i.get('is_decaf') is True else "Regular"
+                body = i.get('body_intensity', 3)
+                acid = i.get('acidity_score', 3)
+                bitter = i.get('bitterness_score', 3)
+                notes = i.get('flavor_notes', '')
+                if isinstance(notes, list):
+                    notes = ", ".join(notes)
+                desc = f"{name}{amt_str} [Type: {itype}, Roast: {roast}, {decaf}, Body: {body}/5, Acidity: {acid}/5, Bitterness: {bitter}/5, Notes: {notes}]"
+            else:
+                intensity = i.get('intensity', 3)
+                sweetness = i.get('sweetness', 3)
+                acidity = i.get('acidity', 3)
+                bitterness = i.get('bitterness', 1)
+                complexity = i.get('complexity', 3)
+                desc = f"{name}{amt_str} [Type: {itype}, Intensity: {intensity}/5, Sweetness: {sweetness}/5, Acidity: {acidity}/5, Bitterness: {bitterness}/5, Complexity: {complexity}/5]"
+            enriched_list.append(desc)
+        
+        ingredient_list = '\n'.join(f"- {item}" for item in enriched_list)
         
         prompt = f"""FLAVOR SYNTHESIS REPORT
 
-Finalized {drink_label} compound: {ingredient_list}
+Finalized {drink_label} compound:
+{ingredient_list}
 
 Write a concise 2-paragraph lab report:
 Paragraph 1 — FLAVOR SYNERGY: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance, complementary/contrasting notes).
@@ -605,6 +681,12 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - is_dry (boolean, true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false for liquid ingredients like syrups, juice, milk, water)
         - compatible_systems (comma-separated list of systems it fits physically and flavor-wise, from: 'SODA', 'COFFEE', 'SLUSHIE' - e.g., 'SODA,SLUSHIE' or 'COFFEE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
+        - roast_level (string, must be 'LIGHT', 'MEDIUM', or 'DARK', or null if not a coffee bean)
+        - is_decaf (boolean, true if decaf coffee, false otherwise)
+        - body_intensity (integer, 1 to 5, default 3)
+        - acidity_score (integer, 1 to 5, default 3)
+        - bitterness_score (integer, 1 to 5, default 3)
+        - flavor_notes (string, comma-separated flavor descriptors e.g. 'herbal, earthy, chocolate, nutty')
 
         OUTPUT FORMAT: A raw JSON object. [NO MARKDOWN] [NO PREAMBLE].
         Example: {cls.FLAVOR_PROFILE_FORMAT}
@@ -642,9 +724,15 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         - is_dry (boolean, true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false for liquid ingredients like syrups, juice, milk, water)
         - compatible_systems (comma-separated list of compatible systems from: 'SODA', 'COFFEE', 'SLUSHIE')
         - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
+        - roast_level (string, 'LIGHT', 'MEDIUM', 'DARK', or null if not a coffee bean)
+        - is_decaf (boolean, true if decaf coffee, false otherwise)
+        - body_intensity (integer, 1 to 5, default 3)
+        - acidity_score (integer, 1 to 5, default 3)
+        - bitterness_score (integer, 1 to 5, default 3)
+        - flavor_notes (string, comma-separated flavor descriptors e.g. 'herbal, earthy, chocolate, nutty')
         
         OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "is_ready_to_drink": false, "is_dry": false, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness." }}]
+        Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "is_ready_to_drink": false, "is_dry": false, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness.", "roast_level": null, "is_decaf": false, "body_intensity": 3, "acidity_score": 3, "bitterness_score": 3, "flavor_notes": "citrus, sweet" }}]
         """
         response = cls.chat(prompt)
         return cls._extract_json(response)

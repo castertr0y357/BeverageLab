@@ -144,6 +144,13 @@
                             <button type="button" class="btn btn-sm btn-outline-info px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" onclick="stepBack()">
                                 <i class="bi bi-arrow-left"></i> STEP BACK
                             </button>
+                            <div class="dropdown d-inline-block" id="mixBeanDropdownContainer" style="display: none !important;">
+                                <button class="btn btn-sm btn-outline-experimental px-3 py-1.5 fs-6 dropdown-toggle" type="button" id="mixBeanDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-plus-circle me-1"></i> BLEND BEAN
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end bg-dark border-white border-opacity-10 text-white" aria-labelledby="mixBeanDropdown" id="mixBeanDropdownMenu" style="max-height: 250px; overflow-y: auto;">
+                                </ul>
+                            </div>
                             <button type="button" id="analyzeBtn" class="btn btn-sm btn-outline-info px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" style="display: none;" onclick="triggerFlavorSynthesis()">
                                 <i class="bi bi-cpu"></i> ANALYZE COMPOUND
                             </button>
@@ -537,7 +544,58 @@
     }
 
     // ☕ Coffee drink format controls
+    function getTotalCoffeeBeansGrams() {
+        if (coffeeBaseType === 'espresso') {
+            return 18.0 * coffeeBaseAmount;
+        } else {
+            return Math.round((7.0 / 6.0) * coffeeBaseAmount);
+        }
+    }
+
+    function adjustCoffeeBeanSplit(id, val) {
+        const targetVal = parseFloat(val);
+        const totalGrams = getTotalCoffeeBeansGrams();
+        
+        // Find target bean
+        const targetBean = selectedIngredients.find(x => x.id == id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        if (!targetBean) return;
+        
+        // Clamp target value
+        const clampedVal = Math.min(totalGrams, Math.max(0, targetVal));
+        targetBean.amount = clampedVal;
+        targetBean.isUserOverridden = true;
+        
+        // Find other coffee beans
+        const otherBeans = selectedIngredients.filter(x => x.id != id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        const remainingGrams = totalGrams - clampedVal;
+        
+        if (otherBeans.length > 0) {
+            const sumOthers = otherBeans.reduce((sum, x) => sum + parseFloat(x.amount || 0), 0);
+            if (sumOthers > 0) {
+                otherBeans.forEach(x => {
+                    x.amount = remainingGrams * (parseFloat(x.amount) / sumOthers);
+                    x.isUserOverridden = true;
+                });
+            } else {
+                otherBeans.forEach(x => {
+                    x.amount = remainingGrams / otherBeans.length;
+                    x.isUserOverridden = true;
+                });
+            }
+        }
+        
+        // Trigger updates asynchronously
+        updateCoffeeChemistryWizard().then(() => {
+            updateSelectedArea();
+            if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                triggerFlavorSynthesis();
+            }
+        });
+    }
+
     function recalculateCoffeeBaseAmount() {
+        const oldBudget = getTotalCoffeeBeansGrams();
+
         if (coffeeBaseType === 'espresso') {
             if (coffeeStyle === 'espresso_shot') {
                 if (coffeeSizeOz === 1) {
@@ -590,6 +648,27 @@
                     coffeeBaseAmount = 16;
                 } else {
                     coffeeBaseAmount = 8;
+                }
+            }
+        }
+
+        const newBudget = getTotalCoffeeBeansGrams();
+        if (oldBudget > 0 && Math.abs(oldBudget - newBudget) > 0.001) {
+            const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+            if (coffeeBeans.length > 0) {
+                if (coffeeBeans.length === 1) {
+                    coffeeBeans[0].amount = newBudget;
+                } else {
+                    const totalCurrentGrams = coffeeBeans.reduce((sum, x) => sum + parseFloat(x.amount || 0), 0);
+                    if (totalCurrentGrams > 0) {
+                        coffeeBeans.forEach(x => {
+                            x.amount = newBudget * (parseFloat(x.amount) / totalCurrentGrams);
+                        });
+                    } else {
+                        coffeeBeans.forEach(x => {
+                            x.amount = newBudget / coffeeBeans.length;
+                        });
+                    }
                 }
             }
         }
@@ -740,6 +819,13 @@
         const isShot = (coffeeStyle === 'espresso_shot');
 
         if (isDryCoffee) {
+            const selectedBean = selectedIngredients.find(x => x.id == ing.id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+            if (selectedBean && selectedBean.amount !== null && selectedBean.amount !== undefined) {
+                const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+                if (coffeeBeans.length > 1) {
+                    return selectedBean.amount;
+                }
+            }
             if (baseType === 'espresso') {
                 // coffeeBaseAmount = number of shots; each shot ~18g
                 return 18.0 * coffeeBaseAmount;
@@ -1124,6 +1210,17 @@
             is_decaf: isDecaf || (profileObj ? (profileObj.is_decaf === true || profileObj.is_decaf === 'true') : false) || name.toLowerCase().includes('decaf'),
             profile: profileObj
         });
+
+        // Split grams budget equally among all coffee beans in the mix
+        const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        if (coffeeBeans.length > 0) {
+            const totalGrams = getTotalCoffeeBeansGrams();
+            const count = coffeeBeans.length;
+            coffeeBeans.forEach(x => {
+                x.amount = totalGrams / count;
+                x.isUserOverridden = false;
+            });
+        }
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
         const isDone = selectedIngredients.length >= maxIngredients;
         
@@ -2301,6 +2398,19 @@
             if ((currentLabMode === 'SLUSHIE' || currentLabMode === 'SODA') && !isDry) {
                 totalSyrup += parseFloat(amount);
             }
+
+            let sliderHtml = '';
+            const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+            if (currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN' && coffeeBeans.length > 1) {
+                const totalG = getTotalCoffeeBeansGrams();
+                const curVal = amount;
+                sliderHtml = `
+                    <div class="my-2 px-1">
+                        <input type="range" class="form-range custom-slider" min="0" max="${totalG}" step="0.5" value="${curVal}" oninput="adjustCoffeeBeanSplit(${ing.id}, this.value)">
+                        <div class="text-dim font-monospace mt-1" style="font-size: 0.55rem;">SPLIT: ${parseFloat(curVal).toFixed(1)}g / ${totalG}g</div>
+                    </div>
+                `;
+            }
             
             html += `
                 <div class="col-auto">
@@ -2309,6 +2419,7 @@
                         <div class="fw-bold mb-1" style="font-size: 0.9rem;">${mainName} ${balanceIndicator}</div>
                         ${renameWarningHtml}
                         <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${dualLabel}</div>
+                        ${sliderHtml}
                         
                         <!-- 🧪 Synthesized Profile Display -->
                         <div class="mt-1 pt-1 border-top border-white border-opacity-10">
@@ -2402,6 +2513,61 @@
             submitArea.style.display = 'block';
         } else {
             submitArea.style.display = 'none';
+        }
+        
+        // Blended Bean Dropdown population
+        const dropdownContainer = document.getElementById('mixBeanDropdownContainer');
+        const dropdownMenu = document.getElementById('mixBeanDropdownMenu');
+        if (dropdownContainer && dropdownMenu) {
+            const coffeeBeansInMix = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+            if (currentLabMode === 'COFFEE' && coffeeBeansInMix.length > 0 && !isMixSealed) {
+                dropdownContainer.style.setProperty('display', 'inline-block', 'important');
+                
+                // Get all COFFEE_BEAN buttons from availableIngredients
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = allIngredientsHtml;
+                const allCoffeeButtons = Array.from(tempDiv.querySelectorAll('.select-ingredient-btn'))
+                    .filter(btn => btn.getAttribute('data-type') === 'COFFEE_BEAN');
+                
+                // Filter out already selected beans
+                const selectedIds = selectedIngredients.map(x => x.id.toString());
+                const availableToBlend = allCoffeeButtons.filter(btn => !selectedIds.includes(btn.getAttribute('data-id')));
+                
+                if (availableToBlend.length > 0) {
+                    dropdownMenu.innerHTML = availableToBlend.map(btn => {
+                        const id = btn.getAttribute('data-id');
+                        const name = btn.getAttribute('data-name');
+                        const intensity = btn.getAttribute('data-intensity');
+                        const category = btn.getAttribute('data-category');
+                        const profile = btn.getAttribute('data-profile') || '';
+                        const sweetness = btn.getAttribute('data-sweetness') || 0;
+                        const acidity = btn.getAttribute('data-acidity') || 0;
+                        const bitterness = btn.getAttribute('data-bitterness') || 0;
+                        const complexity = btn.getAttribute('data-complexity') || 0;
+                        const type = btn.getAttribute('data-type');
+                        const isReadyToDrink = btn.getAttribute('data-is-ready-to-drink') === 'true';
+                        const isDry = btn.getAttribute('data-is-dry') === 'true';
+                        const roastLevel = btn.getAttribute('data-roast-level') || '';
+                        const flavorNotes = btn.getAttribute('data-flavor-notes') || '';
+                        const isDecaf = btn.getAttribute('data-is-decaf') === 'true';
+                        
+                        const profileEscaped = profile.replace(/'/g, "\\'");
+                        const nameEscaped = name.replace(/'/g, "\\'");
+                        
+                        return `
+                            <li>
+                                <a class="dropdown-item text-white hover-lime" href="#" onclick="event.preventDefault(); selectIngredient(${id}, '${nameEscaped}', ${intensity}, '${category}', '${profileEscaped}', false, null, ${sweetness}, ${acidity}, ${bitterness}, ${complexity}, '${type}', ${isReadyToDrink}, ${isDry}, '${roastLevel}', '${flavorNotes}', ${isDecaf})">
+                                    ${name}
+                                </a>
+                            </li>
+                        `;
+                    }).join('');
+                } else {
+                    dropdownMenu.innerHTML = '<li><span class="dropdown-item-text text-dim small">No other coffee beans in registry</span></li>';
+                }
+            } else {
+                dropdownContainer.style.setProperty('display', 'none', 'important');
+            }
         }
         
         list.innerHTML = html;

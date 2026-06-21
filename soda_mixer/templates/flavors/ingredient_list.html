@@ -157,7 +157,13 @@
                         data-is-dry="{{ ingredient.is_dry|yesno:'true,false' }}"
                         data-systems="{{ ingredient.compatible_systems }}"
                         data-description="{{ ingredient.description }}"
-                        data-ai-notes="{{ ingredient.ai_notes|default_if_none:'' }}">
+                        data-ai-notes="{{ ingredient.ai_notes|default_if_none:'' }}"
+                        data-roast-level="{{ ingredient.roast_level|default:'MEDIUM' }}"
+                        data-is-decaf="{{ ingredient.is_decaf|yesno:'true,false' }}"
+                        data-body-intensity="{{ ingredient.body_intensity|default:3 }}"
+                        data-acidity-score="{{ ingredient.acidity_score|default:3 }}"
+                        data-bitterness-score="{{ ingredient.bitterness_score|default:3 }}"
+                        data-flavor-notes="{{ ingredient.flavor_notes|default:'' }}">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <form action="{% url 'delete_ingredient' ingredient.id %}" method="post" class="m-0"
@@ -235,6 +241,44 @@
                             <option value="{{ cat_val }}">{{ cat_display }}</option>
                             {% endfor %}
                         </datalist>
+                    </div>
+                </div>
+                <!-- Coffee-Specific Fields Container -->
+                <div id="addCoffeeFields" style="display: none;" class="border border-white border-opacity-10 rounded p-3 mb-3 bg-white bg-opacity-5">
+                    <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-gradient-lab"></i> Coffee Material Specs</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Roast Level</label>
+                            <select name="roast_level" id="addRoastLevel" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
+                                <option value="LIGHT">Light</option>
+                                <option value="MEDIUM" selected>Medium</option>
+                                <option value="DARK">Dark</option>
+                            </select>
+                        </div>
+                        <div class="col-6 d-flex align-items-center mt-4">
+                            <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                                <input class="neon-check" type="checkbox" name="is_decaf" id="addIsDecaf">
+                                <label class="form-label text-white fw-bold small mb-0" for="addIsDecaf">Is Decaf?</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Body Int.</label>
+                            <input type="number" name="body_intensity" id="addBodyIntensity" value="3" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Acd. Score</label>
+                            <input type="number" name="acidity_score" id="addAcidityScore" value="3" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Bit. Score</label>
+                            <input type="number" name="bitterness_score" id="addBitternessScore" value="3" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label text-white fw-bold small">Flavor Notes</label>
+                        <input type="text" name="flavor_notes" id="addFlavorNotes" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. herbal, earthy, chocolate, nutty">
                     </div>
                 </div>
                 <div class="row g-2 mb-3">
@@ -372,6 +416,44 @@
                             <option value="{{ cat_val }}">{{ cat_display }}</option>
                             {% endfor %}
                         </datalist>
+                    </div>
+                </div>
+                <!-- Coffee-Specific Fields Container -->
+                <div id="editCoffeeFields" style="display: none;" class="border border-white border-opacity-10 rounded p-3 mb-3 bg-white bg-opacity-5">
+                    <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-warning"></i> Coffee Material Specs</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-white fw-bold small">Roast Level</label>
+                            <select name="roast_level" id="editRoastLevel" class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
+                                <option value="LIGHT">Light</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="DARK">Dark</option>
+                            </select>
+                        </div>
+                        <div class="col-6 d-flex align-items-center mt-4">
+                            <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                                <input class="neon-check" type="checkbox" name="is_decaf" id="editIsDecaf">
+                                <label class="form-label text-white fw-bold small mb-0" for="editIsDecaf">Is Decaf?</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Body Int.</label>
+                            <input type="number" name="body_intensity" id="editBodyIntensity" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Acd. Score</label>
+                            <input type="number" name="acidity_score" id="editAcidityScore" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-white fw-bold small" title="1-5">Bit. Score</label>
+                            <input type="number" name="bitterness_score" id="editBitternessScore" min="1" max="5" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10 text-center">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label text-white fw-bold small">Flavor Notes</label>
+                        <input type="text" name="flavor_notes" id="editFlavorNotes" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. herbal, earthy, chocolate, nutty">
                     </div>
                 </div>
                 <div class="row g-2 mb-3">
@@ -535,6 +617,27 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Toggle Coffee-Specific Fields Function
+        function toggleCoffeeFields(prefix) {
+            const typeSelect = document.getElementById(prefix + 'Type');
+            const coffeeFields = document.getElementById(prefix + 'CoffeeFields');
+            if (typeSelect && coffeeFields) {
+                if (typeSelect.value === 'COFFEE_BEAN') {
+                    coffeeFields.style.display = 'block';
+                } else {
+                    coffeeFields.style.display = 'none';
+                }
+            }
+        }
+        const addTypeSelect = document.getElementById('addType');
+        if (addTypeSelect) {
+            addTypeSelect.addEventListener('change', () => toggleCoffeeFields('add'));
+        }
+        const editTypeSelect = document.getElementById('editType');
+        if (editTypeSelect) {
+            editTypeSelect.addEventListener('change', () => toggleCoffeeFields('edit'));
+        }
+
         // 1. Edit Material Modal Logic
         document.querySelectorAll('.btn-edit-material').forEach(btn => {
             btn.addEventListener('click', function () {
@@ -555,6 +658,16 @@
                 document.getElementById('editAINotes').value = d.aiNotes || '';
                 document.getElementById('editReadyToDrink').checked = d.isReadyToDrink === 'true';
                 document.getElementById('editIsDry').checked = d.isDry === 'true';
+                
+                // Coffee fields populator
+                document.getElementById('editRoastLevel').value = d.roastLevel || 'MEDIUM';
+                document.getElementById('editIsDecaf').checked = d.isDecaf === 'true';
+                document.getElementById('editBodyIntensity').value = d.bodyIntensity || 3;
+                document.getElementById('editAcidityScore').value = d.acidityScore || 3;
+                document.getElementById('editBitternessScore').value = d.bitternessScore || 3;
+                document.getElementById('editFlavorNotes').value = d.flavorNotes || '';
+                
+                toggleCoffeeFields('edit');
                 
                 // Set system checkboxes
                 const systems = d.systems ? d.systems.split(',') : [];
@@ -718,6 +831,36 @@
                     typeEl.value = profile.ingredient_type;
                     typeEl.classList.add('is-valid');
                     setTimeout(() => typeEl.classList.remove('is-valid'), 2000);
+                    toggleCoffeeFields(prefix);
+                }
+
+                // Coffee fields populator
+                const coffeeFields = {
+                    'RoastLevel': profile.roast_level || 'MEDIUM',
+                    'BodyIntensity': profile.body_intensity || 3,
+                    'AcidityScore': profile.acidity_score || 3,
+                    'BitternessScore': profile.bitterness_score || 3,
+                    'FlavorNotes': profile.flavor_notes || ''
+                };
+                for (const [suffix, value] of Object.entries(coffeeFields)) {
+                    const el = document.getElementById(prefix + suffix);
+                    if (el) {
+                        if (suffix === 'RoastLevel') {
+                            el.value = value.toUpperCase();
+                        } else if (suffix === 'FlavorNotes') {
+                            el.value = value;
+                        } else {
+                            el.value = Math.round(value);
+                        }
+                        el.classList.add('is-valid');
+                        setTimeout(() => el.classList.remove('is-valid'), 2000);
+                    }
+                }
+                const decafEl = document.getElementById(prefix + 'IsDecaf');
+                if (decafEl && profile.is_decaf !== undefined) {
+                    decafEl.checked = profile.is_decaf === true || profile.is_decaf === 'true';
+                    decafEl.classList.add('is-valid');
+                    setTimeout(() => decafEl.classList.remove('is-valid'), 2000);
                 }
 
                 if (profile.compatible_systems) {

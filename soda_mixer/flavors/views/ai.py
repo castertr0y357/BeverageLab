@@ -221,7 +221,11 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         registry: List[str] = []
         for ing in all_ingredients:
             ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-            registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
+            if ing.ingredient_type == 'COFFEE_BEAN':
+                coffee_details = f"Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acidity: {ing.acidity_score}/5, Bitterness: {ing.bitterness_score}/5, Flavor Notes: {ing.flavor_notes}"
+                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, {coffee_details})")
+            else:
+                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         prompt = user_message + lab_context
@@ -372,7 +376,11 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             registry = []
             for ing in all_ingredients:
                 ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink})")
+                if ing.ingredient_type == 'COFFEE_BEAN':
+                    coffee_details = f"Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acidity: {ing.acidity_score}/5, Bitterness: {ing.bitterness_score}/5, Flavor Notes: {ing.flavor_notes}"
+                    registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink}, {coffee_details})")
+                else:
+                    registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink})")
             inventory_context = "\n".join(registry)
 
             yield send_progress("Locating matching flavor affinity groups...")
@@ -600,6 +608,33 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         if 'is_dry' in res:
                             match.is_dry = bool(res.get('is_dry'))
                             
+                        # Coffee-specific fields
+                        if 'roast_level' in res and res.get('roast_level'):
+                            match.roast_level = str(res.get('roast_level')).upper()
+                        if 'is_decaf' in res:
+                            match.is_decaf = bool(res.get('is_decaf'))
+                        if 'body_intensity' in res:
+                            try:
+                                match.body_intensity = int(res.get('body_intensity'))
+                            except (ValueError, TypeError):
+                                pass
+                        if 'acidity_score' in res:
+                            try:
+                                match.acidity_score = int(res.get('acidity_score'))
+                            except (ValueError, TypeError):
+                                pass
+                        if 'bitterness_score' in res:
+                            try:
+                                match.bitterness_score = int(res.get('bitterness_score'))
+                            except (ValueError, TypeError):
+                                pass
+                        if 'flavor_notes' in res:
+                            notes_val = res.get('flavor_notes')
+                            if isinstance(notes_val, list):
+                                match.flavor_notes = ", ".join(notes_val)
+                            else:
+                                match.flavor_notes = str(notes_val or '')
+
                         match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
                         total_analyzed += 1

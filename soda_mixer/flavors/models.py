@@ -96,13 +96,23 @@ class Ingredient(models.Model):
     )
     
     # Coffee-specific fields
+    ROAST_CHOICES = [
+        ('LIGHT', 'Light'),
+        ('MEDIUM', 'Medium'),
+        ('DARK', 'Dark'),
+    ]
     origin = models.CharField(max_length=100, blank=True, null=True)
-    roast_level = models.IntegerField(
-        help_text="Roast level from 1 (light) to 5 (dark)",
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    roast_level = models.CharField(
+        max_length=10,
+        choices=ROAST_CHOICES,
+        default='MEDIUM',
         blank=True,
         null=True
     )
+    is_decaf = models.BooleanField(default=False)
+    body_intensity = models.PositiveSmallIntegerField(default=3)
+    acidity_score = models.PositiveSmallIntegerField(default=3)
+    bitterness_score = models.PositiveSmallIntegerField(default=3)
     process = models.CharField(
         max_length=50, 
         choices=[('washed', 'Washed'), ('natural', 'Natural'), ('honey', 'Honey'), ('other', 'Other')],
@@ -129,8 +139,7 @@ class Ingredient(models.Model):
         null=True,
         help_text="AI-generated notes about the flavor profile and pairings"
     )
-    flavor_notes = models.CharField(
-        max_length=200,
+    flavor_notes = models.TextField(
         blank=True,
         help_text="Comma-separated flavor descriptors (e.g., 'berry, chocolatey, floral')"
     )

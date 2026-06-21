@@ -35,6 +35,19 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     is_dry = request.POST.get('is_dry') == 'on'
     
+    # Coffee fields
+    roast_level = request.POST.get('roast_level', 'MEDIUM')
+    is_decaf = request.POST.get('is_decaf') == 'on'
+    try:
+        body_intensity = int(request.POST.get('body_intensity', 3))
+        acidity_score = int(request.POST.get('acidity_score', 3))
+        bitterness_score = int(request.POST.get('bitterness_score', 3))
+    except ValueError:
+        body_intensity = 3
+        acidity_score = 3
+        bitterness_score = 3
+    flavor_notes = request.POST.get('flavor_notes', '').strip()
+    
     systems = request.POST.getlist('compatible_systems')
     compatible_systems = ",".join(systems) if systems else "SODA,COFFEE,SLUSHIE"
 
@@ -57,7 +70,13 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 compatible_systems=compatible_systems,
                 is_ready_to_drink=is_ready_to_drink,
                 is_dry=is_dry,
-                is_in_inventory=True
+                is_in_inventory=True,
+                roast_level=roast_level,
+                is_decaf=is_decaf,
+                body_intensity=body_intensity,
+                acidity_score=acidity_score,
+                bitterness_score=bitterness_score,
+                flavor_notes=flavor_notes
             )
             logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name} ({brand})")
         except IntegrityError:
@@ -86,6 +105,17 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
     ingredient.ai_notes = request.POST.get('ai_notes', ingredient.ai_notes)
     ingredient.is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     ingredient.is_dry = request.POST.get('is_dry') == 'on'
+    
+    # Coffee fields
+    ingredient.roast_level = request.POST.get('roast_level', ingredient.roast_level)
+    ingredient.is_decaf = request.POST.get('is_decaf') == 'on'
+    try:
+        ingredient.body_intensity = int(request.POST.get('body_intensity', ingredient.body_intensity))
+        ingredient.acidity_score = int(request.POST.get('acidity_score', ingredient.acidity_score))
+        ingredient.bitterness_score = int(request.POST.get('bitterness_score', ingredient.bitterness_score))
+    except ValueError:
+        pass
+    ingredient.flavor_notes = request.POST.get('flavor_notes', ingredient.flavor_notes).strip()
     
     systems = request.POST.getlist('compatible_systems')
     if systems:
