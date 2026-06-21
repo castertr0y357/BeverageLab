@@ -1917,20 +1917,41 @@
         }
 
         let stepText = '';
-        if (ingredientIds.length === 0) {
-            stepText = 'Step 1: Select Base Component';
-        } else if (ingredientIds.length === 1) {
-            if (currentLabMode === 'SLUSHIE' && selectedIngredients[0].id === 'virtual_water') {
-                stepText = 'Step 2: Select Syrup Base';
-            } else {
+        let forceType = null;
+        
+        if (currentLabMode === 'COFFEE') {
+            const coffeeBeansCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN').length;
+            const dairyCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'DAIRY').length;
+            const accentsCount = selectedIngredients.length - coffeeBeansCount - dairyCount;
+            
+            if (coffeeBeansCount === 0) {
+                stepText = 'Step 1: Select Base Component';
+            } else if (dairyCount === 0) {
                 stepText = 'Step 2: Select Complementary Payload';
+                forceType = 'DAIRY';
+            } else if (accentsCount === 0) {
+                stepText = 'Step 3: Select Flavor Accent';
+            } else if (accentsCount === 1) {
+                stepText = 'Step 4: Select Deep Accent';
+            } else {
+                stepText = 'Step 5: Select Final Stabilizer';
             }
-        } else if (ingredientIds.length === 2) {
-            stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
-        } else if (ingredientIds.length === 3) {
-            stepText = 'Step 4: Select Deep Accent';
         } else {
-            stepText = 'Step 5: Select Final Stabilizer';
+            if (ingredientIds.length === 0) {
+                stepText = 'Step 1: Select Base Component';
+            } else if (ingredientIds.length === 1) {
+                if (currentLabMode === 'SLUSHIE' && selectedIngredients[0].id === 'virtual_water') {
+                    stepText = 'Step 2: Select Syrup Base';
+                } else {
+                    stepText = 'Step 2: Select Complementary Payload';
+                }
+            } else if (ingredientIds.length === 2) {
+                stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
+            } else if (ingredientIds.length === 3) {
+                stepText = 'Step 4: Select Deep Accent';
+            } else {
+                stepText = 'Step 5: Select Final Stabilizer';
+            }
         }
         
         document.getElementById('stepTitle').textContent = stepText;
@@ -1951,8 +1972,6 @@
 
         const isAiEngine = engineMode === 'ai';
         const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
-        
-        const forceType = (currentLabMode === 'COFFEE' && ingredientIds.length === 1) ? 'DAIRY' : null;
         const payload = isAiEngine ? {
             ingredients: selectedIngredients.map(i => i.name),
             drink_type: currentLabMode,
@@ -2419,8 +2438,24 @@
             let role;
             if (hasRtdBase && index === firstRtdIndex && currentLabMode !== 'COFFEE') {
                 role = 'VOLUME FILLER';
-            } else if (currentLabMode === 'COFFEE' && (ing.type || ing.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN') {
-                role = 'COFFEE BASE';
+            } else if (currentLabMode === 'COFFEE') {
+                const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
+                if (ingType === 'COFFEE_BEAN') {
+                    role = 'COFFEE BASE';
+                } else if (ingType === 'DAIRY') {
+                    role = 'PAYLOAD';
+                } else {
+                    // Accent roles: count how many accents are before this one
+                    let prevAccents = 0;
+                    for (let i = 0; i < index; i++) {
+                        const prevIngType = (selectedIngredients[i].type || selectedIngredients[i].ingredient_type || '').toUpperCase();
+                        if (prevIngType !== 'COFFEE_BEAN' && prevIngType !== 'DAIRY') {
+                            prevAccents++;
+                        }
+                    }
+                    const accentRoles = ['ACCENT', 'DEEP ACCENT', 'STABILIZER'];
+                    role = (isLast && isFull) ? 'FINAL' : (accentRoles[prevAccents] || 'MODIFIER');
+                }
             } else {
                 role = (isLast && isFull) ? 'FINAL' : (roles[index] || 'MODIFIER');
             }
