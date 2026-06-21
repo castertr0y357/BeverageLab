@@ -552,36 +552,119 @@
         }
     }
 
-    function adjustCoffeeBeanSplit(id, val) {
-        const targetVal = parseFloat(val);
-        const totalGrams = getTotalCoffeeBeansGrams();
+    function adjustCoffeeBeanSplitButtons(id, change) {
+        const isEspresso = (coffeeBaseType === 'espresso');
+        const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        if (coffeeBeans.length < 2) return;
         
         // Find target bean
-        const targetBean = selectedIngredients.find(x => x.id == id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        const targetBean = coffeeBeans.find(x => x.id == id);
         if (!targetBean) return;
         
-        // Clamp target value
-        const clampedVal = Math.min(totalGrams, Math.max(0, targetVal));
-        targetBean.amount = clampedVal;
-        targetBean.isUserOverridden = true;
-        
-        // Find other coffee beans
-        const otherBeans = selectedIngredients.filter(x => x.id != id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
-        const remainingGrams = totalGrams - clampedVal;
-        
-        if (otherBeans.length > 0) {
-            const sumOthers = otherBeans.reduce((sum, x) => sum + parseFloat(x.amount || 0), 0);
-            if (sumOthers > 0) {
-                otherBeans.forEach(x => {
-                    x.amount = remainingGrams * (parseFloat(x.amount) / sumOthers);
-                    x.isUserOverridden = true;
-                });
+        if (isEspresso) {
+            // Espresso: change is in shots (-1 or 1)
+            const currentShots = Math.round(parseFloat(targetBean.amount || 0) / 18.0);
+            const totalShots = coffeeBaseAmount;
+            const newShots = currentShots + change;
+            
+            // Clamp target bean shots
+            if (newShots < 0 || newShots > totalShots) return;
+            
+            // Find other beans
+            const otherBeans = coffeeBeans.filter(x => x.id != id);
+            
+            // Calculate how much we need to subtract/add from other beans
+            let remainingChange = -change;
+            
+            if (change > 0) {
+                // We are increasing target bean. We need to decrease other beans.
+                for (let i = 0; i < otherBeans.length; i++) {
+                    const otherShots = Math.round(parseFloat(otherBeans[i].amount || 0) / 18.0);
+                    if (otherShots > 0) {
+                        const reduceBy = Math.min(otherShots, remainingChange);
+                        otherBeans[i].amount = (otherShots - reduceBy) * 18.0;
+                        otherBeans[i].isUserOverridden = true;
+                        remainingChange -= reduceBy;
+                        if (remainingChange === 0) break;
+                    }
+                }
             } else {
-                otherBeans.forEach(x => {
-                    x.amount = remainingGrams / otherBeans.length;
-                    x.isUserOverridden = true;
-                });
+                // We are decreasing target bean. We need to increase other beans.
+                // We add it to the first other bean.
+                const firstOtherShots = Math.round(parseFloat(otherBeans[0].amount || 0) / 18.0);
+                otherBeans[0].amount = (firstOtherShots + 1) * 18.0;
+                otherBeans[0].isUserOverridden = true;
+                remainingChange = 0;
             }
+            
+            if (remainingChange === 0) {
+                targetBean.amount = newShots * 18.0;
+                targetBean.isUserOverridden = true;
+            }
+        } else {
+            // Standard Brew: change is in grams
+            const totalGrams = getTotalCoffeeBeansGrams();
+            const currentGrams = parseFloat(targetBean.amount || 0);
+            const newGrams = currentGrams + change;
+            
+            if (newGrams < 0 || newGrams > totalGrams) return;
+            
+            const otherBeans = coffeeBeans.filter(x => x.id != id);
+            let remainingChange = -change;
+            
+            if (change > 0) {
+                // Decrease other beans
+                for (let i = 0; i < otherBeans.length; i++) {
+                    const otherG = parseFloat(otherBeans[i].amount || 0);
+                    if (otherG > 0) {
+                        const reduceBy = Math.min(otherG, remainingChange);
+                        otherBeans[i].amount = otherG - reduceBy;
+                        otherBeans[i].isUserOverridden = true;
+                        remainingChange -= reduceBy;
+                        if (remainingChange === 0) break;
+                    }
+                }
+            } else {
+                // Increase other beans (add it to the first other bean)
+                otherBeans[0].amount = parseFloat(otherBeans[0].amount || 0) + 1;
+                otherBeans[0].isUserOverridden = true;
+                remainingChange = 0;
+            }
+            
+            if (remainingChange === 0) {
+                targetBean.amount = newGrams;
+                targetBean.isUserOverridden = true;
+            }
+        }
+        
+        // Trigger updates asynchronously
+        updateCoffeeChemistryWizard().then(() => {
+            updateSelectedArea();
+            if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                triggerFlavorSynthesis();
+            }
+        });
+    }
+
+    function removeCoffeeBeanSplit(id) {
+        // Find target index in selectedIngredients
+        const index = selectedIngredients.findIndex(x => x.id == id && (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        if (index === -1) return;
+        
+        // Remove the bean
+        selectedIngredients.splice(index, 1);
+        
+        // Restore remaining coffee beans to the full budget
+        const remainingBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
+        if (remainingBeans.length === 1) {
+            remainingBeans[0].amount = getTotalCoffeeBeansGrams();
+            remainingBeans[0].isUserOverridden = false;
+        } else if (remainingBeans.length > 1) {
+            const totalGrams = getTotalCoffeeBeansGrams();
+            remainingBeans.forEach(x => {
+                x.amount = totalGrams / remainingBeans.length;
+                x.isUserOverridden = true;
+            });
         }
         
         // Trigger updates asynchronously
@@ -656,8 +739,35 @@
         if (oldBudget > 0 && Math.abs(oldBudget - newBudget) > 0.001) {
             const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
             if (coffeeBeans.length > 0) {
-                if (coffeeBeans.length === 1) {
+                const isEspresso = (coffeeBaseType === 'espresso');
+                const targetShotsCount = isEspresso ? Math.round(newBudget / 18.0) : 999;
+                
+                if (isEspresso && targetShotsCount < 2 && coffeeBeans.length > 1) {
+                    // Merge splits back into the first bean
+                    const firstBean = coffeeBeans[0];
+                    firstBean.amount = newBudget;
+                    firstBean.isUserOverridden = false;
+                    selectedIngredients = selectedIngredients.filter(x => 
+                        (x.type || x.ingredient_type || '').toUpperCase() !== 'COFFEE_BEAN' || x.id === firstBean.id
+                    );
+                } else if (coffeeBeans.length === 1) {
                     coffeeBeans[0].amount = newBudget;
+                } else if (isEspresso) {
+                    let sumOfShots = 0;
+                    const shotsList = coffeeBeans.map(x => {
+                        const s = Math.round((parseFloat(x.amount || 0) / oldBudget) * targetShotsCount);
+                        sumOfShots += s;
+                        return s;
+                    });
+                    
+                    let diff = targetShotsCount - sumOfShots;
+                    if (diff !== 0) {
+                        shotsList[0] = Math.max(0, shotsList[0] + diff);
+                    }
+                    
+                    coffeeBeans.forEach((x, i) => {
+                        x.amount = shotsList[i] * 18.0;
+                    });
                 } else {
                     const totalCurrentGrams = coffeeBeans.reduce((sum, x) => sum + parseFloat(x.amount || 0), 0);
                     if (totalCurrentGrams > 0) {
@@ -1215,11 +1325,25 @@
         const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
         if (coffeeBeans.length > 0) {
             const totalGrams = getTotalCoffeeBeansGrams();
+            const isEspresso = (coffeeBaseType === 'espresso');
             const count = coffeeBeans.length;
-            coffeeBeans.forEach(x => {
-                x.amount = totalGrams / count;
-                x.isUserOverridden = false;
-            });
+            
+            if (isEspresso) {
+                const totalShots = coffeeBaseAmount;
+                const baseShots = Math.floor(totalShots / count);
+                const remainder = totalShots % count;
+                
+                coffeeBeans.forEach((x, i) => {
+                    const shots = baseShots + (i < remainder ? 1 : 0);
+                    x.amount = shots * 18.0;
+                    x.isUserOverridden = false;
+                });
+            } else {
+                coffeeBeans.forEach(x => {
+                    x.amount = totalGrams / count;
+                    x.isUserOverridden = false;
+                });
+            }
         }
         const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
         const isDone = selectedIngredients.length >= maxIngredients;
@@ -2295,6 +2419,8 @@
             let role;
             if (hasRtdBase && index === firstRtdIndex && currentLabMode !== 'COFFEE') {
                 role = 'VOLUME FILLER';
+            } else if (currentLabMode === 'COFFEE' && (ing.type || ing.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN') {
+                role = 'COFFEE BASE';
             } else {
                 role = (isLast && isFull) ? 'FINAL' : (roles[index] || 'MODIFIER');
             }
@@ -2307,7 +2433,7 @@
             }
 
             const isDry = ing.isDry === true || ing.isDry === 'true';
-            const isDryCoffee = currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN';
+            const isDryCoffee = currentLabMode === 'COFFEE' && (ing.type || ing.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN';
             const ingUnit = (isDry || isDryCoffee) ? 'g' : 'ml';
 
             let alignedItem = null;
@@ -2363,9 +2489,12 @@
                 } else {
                     if (isDryCoffee) {
                         if (coffeeBaseType === 'espresso') {
-                            dualLabel = `${coffeeBaseAmount} shot${coffeeBaseAmount > 1 ? 's' : ''}`;
+                            const shots = Math.round(parseFloat(amount || 0) / 18.0);
+                            dualLabel = `${shots} shot${shots !== 1 ? 's' : ''} (${(shots * 0.9).toFixed(2)}oz extraction)`;
                         } else {
-                            dualLabel = `${coffeeBaseAmount}oz`;
+                            const totalG = getTotalCoffeeBeansGrams();
+                            const oz = totalG > 0 ? (amount * (coffeeBaseAmount / totalG)).toFixed(1) : coffeeBaseAmount;
+                            dualLabel = `${oz}oz (${parseFloat(amount).toFixed(1)}g)`;
                         }
                     } else {
                         dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
@@ -2401,13 +2530,30 @@
 
             let sliderHtml = '';
             const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
-            if (currentLabMode === 'COFFEE' && ing.type === 'COFFEE_BEAN' && coffeeBeans.length > 1) {
+            if (currentLabMode === 'COFFEE' && (ing.type || ing.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN' && coffeeBeans.length > 1) {
                 const totalG = getTotalCoffeeBeansGrams();
-                const curVal = amount;
+                const curVal = parseFloat(amount || 0);
+                const isEspresso = (coffeeBaseType === 'espresso');
+                
+                let displayVal = '';
+                if (isEspresso) {
+                    const shots = Math.round(curVal / 18.0);
+                    displayVal = `${shots} shot${shots !== 1 ? 's' : ''}`;
+                } else {
+                    displayVal = `${Math.round(curVal)}g`;
+                }
+
                 sliderHtml = `
-                    <div class="my-2 px-1">
-                        <input type="range" class="form-range custom-slider" min="0" max="${totalG}" step="0.5" value="${curVal}" oninput="adjustCoffeeBeanSplit(${ing.id}, this.value)">
-                        <div class="text-dim font-monospace mt-1" style="font-size: 0.55rem;">SPLIT: ${parseFloat(curVal).toFixed(1)}g / ${totalG}g</div>
+                    <div class="my-2 px-1 d-flex flex-column align-items-center gap-1">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <button type="button" class="btn btn-xs btn-outline-warning px-2 py-0 border-white border-opacity-10 text-white font-monospace" onclick="adjustCoffeeBeanSplitButtons(${ing.id}, -1)">-</button>
+                            <span class="text-white font-monospace small" style="min-width: 55px; display: inline-block;">${displayVal}</span>
+                            <button type="button" class="btn btn-xs btn-outline-warning px-2 py-0 border-white border-opacity-10 text-white font-monospace" onclick="adjustCoffeeBeanSplitButtons(${ing.id}, 1)">+</button>
+                        </div>
+                        <div class="text-dim font-monospace mt-1" style="font-size: 0.55rem;">SPLIT: ${curVal.toFixed(1)}g / ${totalG.toFixed(1)}g</div>
+                        <button type="button" class="btn btn-xs btn-outline-danger px-2 py-0.5 border-white border-opacity-10 mt-1" style="font-size: 0.55rem;" onclick="removeCoffeeBeanSplit(${ing.id})">
+                            <i class="bi bi-trash"></i> Remove Split
+                        </button>
                     </div>
                 `;
             }
@@ -2446,7 +2592,8 @@
             `;
 
             // 🧊 Inject virtual Ice card right next to the coffee base for iced style
-            if (currentLabMode === 'COFFEE' && isDryCoffee && coffeeStyle === 'iced') {
+            const isLastCoffeeBean = isDryCoffee && (coffeeBeans.length > 0 && coffeeBeans[coffeeBeans.length - 1].id === ing.id);
+            if (currentLabMode === 'COFFEE' && isLastCoffeeBean && coffeeStyle === 'iced') {
                 const iceOz = getIceAmountOz(coffeeSizeOz);
                 const iceMl = Math.round(iceOz * 29.5735);
                 html += `
@@ -2467,7 +2614,7 @@
             }
 
             // 💧 Inject virtual Hot Water card right next to the coffee base for hot espresso in water mode
-            if (currentLabMode === 'COFFEE' && isDryCoffee && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water') {
+            if (currentLabMode === 'COFFEE' && isLastCoffeeBean && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water') {
                 const hotWaterOz = (coffeeBaseAmount * 0.9).toFixed(1);
                 const hotWaterMl = Math.round(hotWaterOz * 29.5735);
                 html += `
@@ -2520,7 +2667,9 @@
         const dropdownMenu = document.getElementById('mixBeanDropdownMenu');
         if (dropdownContainer && dropdownMenu) {
             const coffeeBeansInMix = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
-            if (currentLabMode === 'COFFEE' && coffeeBeansInMix.length > 0 && !isMixSealed) {
+            const isEspressoBase = (coffeeBaseType === 'espresso');
+            const canSplit = !isEspressoBase || (coffeeBaseAmount >= 2);
+            if (currentLabMode === 'COFFEE' && coffeeBeansInMix.length > 0 && !isMixSealed && canSplit) {
                 dropdownContainer.style.setProperty('display', 'inline-block', 'important');
                 
                 // Get all COFFEE_BEAN buttons from availableIngredients
