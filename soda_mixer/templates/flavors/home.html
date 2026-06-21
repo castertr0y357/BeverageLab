@@ -1461,31 +1461,50 @@
                     drinkCategory = "Pure Espresso / Short Milk";
                 }
 
-                const r = await fetch('/api/coffee/chemistry/', {
+                const mappedIngredients = selectedIngredients.map((ing, idx) => {
+                    const ingCopy = { ...ing };
+                    if (ingCopy.type === 'COFFEE_BEAN') {
+                        ingCopy.coffee_base_type = coffeeBaseType;
+                    }
+                    let amount = ing.amount;
+                    if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
+                        amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
+                    } else {
+                        amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
+                    }
+                    ingCopy.amount = amount;
+                    ingCopy.ingredient_type = ing.type;
+                    return ingCopy;
+                });
+
+                const chemistryPromise = fetch('/api/coffee/chemistry/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                     body: JSON.stringify({
                         drink_category: drinkCategory,
                         cup_size_oz: coffeeSizeOz,
                         espresso_hot_mode: coffeeEspressoHotMode,
-                        ingredients: selectedIngredients.map((ing, idx) => {
-                            const ingCopy = { ...ing };
-                            if (ingCopy.type === 'COFFEE_BEAN') {
-                                ingCopy.coffee_base_type = coffeeBaseType;
-                            }
-                            let amount = ing.amount;
-                            if (ing.isAiBalanced && ing.aiRatio !== undefined && ing.type !== 'COFFEE_BEAN' && ing.type !== 'DAIRY') {
-                                amount = Math.round(coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType) * ing.aiRatio);
-                            } else {
-                                amount = coffeeAmountForIngredient(ing, idx, coffeeSizeOz, coffeeBaseType);
-                            }
-                            ingCopy.amount = amount;
-                            ingCopy.ingredient_type = ing.type;
-                            return ingCopy;
-                        })
+                        ingredients: mappedIngredients
                     })
                 });
-                const data = await r.json();
+
+                const aiProfilePromise = fetch('/api/ai/synthesize/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        ingredients: mappedIngredients,
+                        drink_type: currentLabMode
+                    })
+                });
+
+                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const data = await chemRes.json();
+                let aiProfileData = null;
+                try {
+                    aiProfileData = await aiRes.json();
+                } catch (e) {
+                    console.error("AI profile synthesis failed", e);
+                }
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -1610,7 +1629,12 @@
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">BARISTA RECOMMENDATIONS</h6>
-                                    <p class="mb-0 italic small text-dim">"${data.barista_notes}"</p>
+                                    <p class="mb-0 italic small text-dim mb-3">"${data.barista_notes}"</p>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
                                 </div>
                             </div>
                         </div>

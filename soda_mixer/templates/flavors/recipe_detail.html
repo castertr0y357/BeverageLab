@@ -925,23 +925,42 @@
         }
 
         try {
-            const r = await fetch('/api/coffee/chemistry/', {
+            const mappedIngredients = ingredients.map(ing => {
+                const copy = { ...ing };
+                if (copy.ingredient_type === 'COFFEE_BEAN') {
+                    copy.coffee_base_type = coffeeBaseType;
+                }
+                return copy;
+            });
+
+            const chemistryPromise = fetch('/api/coffee/chemistry/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                 body: JSON.stringify({
                     drink_category: drinkCategory,
                     cup_size_oz: coffeeSizeOz,
                     espresso_hot_mode: coffeeEspressoHotMode,
-                    ingredients: ingredients.map(ing => {
-                        const copy = { ...ing };
-                        if (copy.ingredient_type === 'COFFEE_BEAN') {
-                            copy.coffee_base_type = coffeeBaseType;
-                        }
-                        return copy;
-                    })
+                    ingredients: mappedIngredients
                 })
             });
-            const data = await r.json();
+
+            const aiProfilePromise = fetch('/api/ai/synthesize/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    ingredients: mappedIngredients,
+                    drink_type: 'COFFEE'
+                })
+            });
+
+            const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+            const data = await chemRes.json();
+            let aiProfileData = null;
+            try {
+                aiProfileData = await aiRes.json();
+            } catch (e) {
+                console.error("AI profile synthesis failed", e);
+            }
 
             let validationBadge = '';
             if (data.recipe_validation) {
@@ -1011,7 +1030,12 @@
 
                 <div class="pt-2 border-top border-white border-opacity-5">
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">BARISTA RECOMMENDATION</span>
-                    <p class="mb-0 small text-dim italic">"${data.barista_notes}"</p>
+                    <p class="mb-0 small text-dim italic mb-3">"${data.barista_notes}"</p>
+                </div>
+
+                <div class="pt-2 border-top border-white border-opacity-5">
+                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">OVERALL PROFILE DESCRIPTION</span>
+                    <p class="mb-0 small text-white opacity-90 italic" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
                 </div>
             `;
         } catch (err) {
