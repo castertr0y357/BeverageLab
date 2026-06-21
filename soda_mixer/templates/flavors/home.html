@@ -542,24 +542,26 @@
             if (coffeeStyle === 'espresso_shot') {
                 if (coffeeSizeOz === 1) {
                     coffeeBaseAmount = 1;
+                } else if (coffeeSizeOz === 2) {
+                    coffeeBaseAmount = 2;
+                } else if (coffeeSizeOz === 3) {
+                    coffeeBaseAmount = 3;
+                } else if (coffeeSizeOz === 4) {
+                    coffeeBaseAmount = 4;
                 } else {
                     coffeeBaseAmount = 2;
                 }
             } else { // hot or iced
-                if (coffeeStyle === 'hot' && coffeeEspressoHotMode === 'shots') {
-                    coffeeBaseAmount = Math.round(coffeeSizeOz * 0.30);
+                if (coffeeSizeOz === 8) {
+                    coffeeBaseAmount = 1;
+                } else if (coffeeSizeOz === 12) {
+                    coffeeBaseAmount = 2;
+                } else if (coffeeSizeOz === 16) {
+                    coffeeBaseAmount = 3;
+                } else if (coffeeSizeOz === 20) {
+                    coffeeBaseAmount = 4;
                 } else {
-                    if (coffeeSizeOz === 8) {
-                        coffeeBaseAmount = 1;
-                    } else if (coffeeSizeOz === 12) {
-                        coffeeBaseAmount = 2;
-                    } else if (coffeeSizeOz === 16) {
-                        coffeeBaseAmount = 3;
-                    } else if (coffeeSizeOz === 20) {
-                        coffeeBaseAmount = 4;
-                    } else {
-                        coffeeBaseAmount = 2;
-                    }
+                    coffeeBaseAmount = 2;
                 }
             }
         } else { // standard_brew
@@ -611,7 +613,9 @@
         if (shotMode) {
             sizeBtns.innerHTML = `
                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
-                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size3oz" onclick="setCoffeeSize(3)">Triple (3oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size4oz" onclick="setCoffeeSize(4)">Quad (4oz)</button>
             `;
             // Force coffee base type to espresso for shots
             coffeeBaseType = 'espresso';
@@ -621,7 +625,9 @@
             const coffeeBaseTypeField = document.getElementById('coffeeBaseTypeField');
             if (coffeeBaseTypeField) coffeeBaseTypeField.value = 'espresso';
 
-            setCoffeeSize(2);
+            const prev = coffeeSizeOz;
+            const defaultSize = [1,2,3,4].includes(prev) ? prev : 2;
+            setCoffeeSize(defaultSize);
         } else {
             // Default 12oz selected
             const prev = coffeeSizeOz;
@@ -883,8 +889,12 @@
         
         // Apply saved selections via setters
         setCoffeeStyle(savedCoffeeStyle);
-        if (savedCoffeeStyle !== 'espresso_shot') {
-            setCoffeeSize(savedCoffeeSizeOz);
+        if (savedCoffeeStyle === 'espresso_shot') {
+            const validSize = [1, 2, 3, 4].includes(savedCoffeeSizeOz) ? savedCoffeeSizeOz : 2;
+            setCoffeeSize(validSize);
+        } else {
+            const validSize = [8, 12, 16, 20].includes(savedCoffeeSizeOz) ? savedCoffeeSizeOz : 12;
+            setCoffeeSize(validSize);
         }
         setCoffeeBaseType(savedCoffeeBaseType);
     });

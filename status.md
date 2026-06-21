@@ -14,6 +14,7 @@
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
 
 ## 🛠️ Completed Tasks
+- [x] Simplified espresso options so shot sizes start at 1 and increase by 1: 1 shot (1oz), 2 shots (2oz), 3 shots (3oz), and 4 shots (4oz). Enforced linear shot mapping (1 shot for 8oz, 2 shots for 12oz, 3 shots for 16oz, 4 shots for 20oz) for all espresso options in home and recipe detail views.
 - [x] Implemented consistent espresso shot volume adjustments, including a virtual "Hot Water" card in water dilution mode and shot count scaling in shots mode across the wizard and recipe detail views.
 - [x] Added auto-reanalysis to trigger AI/chemistry re-evaluation immediately when style, size, or coffee base is updated after an analysis has been initiated.
 - [x] Enforced mix sealing: blocked adding further steps or ingredients, and hid the step selection UI and base library until step back or reset is clicked.
