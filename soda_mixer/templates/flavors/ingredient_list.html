@@ -817,6 +817,13 @@
         const nameInput = document.getElementById(prefix + 'Name');
         const brandInput = document.getElementById(prefix + 'Brand');
         const descInput = document.getElementById(prefix + 'Desc') || { value: '' };
+
+        if (!nameInput) {
+            console.error('[synthesizeProfile] Could not find name input for prefix:', prefix);
+            alert('Comms Failure: Modal input not found. Please try closing and reopening the form.');
+            return;
+        }
+
         const name = nameInput.value.trim();
         const brand = brandInput ? brandInput.value.trim() : '';
         const description = descInput.value.trim();
@@ -839,6 +846,12 @@
                 },
                 body: JSON.stringify({ name, brand, description })
             });
+            if (!response.ok) {
+                const errText = await response.text();
+                console.error('[synthesizeProfile] Server returned HTTP', response.status, errText.substring(0, 500));
+                alert(`Analysis Error: Server returned HTTP ${response.status}. Check console for details.`);
+                return;
+            }
             const data = await response.json();
             
             if (data.status === 'success') {
@@ -964,7 +977,8 @@
                 alert("Analysis Error: " + data.error);
             }
         } catch (err) {
-            alert("Comms Failure: Could not reach assistant substrate.");
+            console.error('[synthesizeProfile] Caught exception:', err);
+            alert("Comms Failure: Could not reach assistant substrate.\n\nSee browser console (F12) for details.");
         } finally {
             setTimeout(() => {
                 btn.disabled = false;
