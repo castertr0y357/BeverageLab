@@ -169,20 +169,20 @@ def suggest_categories(ingredient_ids: Union[List[int], Set[int]]) -> List[str]:
 
 
 # pairing suggestions with intensity rules
-def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None) -> Dict[str, Any]:
+def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None, exclude_ids: Optional[List[int]] = None) -> Dict[str, Any]:
     """
     Get ingredient recommendations based on selected ingredients.
     """
     if not ingredient_ids:
         return {
-            'recommended': _get_top_recommendations(drink_type, experimental),
+            'recommended': _get_top_recommendations(drink_type, experimental, exclude_ids=exclude_ids),
             'recipes': [],
             'suggestions': []
         }
     
     selected_ingredients = Ingredient.objects.filter(id__in=ingredient_ids)
     if not selected_ingredients.exists():
-        return get_recommendation([], drink_type, experimental)
+        return get_recommendation([], drink_type, experimental, force_type=force_type, exclude_ids=exclude_ids)
     
     recommendations = []
     
@@ -206,6 +206,11 @@ def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', expe
             
         if force_type:
             matching_ingredients = matching_ingredients.filter(ingredient_type=force_type)
+
+        if exclude_ids:
+            filtered_ingredients = matching_ingredients.exclude(id__in=exclude_ids)
+            if filtered_ingredients.exists():
+                matching_ingredients = filtered_ingredients
         
         # Score matching ingredients
         for i in matching_ingredients:
@@ -242,7 +247,7 @@ def get_recommendation(ingredient_ids: List[int], drink_type: str = 'SODA', expe
         'suggestions': list(selected_ingredients)
     }
 
-def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None) -> Dict[str, Any]:
+def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, drink_type: str = 'SODA', experimental: bool = False, force_type: Optional[str] = None, exclude_ids: Optional[List[int]] = None) -> Dict[str, Any]:
     """
     Get tiered recommendations (Secondary or Tertiary) based on selected base and optional secondary.
     """
@@ -285,6 +290,11 @@ def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, 
             
         if force_type:
             candidates = candidates.filter(ingredient_type=force_type)
+            
+        if exclude_ids:
+            filtered_candidates = candidates.exclude(id__in=exclude_ids)
+            if filtered_candidates.exists():
+                candidates = filtered_candidates
         
         for cand in candidates:
             score_data = _calculate_compatibility_score(base_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating)
@@ -324,6 +334,11 @@ def get_tiered_recommendation(base_id: int, secondary_id: Optional[int] = None, 
             
         if force_type:
             candidates = candidates.filter(ingredient_type=force_type)
+            
+        if exclude_ids:
+            filtered_candidates = candidates.exclude(id__in=exclude_ids)
+            if filtered_candidates.exists():
+                candidates = filtered_candidates
         
         for cand in candidates:
             res1 = _calculate_compatibility_score(base_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating)
@@ -449,7 +464,7 @@ def calculate_recipe_stats(recipe_ingredients: Union[List[RecipeIngredient], Que
     }
 
 
-def _get_top_recommendations(drink_type: str = 'SODA', experimental: bool = False) -> List[Dict[str, Any]]:
+def _get_top_recommendations(drink_type: str = 'SODA', experimental: bool = False, exclude_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     """Get top recommended base ingredients to start a mix."""
     recommendations = []
     
@@ -459,6 +474,11 @@ def _get_top_recommendations(drink_type: str = 'SODA', experimental: bool = Fals
         query = query.filter(compatible_systems__icontains=drink_type)
         if drink_type == 'COFFEE':
             query = query.filter(ingredient_type='COFFEE_BEAN')
+            
+    if exclude_ids:
+        filtered_query = query.exclude(id__in=exclude_ids)
+        if filtered_query.exists():
+            query = filtered_query
         
     # Get a diverse, dynamic set of 10 ingredients to serve as bases
     diverse_bases = query.order_by('?')[:10]

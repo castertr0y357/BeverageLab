@@ -1979,4 +1979,170 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         self.assertEqual(water_part['volume_oz'], 0.9)
 
 
+class BeverageLabRecommendationExclusionTest(TestCase):
+    """Test case for recommendation exclusion and fallback logic."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.client.login(username="lab_tech", password="secure_password_123")
+        
+        # Deactivate all other ingredients from active inventory for deterministic testing
+        Ingredient.objects.all().update(is_in_inventory=False)
+        
+        # Create some ingredients of same system (SODA) and category to ensure compatibility
+        self.ing1 = Ingredient.objects.create(
+            name="Soda Base Cola",
+            ingredient_type="SODA_SYRUP",
+            category="citrus",
+            intensity=3,
+            sweetness=4,
+            acidity=2,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        self.ing2 = Ingredient.objects.create(
+            name="Vanilla Twist",
+            ingredient_type="SODA_SYRUP",
+            category="sweet",
+            intensity=2,
+            sweetness=5,
+            acidity=1,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        self.ing3 = Ingredient.objects.create(
+            name="Cherry Blast",
+            ingredient_type="SODA_SYRUP",
+            category="sweet",
+            intensity=3,
+            sweetness=4,
+            acidity=3,
+            bitterness=1,
+            complexity=3,
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+
+    def test_algorithmic_exclusion(self) -> None:
+        # Without exclusions, recommendations should contain both ing2 and ing3
+        res = get_recommendation([self.ing1.id], drink_type="SODA")
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        self.assertIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+        # With exclusion of ing2, it should only recommend ing3
+        res = get_recommendation([self.ing1.id], drink_type="SODA", exclude_ids=[self.ing2.id])
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        self.assertNotIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+    def test_algorithmic_exclusion_fallback(self) -> None:
+        # If all candidates (ing2 and ing3) are excluded, it should fall back to recommend all candidates
+        res = get_recommendation([self.ing1.id], drink_type="SODA", exclude_ids=[self.ing2.id, self.ing3.id])
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        # Because of fallback, both ingredients should be returned
+        self.assertIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+    def test_tiered_exclusion_secondary(self) -> None:
+        res = get_tiered_recommendation(self.ing1.id, drink_type="SODA", exclude_ids=[self.ing2.id])
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        self.assertNotIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+    def test_tiered_exclusion_secondary_fallback(self) -> None:
+        # Exclude everything, it should fallback and recommend everything
+        res = get_tiered_recommendation(self.ing1.id, drink_type="SODA", exclude_ids=[self.ing2.id, self.ing3.id])
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        self.assertIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+    def test_get_recommendations_api_exclusion(self) -> None:
+        response = self.client.post(
+            reverse('get_recommendations_api'),
+            data=json.dumps({
+                'ingredient_ids': [self.ing1.id],
+                'drink_type': 'SODA',
+                'exclude_ids': [self.ing2.id]
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        recommended_ids = [r['id'] for r in data['recommended']]
+        self.assertNotIn(self.ing2.id, recommended_ids)
+        self.assertIn(self.ing3.id, recommended_ids)
+
+    @patch('requests.request')
+    def test_ai_suggest_api_exclusion_and_fallback(self, mock_request: MagicMock) -> None:
+        # Set up default LLM provider
+        provider = LLMProvider.objects.create(
+            name="Mock OpenAI",
+            provider_type="OPENAI",
+            api_key="mock-key-123",
+            default_model="gpt-3.5-turbo",
+            is_enabled=True
+        )
+        config = SystemConfiguration.get_config()
+        config.default_llm_provider = provider
+        config.save()
+
+        # 1. Normal exclusion request
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Cherry Blast", "reason": "Adds flavor", "resonance": 95, "amount": 100.0}]}'}}]
+        }
+        mock_request.return_value = mock_response
+
+        # We exclude Vanilla Twist
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': [self.ing1.name],
+                'drink_type': 'SODA',
+                'exclude': [self.ing2.name]
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = _get_sse_data(response)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['suggestions'][0]['name'], 'Cherry Blast')
+        
+        # Verify call to AI service has the excluded ingredient in the request context/instructions
+        args, kwargs = mock_request.call_args
+        user_msg = kwargs['json']['messages'][1]['content']
+        self.assertIn("Exclude these previously suggested items: Vanilla Twist.", user_msg)
+
+        # 2. Exclude all candidates: Cherry Blast and Vanilla Twist
+        # It should fall back, meaning Vanilla Twist and Cherry Blast are still in the context.
+        mock_response_fallback = MagicMock()
+        mock_response_fallback.status_code = 200
+        mock_response_fallback.json.return_value = {
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Vanilla Twist", "reason": "Adds flavor", "resonance": 95, "amount": 100.0}]}'}}]
+        }
+        mock_request.return_value = mock_response_fallback
+
+        response_fallback = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': [self.ing1.name],
+                'drink_type': 'SODA',
+                'exclude': [self.ing2.name, self.ing3.name]
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response_fallback.status_code, 200)
+        data_fallback = _get_sse_data(response_fallback)
+        self.assertEqual(data_fallback['status'], 'success')
+        self.assertEqual(data_fallback['suggestions'][0]['name'], 'Vanilla Twist')
+
+
+
 

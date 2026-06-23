@@ -3,4 +3,9 @@ services:
     ports:
       - "5434:5432"
 
+  web:
+    volumes:
+      - .:/app
+
+
 

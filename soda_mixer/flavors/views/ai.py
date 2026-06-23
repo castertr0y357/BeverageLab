@@ -89,12 +89,14 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
         experimental = data.get('mode') == 'experimental' or data.get('experimental', False)
         force_type = data.get('force_type') # e.g. 'ADDITIVE'
         drink_type = data.get('drink_type', 'SODA').upper()
+        exclude_ids = data.get('exclude_ids', [])
+        exclude_ids = [int(i) for i in exclude_ids if str(i).isdigit()]
 
         serialized_recs: List[Dict[str, Any]] = []
         multibrand_names = get_multibrand_names_in_inventory()
 
         if len(ingredient_ids) == 0:
-            result = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type)
+            result = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
@@ -116,7 +118,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                 } for r in result.get('recommended', [])
             ]
         elif len(ingredient_ids) == 1:
-            result = get_tiered_recommendation(ingredient_ids[0], drink_type=drink_type, experimental=experimental, force_type=force_type)
+            result = get_tiered_recommendation(ingredient_ids[0], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
@@ -138,7 +140,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                 } for r in result.get('recommended', [])
             ]
         else:
-            result = get_tiered_recommendation(ingredient_ids[0], ingredient_ids[1], drink_type=drink_type, experimental=experimental, force_type=force_type)
+            result = get_tiered_recommendation(ingredient_ids[0], ingredient_ids[1], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
@@ -373,8 +375,43 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             
             # Get full inventory registry for AI context
             all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-            registry = []
+            
+            # Filter the candidate pool for this step
+            candidate_pool = all_ingredients
+            if force_type:
+                candidate_pool = candidate_pool.filter(ingredient_type=force_type)
+            if mode != 'experimental':
+                candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
+            
+            exclude_names = [name.strip().lower() for name in exclude]
+            remaining = []
+            for ing in candidate_pool:
+                display_name = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+                if ing.name.strip().lower() in exclude_names or display_name.strip().lower() in exclude_names:
+                    continue
+                remaining.append(ing)
+                
+            if remaining:
+                oracle_ingredients = remaining
+                actual_exclude = exclude
+            else:
+                oracle_ingredients = list(candidate_pool)
+                actual_exclude = []
+                
+            # Build the registry context with details of active candidates + current ingredients
+            current_names = [n.strip().lower() for n in ingredients]
+            registry_ingredients = []
+            seen_ids = set()
             for ing in all_ingredients:
+                display_name = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+                is_current = (ing.name.strip().lower() in current_names or display_name.strip().lower() in current_names)
+                is_oracle = any(o.id == ing.id for o in oracle_ingredients)
+                if (is_current or is_oracle) and ing.id not in seen_ids:
+                    registry_ingredients.append(ing)
+                    seen_ids.add(ing.id)
+                    
+            registry = []
+            for ing in registry_ingredients:
                 ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
                 if ing.ingredient_type == 'COFFEE_BEAN':
                     coffee_details = f"Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acidity: {ing.acidity_score}/5, Bitterness: {ing.bitterness_score}/5, Flavor Notes: {ing.flavor_notes}"
@@ -398,7 +435,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     ingredients, mode, 
                     drink_type=drink_type,
                     inventory=inventory_context, 
-                    exclude=exclude,
+                    exclude=actual_exclude,
                     retry_note=retry_note,
                     force_type=force_type
                 )

@@ -302,6 +302,9 @@
     let selectedIngredients = []; 
     let bottleScale = 1.0; 
     let latestCoffeeChemistryData = null;
+    let currentStepKey = '';
+    let stepExcludingIds = [];
+    let stepExcludingNames = [];
 
     function getChemistryAlignedIngredient(ing, idx) {
         if (!latestCoffeeChemistryData || !latestCoffeeChemistryData.ingredients) {
@@ -1840,387 +1843,424 @@
 
         if (totalCount === 0) {
             if (emptyMsg) emptyMsg.classList.remove('d-none');
-            if (stepHeader) stepHeader.classList.add('d-none');
-            if (partitionedBases) partitionedBases.classList.add('d-none');
-        } else {
-            if (emptyMsg) emptyMsg.classList.add('d-none');
-            if (stepHeader) stepHeader.classList.remove('d-none');
-            if (partitionedBases) partitionedBases.classList.remove('d-none');
+                if (emptyMsg) emptyMsg.classList.add('d-none');
+                if (stepHeader) stepHeader.classList.remove('d-none');
+                if (partitionedBases) partitionedBases.classList.remove('d-none');
+            }
         }
-    }
-
-    function resetMixer() {
-        selectedIngredients = [];
-        bottleScale = 1.0;
-        latestCoffeeChemistryData = null;
-        isMixSealed = false;
         
-        // Reset soda/slushie scale UI
-        ['scale1L', 'scale05L', 'scale12oz'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.toggle('active-lab-mode', id === 'scale1L');
-        });
-        ['scale16oz', 'scale32oz', 'scale48oz', 'scale64oz'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.toggle('active-lab-mode', id === 'scale32oz');
-        });
-        
-        // Reset coffee controls to saved/default state
-        const savedStyle = localStorage.getItem('coffee_style') || 'hot';
-        const savedSize  = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
-        const savedBase  = localStorage.getItem('coffee_base_type') || 'espresso';
-        
-        // Sync selectors using their setter functions
-        setCoffeeStyle(savedStyle);
-        if (savedStyle !== 'espresso_shot') {
-            setCoffeeSize(savedSize);
+        function resetMixer() {
+            selectedIngredients = [];
+            bottleScale = 1.0;
+            latestCoffeeChemistryData = null;
+            isMixSealed = false;
+            currentStepKey = '';
+            stepExcludingIds = [];
+            stepExcludingNames = [];
+            
+            // Reset soda/slushie scale UI
+            ['scale1L', 'scale05L', 'scale12oz'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('active-lab-mode', id === 'scale1L');
+            });
+            ['scale16oz', 'scale32oz', 'scale48oz', 'scale64oz'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('active-lab-mode', id === 'scale32oz');
+            });
+            
+            // Reset coffee controls to saved/default state
+            const savedStyle = localStorage.getItem('coffee_style') || 'hot';
+            const savedSize  = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
+            const savedBase  = localStorage.getItem('coffee_base_type') || 'espresso';
+            
+            // Sync selectors using their setter functions
+            setCoffeeStyle(savedStyle);
+            if (savedStyle !== 'espresso_shot') {
+                setCoffeeSize(savedSize);
+            }
+            setCoffeeBaseType(savedBase);
+            
+            document.getElementById('stepContainer').style.display = 'block';
+            document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
+            document.getElementById('synthesisReportContainer').style.display = 'none';
+            updateSelectedArea();
+            document.getElementById('recommendationContainer').innerHTML = '';
+            document.getElementById('partitionedBasesContainer').style.display = 'block';
+            partitionBases();
         }
-        setCoffeeBaseType(savedBase);
-        
-        document.getElementById('stepContainer').style.display = 'block';
-        document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
-        document.getElementById('synthesisReportContainer').style.display = 'none';
-        updateSelectedArea();
-        document.getElementById('recommendationContainer').innerHTML = '';
-        document.getElementById('partitionedBasesContainer').style.display = 'block';
-        partitionBases();
-    }
 
-    function stepBack() {
-        if (selectedIngredients.length === 0) return;
-        
-        selectedIngredients.pop();
-        isMixSealed = false;
-        document.getElementById('stepContainer').style.display = 'block';
-        document.getElementById('synthesisReportContainer').style.display = 'none';
-        
-        if (currentLabMode === 'COFFEE') {
-            updateCoffeeChemistryWizard().then(() => {
+        function stepBack() {
+            if (selectedIngredients.length === 0) return;
+            
+            selectedIngredients.pop();
+            isMixSealed = false;
+            document.getElementById('stepContainer').style.display = 'block';
+            document.getElementById('synthesisReportContainer').style.display = 'none';
+            
+            if (currentLabMode === 'COFFEE') {
+                updateCoffeeChemistryWizard().then(() => {
+                    updateSelectedArea();
+                    fetchRecommendations();
+                    
+                    if (selectedIngredients.length === 0) {
+                        resetMixer();
+                    }
+                });
+            } else {
                 updateSelectedArea();
                 fetchRecommendations();
                 
                 if (selectedIngredients.length === 0) {
                     resetMixer();
                 }
-            });
-        } else {
-            updateSelectedArea();
-            fetchRecommendations();
-            
-            if (selectedIngredients.length === 0) {
-                resetMixer();
             }
         }
-    }
 
-    async function fetchRecommendations() {
-        if (isMixSealed) {
-            document.getElementById('stepContainer').style.display = 'none';
-            const lib = document.getElementById('partitionedBasesContainer');
-            if (lib) lib.style.display = 'none';
-            return;
-        }
-
-        if (activeProgressTimer) {
-            clearTimeout(activeProgressTimer);
-            activeProgressTimer = null;
-        }
-        activeProgressQueue = [];
-        isProcessingProgressQueue = false;
-
-        const ingredientIds = selectedIngredients.map(i => i.id === 'virtual_water' ? 0 : parseInt(i.id));
-        const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
-        
-        if (ingredientIds.length >= maxIngredients) {
-            isMixSealed = true;
-            document.getElementById('stepContainer').style.display = 'none';
-            const lib = document.getElementById('partitionedBasesContainer');
-            if (lib) lib.style.display = 'none';
-            updateSelectedArea(true);
-            triggerFlavorSynthesis();
-            return;
-        }
-
-        let stepText = '';
-        let forceType = null;
-        
-        if (currentLabMode === 'COFFEE') {
-            const coffeeBeansCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN').length;
-            const dairyCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'DAIRY').length;
-            const accentsCount = selectedIngredients.length - coffeeBeansCount - dairyCount;
-            
-            if (coffeeBeansCount === 0) {
-                stepText = 'Step 1: Select Base Component';
-            } else if (dairyCount === 0) {
-                stepText = 'Step 2: Select Complementary Payload';
-                forceType = 'DAIRY';
-            } else if (accentsCount === 0) {
-                stepText = 'Step 3: Select Flavor Accent';
-            } else if (accentsCount === 1) {
-                stepText = 'Step 4: Select Deep Accent';
-            } else {
-                stepText = 'Step 5: Select Final Stabilizer';
-            }
-        } else {
-            if (ingredientIds.length === 0) {
-                stepText = 'Step 1: Select Base Component';
-            } else if (ingredientIds.length === 1) {
-                if (currentLabMode === 'SLUSHIE' && selectedIngredients[0].id === 'virtual_water') {
-                    stepText = 'Step 2: Select Syrup Base';
-                } else {
-                    stepText = 'Step 2: Select Complementary Payload';
-                }
-            } else if (ingredientIds.length === 2) {
-                stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
-            } else if (ingredientIds.length === 3) {
-                stepText = 'Step 4: Select Deep Accent';
-            } else {
-                stepText = 'Step 5: Select Final Stabilizer';
-            }
-        }
-        
-        document.getElementById('stepTitle').textContent = stepText;
-        const container = document.getElementById('recommendationContainer');
-        const library = document.getElementById('partitionedBasesContainer');
-        
-        const isWaterBaseStep2 = (currentLabMode === 'SLUSHIE' && selectedIngredients.length === 1 && selectedIngredients[0].id === 'virtual_water');
-        
-        if (ingredientIds.length === 0 || isWaterBaseStep2) {
-            container.innerHTML = '';
-            library.style.display = 'block';
-            partitionBases();
-            return;
-        }
-
-        container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
-        library.style.display = 'none'; // Hide library when focused on recommendations
-
-        const isAiEngine = engineMode === 'ai';
-        const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
-        const payload = isAiEngine ? {
-            ingredients: selectedIngredients.map(i => i.name),
-            drink_type: currentLabMode,
-            mode: recommendationMode,
-            exclude: [],
-            force_type: forceType
-        } : { 
-            ingredient_ids: ingredientIds,
-            drink_type: currentLabMode,
-            mode: recommendationMode,
-            force_type: forceType
-        };
-
-        try {
-            const r = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                body: JSON.stringify(payload)
-            });
-
-            let data;
-            if (isAiEngine) {
-                const reader = r.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n\n');
-                    buffer = lines.pop();
-                    
-                    for (const line of lines) {
-                        if (line.trim().startsWith('data:')) {
-                            const jsonStr = line.replace('data:', '').trim();
-                            try {
-                                const parsed = JSON.parse(jsonStr);
-                                if (parsed.status === 'progress') {
-                                    activeProgressQueue.push(parsed.message);
-                                    processActiveProgressQueue();
-                                } else if (parsed.status === 'success') {
-                                    data = parsed;
-                                } else if (parsed.status === 'error') {
-                                    throw new Error(parsed.message);
-                                }
-                            } catch (e) {
-                                console.error("Error parsing recommendation stream line:", line, e);
-                            }
-                        }
-                    }
-                }
-                // Wait for progress queue processing to complete
-                while (isProcessingProgressQueue || activeProgressQueue.length > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-            } else {
-                data = await r.json();
-            }
-            
-            container.innerHTML = '';
-            
-            // Apply Neural Re-balancing to existing ingredients
-            if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
-                console.log("Applying Neural Re-balancing:", data.rebalancing);
-                selectedIngredients.forEach((ing, index) => {
-                    // Coffee beans are governed by the shot/gram budget system, never by AI rebalancing
-                    const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
-                    if (ingType === 'COFFEE_BEAN') {
-                        console.log(`Skipping neural re-balancing for coffee bean (chemistry-managed): ${ing.name}`);
-                        return;
-                    }
-                    if (ing.isUserOverridden) {
-                        console.log(`Skipping neural re-balancing for user-overridden ingredient: ${ing.name}`);
-                        return;
-                    }
-                    const normalizedName = ing.name.toLowerCase().trim();
-                    for (const [key, value] of Object.entries(data.rebalancing)) {
-                        const normalizedKey = key.toLowerCase().trim();
-                        // Fuzzy match: exact, substring, or partial overlap
-                        if (normalizedKey === normalizedName ||
-                            normalizedName.includes(normalizedKey) ||
-                            normalizedKey.includes(normalizedName)) {
-                            ing.amount = parseFloat(value);
-                            ing.isAiBalanced = true;
-                            const standard = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
-                            ing.aiRatio = standard > 0 ? (ing.amount / standard) : 1.0;
-                            console.log(`Neural Re-balanced: ${ing.name} → ${value} (Ratio: ${ing.aiRatio})`);
-                            break;
-                        }
-                    }
-                });
-                updateSelectedArea(); // Refresh UI with new volumes
-            }
-
-            let suggestions = isAiEngine ? (data.suggestions || []) : (data.recommended || []);
-            
-            // 🧪 Integrated Sorting Protocol: Add Seal Mix to the list so it can compete with ingredients
-            if (isAiEngine && data.seal_recommended) {
-                suggestions.push({
-                    isSeal: true,
-                    resonance: data.seal_resonance || 0,
-                    name: 'SEAL MIX'
-                });
-            }
-
-            // Sort combined list by resonance (High to Low)
-            if (suggestions && suggestions.length > 0) {
-                suggestions.sort((a, b) => (b.resonance || 0) - (a.resonance || 0));
-            }
-            
-            if (suggestions.length === 0 && !data.seal_recommended) {
-                container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-muted">No ideal matches in lab inventory. <button type="button" class="btn btn-link px-0 text-gradient-lab" onclick="skipOptimization()">Seal current mix</button>.</p></div>';
+        async function fetchRecommendations() {
+            if (isMixSealed) {
+                document.getElementById('stepContainer').style.display = 'none';
+                const lib = document.getElementById('partitionedBasesContainer');
+                if (lib) lib.style.display = 'none';
                 return;
             }
 
-            if (isAiEngine && data.reasoning) {
-                const reasoningHtml = `
-                    <div class="pe-3">
-                        <div class="small fw-bold text-neural mb-1"><i class="bi bi-cpu"></i> NEURAL BALANCE STRATEGY</div>
-                        <div class="small italic opacity-75">${data.reasoning}</div>
-                    </div>
-                `;
-                appendChatMessage('assistant', reasoningHtml);
+            if (activeProgressTimer) {
+                clearTimeout(activeProgressTimer);
+                activeProgressTimer = null;
+            }
+            activeProgressQueue = [];
+            isProcessingProgressQueue = false;
+
+            const ingredientIds = selectedIngredients.map(i => i.id === 'virtual_water' ? 0 : parseInt(i.id));
+            const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
+            
+            const newStepKey = `${currentLabMode}_${recommendationMode}_${engineMode}_${ingredientIds.join(',')}`;
+            if (newStepKey !== currentStepKey) {
+                currentStepKey = newStepKey;
+                stepExcludingIds = [];
+                stepExcludingNames = [];
+            }
+            
+            if (ingredientIds.length >= maxIngredients) {
+                isMixSealed = true;
+                document.getElementById('stepContainer').style.display = 'none';
+                const lib = document.getElementById('partitionedBasesContainer');
+                if (lib) lib.style.display = 'none';
+                updateSelectedArea(true);
+                triggerFlavorSynthesis();
+                return;
             }
 
-            const row = document.createElement('div');
-            row.className = 'row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5';
+            let stepText = '';
+            let forceType = null;
             
-            suggestions.forEach(rec => {
-                const col = document.createElement('div');
-                col.className = 'col animate-fade-in';
+            if (currentLabMode === 'COFFEE') {
+                const coffeeBeansCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN').length;
+                const dairyCount = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'DAIRY').length;
+                const accentsCount = selectedIngredients.length - coffeeBeansCount - dairyCount;
                 
-                if (rec.isSeal) {
-                    // 🧪 Neural Seal Recommendation
-                    col.innerHTML = `
-                        <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-neural glow-neural"
-                             onclick="skipOptimization()">
-                            <div class="rounded-circle bg-neural bg-opacity-10 p-3 mb-2">
-                                <i class="bi bi-check2-circle text-neural fs-3"></i>
-                            </div>
-                            <div class="fw-bold text-neural small">SEAL MIX</div>
-                            <div class="text-xs text-neural opacity-75 mt-1">🧪 ${rec.resonance}% Resonance</div>
-                            <div class="text-xs opacity-50">Profile balanced</div>
+                if (coffeeBeansCount === 0) {
+                    stepText = 'Step 1: Select Base Component';
+                } else if (dairyCount === 0) {
+                    stepText = 'Step 2: Select Complementary Payload';
+                    forceType = 'DAIRY';
+                } else if (accentsCount === 0) {
+                    stepText = 'Step 3: Select Flavor Accent';
+                } else if (accentsCount === 1) {
+                    stepText = 'Step 4: Select Deep Accent';
+                } else {
+                    stepText = 'Step 5: Select Final Stabilizer';
+                }
+            } else {
+                if (ingredientIds.length === 0) {
+                    stepText = 'Step 1: Select Base Component';
+                } else if (ingredientIds.length === 1) {
+                    if (currentLabMode === 'SLUSHIE' && selectedIngredients[0].id === 'virtual_water') {
+                        stepText = 'Step 2: Select Syrup Base';
+                    } else {
+                        stepText = 'Step 2: Select Complementary Payload';
+                    }
+                } else if (ingredientIds.length === 2) {
+                    stepText = 'Step 3: Select Flavor Accent' + (currentLabMode === 'COFFEE' ? '' : ' (Optional)');
+                } else if (ingredientIds.length === 3) {
+                    stepText = 'Step 4: Select Deep Accent';
+                } else {
+                    stepText = 'Step 5: Select Final Stabilizer';
+                }
+            }
+            
+            document.getElementById('stepTitle').textContent = stepText;
+            const container = document.getElementById('recommendationContainer');
+            const library = document.getElementById('partitionedBasesContainer');
+            
+            const isWaterBaseStep2 = (currentLabMode === 'SLUSHIE' && selectedIngredients.length === 1 && selectedIngredients[0].id === 'virtual_water');
+            
+            if (ingredientIds.length === 0 || isWaterBaseStep2) {
+                container.innerHTML = '';
+                library.style.display = 'block';
+                partitionBases();
+                return;
+            }
+
+            container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
+            library.style.display = 'none'; // Hide library when focused on recommendations
+
+            const isAiEngine = engineMode === 'ai';
+            const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
+            const payload = isAiEngine ? {
+                ingredients: selectedIngredients.map(i => i.name),
+                drink_type: currentLabMode,
+                mode: recommendationMode,
+                exclude: stepExcludingNames,
+                force_type: forceType
+            } : { 
+                ingredient_ids: ingredientIds,
+                drink_type: currentLabMode,
+                mode: recommendationMode,
+                exclude_ids: stepExcludingIds,
+                force_type: forceType
+            };
+
+            try {
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify(payload)
+                });
+
+                let data;
+                if (isAiEngine) {
+                    const reader = r.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n\n');
+                        buffer = lines.pop();
+                        
+                        for (const line of lines) {
+                            if (line.trim().startsWith('data:')) {
+                                const jsonStr = line.replace('data:', '').trim();
+                                try {
+                                    const parsed = JSON.parse(jsonStr);
+                                    if (parsed.status === 'progress') {
+                                        activeProgressQueue.push(parsed.message);
+                                        processActiveProgressQueue();
+                                    } else if (parsed.status === 'success') {
+                                        data = parsed;
+                                    } else if (parsed.status === 'error') {
+                                        throw new Error(parsed.message);
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing recommendation stream line:", line, e);
+                                }
+                            }
+                        }
+                    }
+                    // Wait for progress queue processing to complete
+                    while (isProcessingProgressQueue || activeProgressQueue.length > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                } else {
+                    data = await r.json();
+                }
+                
+                container.innerHTML = '';
+                
+                // Apply Neural Re-balancing to existing ingredients
+                if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
+                    console.log("Applying Neural Re-balancing:", data.rebalancing);
+                    selectedIngredients.forEach((ing, index) => {
+                        // Coffee beans are governed by the shot/gram budget system, never by AI rebalancing
+                        const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
+                        if (ingType === 'COFFEE_BEAN') {
+                            console.log(`Skipping neural re-balancing for coffee bean (chemistry-managed): ${ing.name}`);
+                            return;
+                        }
+                        if (ing.isUserOverridden) {
+                            console.log(`Skipping neural re-balancing for user-overridden ingredient: ${ing.name}`);
+                            return;
+                        }
+                        const normalizedName = ing.name.toLowerCase().trim();
+                        for (const [key, value] of Object.entries(data.rebalancing)) {
+                            const normalizedKey = key.toLowerCase().trim();
+                            // Fuzzy match: exact, substring, or partial overlap
+                            if (normalizedKey === normalizedName ||
+                                normalizedName.includes(normalizedKey) ||
+                                normalizedKey.includes(normalizedName)) {
+                                ing.amount = parseFloat(value);
+                                ing.isAiBalanced = true;
+                                const standard = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
+                                ing.aiRatio = standard > 0 ? (ing.amount / standard) : 1.0;
+                                console.log(`Neural Re-balanced: ${ing.name} → ${value} (Ratio: ${ing.aiRatio})`);
+                                break;
+                            }
+                        }
+                    });
+                    updateSelectedArea(); // Refresh UI with new volumes
+                }
+
+                let suggestions = isAiEngine ? (data.suggestions || []) : (data.recommended || []);
+                
+                // Append these to exclusions for the current step
+                suggestions.forEach(rec => {
+                    if (!rec.isSeal) {
+                        if (rec.id && !stepExcludingIds.includes(parseInt(rec.id))) {
+                            stepExcludingIds.push(parseInt(rec.id));
+                        }
+                        if (rec.name && !stepExcludingNames.includes(rec.name)) {
+                            stepExcludingNames.push(rec.name);
+                        }
+                    }
+                });
+                
+                // 🧪 Integrated Sorting Protocol: Add Seal Mix to the list so it can compete with ingredients
+                if (isAiEngine && data.seal_recommended) {
+                    suggestions.push({
+                        isSeal: true,
+                        resonance: data.seal_resonance || 0,
+                        name: 'SEAL MIX'
+                    });
+                }
+
+                // Sort combined list by resonance (High to Low)
+                if (suggestions && suggestions.length > 0) {
+                    suggestions.sort((a, b) => (b.resonance || 0) - (a.resonance || 0));
+                }
+                
+                if (suggestions.length === 0 && !data.seal_recommended) {
+                    container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-muted">No ideal matches in lab inventory. <button type="button" class="btn btn-link px-0 text-gradient-lab" onclick="skipOptimization()">Seal current mix</button>.</p></div>';
+                    return;
+                }
+
+                if (isAiEngine && data.reasoning) {
+                    const reasoningHtml = `
+                        <div class="pe-3">
+                            <div class="small fw-bold text-neural mb-1"><i class="bi bi-cpu"></i> NEURAL BALANCE STRATEGY</div>
+                            <div class="small italic opacity-75">${data.reasoning}</div>
                         </div>
                     `;
-                } else {
-                    // 🧪 Ingredient Recommendation
-                    const badgeClass = getBadgeColor(rec.category);
-                    const isExperimentalMode = recommendationMode === 'experimental';
+                    appendChatMessage('assistant', reasoningHtml);
+                }
+
+                const row = document.createElement('div');
+                row.className = 'row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5';
+                
+                suggestions.forEach(rec => {
+                    const col = document.createElement('div');
+                    col.className = 'col animate-fade-in';
                     
-                    let cardClass = 'border-success border-opacity-25';
-                    let textClass = 'text-gradient-lab';
-                    let iconHtml = '';
-                    
-                    if (isExperimentalMode) {
-                        cardClass = 'border-experimental glow-experimental';
-                        textClass = 'text-experimental';
-                        iconHtml = '<i class="bi bi-flask me-1"></i>';
-                    } else if (isAiEngine) {
-                        cardClass = 'border-neural glow-neural';
-                        textClass = 'text-neural';
-                        iconHtml = '<i class="bi bi-cpu me-1"></i>';
+                    if (rec.isSeal) {
+                        // 🧪 Neural Seal Recommendation
+                        col.innerHTML = `
+                            <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-neural glow-neural"
+                                 onclick="skipOptimization()">
+                                <div class="rounded-circle bg-neural bg-opacity-10 p-3 mb-2">
+                                    <i class="bi bi-check2-circle text-neural fs-3"></i>
+                                </div>
+                                <div class="fw-bold text-neural small">SEAL MIX</div>
+                                <div class="text-xs text-neural opacity-75 mt-1">🧪 ${rec.resonance}% Resonance</div>
+                                <div class="text-xs opacity-50">Profile balanced</div>
+                            </div>
+                        `;
+                    } else {
+                        // 🧪 Ingredient Recommendation
+                        const badgeClass = getBadgeColor(rec.category);
+                        const isExperimentalMode = recommendationMode === 'experimental';
+                        
+                        let cardClass = 'border-success border-opacity-25';
+                        let textClass = 'text-gradient-lab';
+                        let iconHtml = '';
+                        
+                        if (isExperimentalMode) {
+                            cardClass = 'border-experimental glow-experimental';
+                            textClass = 'text-experimental';
+                            iconHtml = '<i class="bi bi-flask me-1"></i>';
+                        } else if (isAiEngine) {
+                            cardClass = 'border-neural glow-neural';
+                            textClass = 'text-neural';
+                            iconHtml = '<i class="bi bi-cpu me-1"></i>';
+                        }
+                        
+                        const profileJson = rec.profile ? JSON.stringify(rec.profile).replace(/"/g, '&quot;') : '';
+                        
+                        col.innerHTML = `
+                            <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn ${cardClass}"
+                                 data-id="${rec.id}" data-name="${rec.name}" data-intensity="${rec.intensity}" data-category="${rec.category}"
+                                 data-sweetness="${rec.sweetness || 0}" data-acidity="${rec.acidity || 0}"
+                                 data-bitterness="${rec.bitterness || 0}" data-complexity="${rec.complexity || 0}"
+                                 data-base-suitability="${rec.base_suitability || 3.0}" data-accent-suitability="${rec.accent_suitability || 3.0}"
+                                 data-is-ready-to-drink="${rec.is_ready_to_drink === true || rec.is_ready_to_drink === 'true'}"
+                                 data-profile='${profileJson}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}">
+                                    <span class="fw-bold fs-5 mb-1">${rec.name}</span>
+                                    <div class="d-flex gap-2 align-items-center mb-2">
+                                        <span class="badge-fizz ${badgeClass}">${rec.category}</span>
+                                        ${rec.resonance ? `<span class="text-info fw-black small" style="text-shadow: 0 0 8px var(--fizz-cyan);">🧪 ${rec.resonance}%</span>` : ''}
+                                    </div>
+                                    <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
+                                        <span class="text-gradient-lab font-monospace">B: ${parseFloat(rec.base_suitability || 3.0).toFixed(1)}</span>
+                                        <span class="text-experimental font-monospace">A: ${parseFloat(rec.accent_suitability || 3.0).toFixed(1)}</span>
+                                    </div>
+                                    <div class="mt-auto">
+                                        <small class="${textClass} fw-bold" style="font-size: 0.7rem;">
+                                            ${iconHtml}${rec.reason}
+                                        </small>
+                                    </div>
+                            </div>
+                        `;
                     }
-                    
-                    const profileJson = rec.profile ? JSON.stringify(rec.profile).replace(/"/g, '&quot;') : '';
-                    
-                    col.innerHTML = `
-                        <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn ${cardClass}"
-                             data-id="${rec.id}" data-name="${rec.name}" data-intensity="${rec.intensity}" data-category="${rec.category}"
-                             data-sweetness="${rec.sweetness || 0}" data-acidity="${rec.acidity || 0}"
-                             data-bitterness="${rec.bitterness || 0}" data-complexity="${rec.complexity || 0}"
-                             data-base-suitability="${rec.base_suitability || 3.0}" data-accent-suitability="${rec.accent_suitability || 3.0}"
-                             data-is-ready-to-drink="${rec.is_ready_to_drink === true || rec.is_ready_to_drink === 'true'}"
-                             data-profile='${profileJson}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}">
-                                <span class="fw-bold fs-5 mb-1">${rec.name}</span>
-                                <div class="d-flex gap-2 align-items-center mb-2">
-                                    <span class="badge-fizz ${badgeClass}">${rec.category}</span>
-                                    ${rec.resonance ? `<span class="text-info fw-black small" style="text-shadow: 0 0 8px var(--fizz-cyan);">🧪 ${rec.resonance}%</span>` : ''}
-                                </div>
-                                <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
-                                    <span class="text-gradient-lab font-monospace">B: ${parseFloat(rec.base_suitability || 3.0).toFixed(1)}</span>
-                                    <span class="text-experimental font-monospace">A: ${parseFloat(rec.accent_suitability || 3.0).toFixed(1)}</span>
-                                </div>
-                                <div class="mt-auto">
-                                    <small class="${textClass} fw-bold" style="font-size: 0.7rem;">
-                                        ${iconHtml}${rec.reason}
-                                    </small>
-                                </div>
+                    row.appendChild(col);
+                });
+                
+                container.appendChild(row);
+
+                const actionsContainer = document.createElement('div');
+                actionsContainer.className = 'row g-3 mt-2';
+                
+                let colsHtml = '';
+                if (suggestions.length > 0) {
+                    colsHtml += `
+                        <div class="col-${ingredientIds.length >= 2 ? '6' : '12'}">
+                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="fetchRecommendations()">
+                                <i class="bi bi-arrow-repeat fs-3 mb-1 text-accent animate-spin-hover"></i>
+                                <span class="fw-bold small text-uppercase text-accent">Recommend More</span>
+                            </div>
                         </div>
                     `;
                 }
-                row.appendChild(col);
-            });
-            
-            container.appendChild(row);
-            
-            if (ingredientIds.length >= 2) {
-                const sealContainer = document.createElement('div');
-                sealContainer.className = 'row g-3 mt-1';
-                sealContainer.innerHTML = `
-                    <div class="col-12">
-                        <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="skipOptimization()">
-                            <i class="bi bi-shield-check fs-3 mb-1 text-success"></i>
-                            <span class="fw-bold small text-uppercase">Seal Mix</span>
+                if (ingredientIds.length >= 2) {
+                    colsHtml += `
+                        <div class="col-${suggestions.length > 0 ? '6' : '12'}">
+                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="skipOptimization()">
+                                <i class="bi bi-shield-check fs-3 mb-1 text-success"></i>
+                                <span class="fw-bold small text-uppercase">Seal Mix</span>
+                            </div>
                         </div>
-                    </div>
-                `;
-                container.appendChild(sealContainer);
-            }
-            
-            // Render recipes
-            if (data.recipes && data.recipes.length > 0) {
-                const recContainer = document.getElementById('similarRecipes');
-                if (recContainer) {
-                    let recHtml = '';
-                    data.recipes.forEach(r => {
-                        recHtml += `
-                            <a href="/ingredients/recipes/${r.id}/" class="fizz-pill bg-dark bg-opacity-50 text-white text-decoration-none border-white border-opacity-10 hover-lime d-flex align-items-center gap-2">
-                                <i class="bi bi-journal-text small"></i> ${r.name}
-                            </a>`;
-                    });
-                    recContainer.innerHTML = recHtml;
+                    `;
+                }
+                
+                if (colsHtml) {
+                    actionsContainer.innerHTML = colsHtml;
+                    container.appendChild(actionsContainer);
+                }
+                
+                // Render recipes
+                if (data.recipes && data.recipes.length > 0) {
+                    const recContainer = document.getElementById('similarRecipes');
+                    if (recContainer) {
+                        let recHtml = '';
+                        data.recipes.forEach(r => {
+                            recHtml += `
+                                <a href="/ingredients/recipes/${r.id}/" class="fizz-pill bg-dark bg-opacity-50 text-white text-decoration-none border-white border-opacity-10 hover-lime d-flex align-items-center gap-2">
+                                    <i class="bi bi-journal-text small"></i> ${r.name}
+                                </a>`;
+                        });
+                        recContainer.innerHTML = recHtml;
+                    }
                 }
             }
         } catch (err) {

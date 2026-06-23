@@ -15,6 +15,7 @@
 - [x] Fixed ingredient profile synthesis client-side JavaScript crashes by implementing robust, type-safe parsing of basic attributes, coffee fields, and system compatibility configurations, preventing alert popups and ensuring consistent form population. Fixed ReferenceError by exposing toggleCoffeeFields globally.
 
 ## 🛠️ Completed Tasks
+- [x] Implemented "Recommend More" feature with exclusion filtering and fallback logic in the recipe synthesis wizard. When the user requests more recommendations, previously suggested ingredients are excluded. If the compatible options are exhausted, the engine falls back to showing all candidates of that type. Added unit and integration tests to verify the behavior.
 - [x] Implemented fixed water volumes (840ml for 1L and 420ml for 0.5L) for Soda synthesis, ensuring the remaining budget (160ml for 1L and 80ml for 0.5L) is proportionally divided among the syrups and additives. Added a variable water volume mode only for the 12oz glass size.
 - [x] Added a type guard in the AI neural re-balancing loop to unconditionally skip `COFFEE_BEAN` ingredients, preventing the AI engine from overriding bean split amounts after a blend. Coffee bean amounts are exclusively managed by the shot/gram chemistry budget system.
 - [x] Fixed coffee bean split amount card readout display bug by updating the `dualLabel` calculation when `alignedItem` is present to dynamically display the split bean's individual shots/volume and weight instead of the total coffee budget of the drink, and added formatting to resolve trailing decimals.
