@@ -12,6 +12,7 @@
 - [x] Upgraded the mixology AI agent to automatically suggest both a base profile (category), ingredient type, and system compatibility in individual material editing and bulk analysis. Implemented system compatibility checks in Standard Mode (filtering cards and recommendation candidates by compatible systems) while allowing any ingredient to be shown or recommended in Experimental Mode.
 - [x] Implement additional creative AI features as requested by user
 - [x] Integrate Coffee Chemistry Engine calculations into the frontend synthesis wizard in `home.html` (including dynamic scaling, renaming warning clashing, and alert banners) and recipe detail views in `recipe_detail.html`.
+- [x] Fixed ingredient profile synthesis client-side JavaScript crashes by implementing robust, type-safe parsing of basic attributes, coffee fields, and system compatibility configurations, preventing alert popups and ensuring consistent form population.
 
 ## 🛠️ Completed Tasks
 - [x] Implemented fixed water volumes (840ml for 1L and 420ml for 0.5L) for Soda synthesis, ensuring the remaining budget (160ml for 1L and 80ml for 0.5L) is proportionally divided among the syrups and additives. Added a variable water volume mode only for the 12oz glass size.

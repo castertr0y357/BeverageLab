@@ -358,7 +358,8 @@
                 suffixes.forEach(s => {
                     const el = document.querySelector(`input[name="${s}_${id}"]`);
                     if (el) {
-                        el.value = Math.round(profile[s]);
+                        const val = parseFloat(profile[s]);
+                        el.value = isNaN(val) ? 3 : Math.round(val);
                         el.classList.add('is-valid');
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
                     }

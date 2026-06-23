@@ -856,9 +856,11 @@
                     const el = document.getElementById(prefix + suffix);
                     if (el) {
                         if (suffix.includes('Suit')) {
-                            el.value = parseFloat(value || 3.0).toFixed(1);
+                            const parsedSuit = parseFloat(value);
+                            el.value = isNaN(parsedSuit) ? '3.0' : parsedSuit.toFixed(1);
                         } else {
-                            el.value = Math.round(value);
+                            const parsedVal = parseFloat(value);
+                            el.value = isNaN(parsedVal) ? 3 : Math.round(parsedVal);
                         }
                         el.classList.add('is-valid');
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
@@ -895,13 +897,14 @@
                     const el = document.getElementById(prefix + suffix);
                     if (el) {
                         if (suffix === 'RoastLevel') {
-                            el.value = value.toUpperCase();
+                            el.value = String(value || 'MEDIUM').toUpperCase();
                         } else if (suffix === 'Process') {
-                            el.value = value.toLowerCase();
+                            el.value = String(value || '').toLowerCase();
                         } else if (suffix === 'FlavorNotes' || suffix === 'Origin' || suffix === 'Roaster') {
-                            el.value = value;
+                            el.value = value !== null && value !== undefined ? String(value) : '';
                         } else {
-                            el.value = Math.round(value);
+                            const parsedVal = parseFloat(value);
+                            el.value = isNaN(parsedVal) ? 3 : Math.round(parsedVal);
                         }
                         el.classList.add('is-valid');
                         setTimeout(() => el.classList.remove('is-valid'), 2000);
@@ -917,9 +920,13 @@
                 if (profile.compatible_systems) {
                     let systems = [];
                     if (Array.isArray(profile.compatible_systems)) {
-                        systems = profile.compatible_systems.map(s => s.trim().toUpperCase());
+                        systems = profile.compatible_systems
+                            .filter(s => s !== null && s !== undefined)
+                            .map(s => String(s).trim().toUpperCase());
                     } else if (typeof profile.compatible_systems === 'string') {
                         systems = profile.compatible_systems.split(',').map(s => s.trim().toUpperCase());
+                    } else {
+                        systems = String(profile.compatible_systems).split(',').map(s => s.trim().toUpperCase());
                     }
                     const sodaChk = document.getElementById(prefix + 'SysSoda');
                     const coffeeChk = document.getElementById(prefix + 'SysCoffee');
