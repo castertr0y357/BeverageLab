@@ -659,19 +659,20 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Toggle Coffee-Specific Fields Function
-        function toggleCoffeeFields(prefix) {
-            const typeSelect = document.getElementById(prefix + 'Type');
-            const coffeeFields = document.getElementById(prefix + 'CoffeeFields');
-            if (typeSelect && coffeeFields) {
-                if (typeSelect.value === 'COFFEE_BEAN') {
-                    coffeeFields.style.display = 'block';
-                } else {
-                    coffeeFields.style.display = 'none';
-                }
+    // Toggle Coffee-Specific Fields Function
+    function toggleCoffeeFields(prefix) {
+        const typeSelect = document.getElementById(prefix + 'Type');
+        const coffeeFields = document.getElementById(prefix + 'CoffeeFields');
+        if (typeSelect && coffeeFields) {
+            if (typeSelect.value === 'COFFEE_BEAN') {
+                coffeeFields.style.display = 'block';
+            } else {
+                coffeeFields.style.display = 'none';
             }
         }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
         const addTypeSelect = document.getElementById('addType');
         if (addTypeSelect) {
             addTypeSelect.addEventListener('change', () => toggleCoffeeFields('add'));
