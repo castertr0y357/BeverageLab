@@ -712,29 +712,9 @@
             if (coffeeStyle === 'espresso_shot') {
                 coffeeBaseAmount = 2;
             } else if (coffeeStyle === 'iced') {
-                if (coffeeSizeOz === 8) {
-                    coffeeBaseAmount = 4;
-                } else if (coffeeSizeOz === 12) {
-                    coffeeBaseAmount = 5;
-                } else if (coffeeSizeOz === 16) {
-                    coffeeBaseAmount = 8;
-                } else if (coffeeSizeOz === 20) {
-                    coffeeBaseAmount = 10;
-                } else {
-                    coffeeBaseAmount = 6;
-                }
+                coffeeBaseAmount = coffeeSizeOz * 0.60 * 0.70;
             } else { // hot
-                if (coffeeSizeOz === 8) {
-                    coffeeBaseAmount = 6;
-                } else if (coffeeSizeOz === 12) {
-                    coffeeBaseAmount = 8;
-                } else if (coffeeSizeOz === 16) {
-                    coffeeBaseAmount = 12;
-                } else if (coffeeSizeOz === 20) {
-                    coffeeBaseAmount = 16;
-                } else {
-                    coffeeBaseAmount = 8;
-                }
+                coffeeBaseAmount = coffeeSizeOz * 0.70;
             }
         }
 
@@ -911,11 +891,7 @@
     }
 
     function getIceAmountOz(sizeOz) {
-        if (sizeOz === 8) return 3;
-        if (sizeOz === 12) return 5;
-        if (sizeOz === 16) return 6;
-        if (sizeOz === 20) return 8;
-        return Math.round(sizeOz * 0.4);
+        return sizeOz * 0.40;
     }
 
     /**
@@ -985,15 +961,19 @@
             const hotWaterVol = (coffeeStyle !== 'iced' && coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
             
             let modifierVolOz = 0;
+            let numModifiers = 0;
+            let combinedSwe = 0;
             selectedIngredients.forEach((otherIng) => {
                 const otherType = (otherIng.type || otherIng.ingredient_type || '').toUpperCase();
                 if (otherType !== 'COFFEE_BEAN' && otherType !== 'DAIRY' && !otherIng.isReadyToDrink) {
+                    numModifiers++;
+                    combinedSwe += parseFloat(otherIng.sweetness || 3.0);
                     const scale = (sizeOz / 12.0) * (coffeeStyle === 'iced' ? 0.6 : 1.0);
                     const volMl = 30.0 * scale;
                     modifierVolOz += volMl / 29.5735;
                 }
             });
-            const maxModifiersOz = liquidBudget * 0.15;
+            const maxModifiersOz = (numModifiers > 1 || combinedSwe > 5) ? (liquidBudget * 0.10) : (liquidBudget * 0.15);
             if (modifierVolOz > maxModifiersOz) {
                 modifierVolOz = maxModifiersOz;
             }

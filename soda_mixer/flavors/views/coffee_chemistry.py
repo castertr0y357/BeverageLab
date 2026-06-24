@@ -191,21 +191,32 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     # 3. Flavor Balancing & "Modifier Crowding" Rules
     requested_modifier_total = 0.0
     has_modifier_amounts = False
+    combined_swe = 0.0
     for m in modified_list:
+        swe = float(m.get('sweetness_score', m.get('sweetness', 3.0)))
+        combined_swe += swe
+        
         amt = m.get('amount')
         if amt is not None:
-            requested_modifier_total += float(amt)
+            amt_val = float(amt)
+            if amt_val > 4.0:
+                amt_val = amt_val / 29.5735
+            requested_modifier_total += amt_val
             has_modifier_amounts = True
 
-    if not has_modifier_amounts:
-        modifier_budget = liquid_budget_oz * 0.10 if modified_list else 0.0
+    num_modifiers = len(modified_list)
+    if num_modifiers > 1 or combined_swe > 5:
+        modifier_cap = liquid_budget_oz * 0.10
     else:
-        modifier_budget = requested_modifier_total
+        modifier_cap = liquid_budget_oz * 0.15
 
-    # Strict Cap at 15% maximum of Liquid Space
-    max_modifier_cap = liquid_budget_oz * 0.15
-    if modifier_budget > max_modifier_cap:
-        modifier_budget = max_modifier_cap
+    if not modified_list:
+        modifier_budget = 0.0
+    else:
+        if not has_modifier_amounts:
+            modifier_budget = modifier_cap
+        else:
+            modifier_budget = min(requested_modifier_total, modifier_cap)
 
     # Re-calculate exact modifier budget shares (60% dominant, 40% accent split)
     flavor_modifiers_output = []
@@ -258,10 +269,17 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                 })
 
     # 4. Base-Specific Processing Guardrails
-    total_bean_grams = sum(float(c.get('amount', 0.0)) for c in coffee_inputs)
-    
     if is_espresso_base:
-        shot_count = max(1, int(round(total_bean_grams / 18.0)))
+        if cup_size_oz <= 4.0:
+            shot_count = max(1, int(round(cup_size_oz)))
+        elif cup_size_oz <= 8.0:
+            shot_count = 1
+        elif cup_size_oz <= 12.0:
+            shot_count = 2
+        elif cup_size_oz <= 16.0:
+            shot_count = 3
+        else:
+            shot_count = 4
         coffee_base_vol = round(shot_count * 0.9, 2)
         
         if is_short_milk:
@@ -274,8 +292,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     else:
         # Route B: Standard Brew
         shot_count = 0
-        coffee_base_vol = round(total_bean_grams * (6.0 / 7.0), 2)
-        coffee_base_vol = min(coffee_base_vol, liquid_budget_oz)
+        if "iced" in drink_cat_lower:
+            coffee_base_vol = round(liquid_budget_oz * 0.70, 2)
+        else:
+            coffee_base_vol = round(cup_size_oz * 0.70, 2)
         hot_water_vol = 0.0
         if is_short_milk:
             recipe_validation = "Warning"
@@ -286,16 +306,18 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     if secondary_liquid_vol < 0.0:
         secondary_liquid_vol = 0.0
 
-    # Apply Melt-Tax Protocol (Category A: Iced only)
-    if "iced" in drink_cat_lower and not is_short_milk:
-        secondary_liquid_vol = secondary_liquid_vol * 0.9
+    # Apply Melt-Tax Protocol (Category A: Iced only and Espresso Base)
+    ice_melt_water_vol = 0.0
+    if "iced" in drink_cat_lower and is_espresso_base:
+        ice_melt_water_vol = round(secondary_liquid_vol * 0.10, 2)
+        secondary_liquid_vol = round(secondary_liquid_vol * 0.90, 2)
 
-    # Apply Body Dilution penalty (reduce total dairy volume by 10%)
+    # Note: Body dilution penalty is removed from ratio volumes per overhaul rules, 
+    # but we retain the validation warnings/notes.
     if body_dilution:
-        secondary_liquid_vol = secondary_liquid_vol * 0.9
         if recipe_validation == "Pass":
             recipe_validation = "Warning"
-            validation_notes = "Warning: Low aggregate body intensity (< 3.5). Dairy threshold reduced to prevent masking."
+            validation_notes = "Warning: Low aggregate body intensity detected."
 
     # Round final volumes
     coffee_base_vol = round(coffee_base_vol, 2)
@@ -308,6 +330,11 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         base_modifiers_output.append({
             "name": "Hot Water (Americano Toggle)",
             "volume_oz": hot_water_vol
+        })
+    if ice_melt_water_vol > 0.0:
+        base_modifiers_output.append({
+            "name": "Ice Melt Water",
+            "volume_oz": ice_melt_water_vol
         })
 
     # Dairy or Filler formatting

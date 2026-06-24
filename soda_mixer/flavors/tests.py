@@ -1735,11 +1735,10 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         data = response.json()
         self.assertIn("Warning", data['recipe_validation'])
         # Hot coffee (espresso base default): budget 10.0oz
-        # Espresso base = 0.9oz (1 shot at 0.9oz)
+        # Espresso base = 1.8oz (2 shots at 0.9oz for 10oz size)
         # Modifiers = 0.0oz
-        # Dairy pre-penalty volume = 10.0 - 0.9 - 0.0 = 9.1oz
-        # Body dilution penalty = 9.1 * 0.9 = 8.19oz
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 8.19)
+        # Dairy volume = 10.0 - 1.8 - 0.0 = 8.2oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 8.2)
 
     def test_flavor_clashing_and_renaming(self) -> None:
         # Earthy + Citrus clashing
@@ -1837,11 +1836,17 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         # Iced Coffee: 40% ice, 60% liquid
         self.assertEqual(data['ice_volume_oz'], 4.8)
         self.assertEqual(data['liquid_budget_oz'], 7.2)
-        # Espresso base: 1 shot * 0.9 = 0.9oz
-        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 0.9)
-        # Secondary liquid before thermal dilution: 7.2 - 0.9 = 6.3oz
-        # Thermal dilution reduction: 6.3 * 0.9 = 5.67oz
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 5.67)
+        # Espresso base: 12oz size maps directly to 2 shots * 0.9 = 1.8oz
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 1.8)
+        # Secondary liquid before melt-tax dilution: 7.2 - 1.8 = 5.4oz
+        # Melt-tax dilution: 5.4 * 0.9 = 4.86oz
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 4.86)
+        
+        # Verify Ice Melt Water is in base_modifiers
+        base_mods = data['ingredients']['base_modifiers']
+        self.assertEqual(len(base_mods), 1)
+        self.assertEqual(base_mods[0]['name'], "Ice Melt Water")
+        self.assertEqual(base_mods[0]['volume_oz'], 0.54)
 
     def test_hot_coffee_standard_brew_budget(self) -> None:
         response = self.client.post(
@@ -1869,12 +1874,12 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         data = response.json()
         self.assertEqual(data['ice_volume_oz'], 0.0)
         self.assertEqual(data['liquid_budget_oz'], 16.0)
-        # Standard Brew: 18g * (6/7) = 15.43oz
-        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 15.43)
-        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 15.43)
-        # Secondary liquid: 16.0 - 15.43 = 0.57oz
-        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 0.57)
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 0.57)
+        # Standard Brew: 70% of total cup size (16oz) = 11.2oz
+        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 11.2)
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 11.2)
+        # Secondary liquid: 16.0 - 11.2 = 4.8oz
+        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 4.8)
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 4.8)
 
     def test_iced_coffee_standard_brew_budget(self) -> None:
         response = self.client.post(
@@ -1903,12 +1908,12 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         # Iced Coffee: 40% ice = 4.0oz, 60% liquid = 6.0oz
         self.assertEqual(data['ice_volume_oz'], 4.0)
         self.assertEqual(data['liquid_budget_oz'], 6.0)
-        # Standard Brew capped at 6.0oz liquid budget
-        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 6.0)
-        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 6.0)
-        # Secondary liquid: 6.0 - 6.0 = 0.0oz
-        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 0.0)
-        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 0.0)
+        # Standard Brew: 70% of liquid budget (6oz) = 4.2oz
+        self.assertEqual(data['ingredients']['coffee_base']['volume_oz'], 4.2)
+        self.assertEqual(data['ingredients']['coffee_base_mix'][0]['volume_oz'], 4.2)
+        # Secondary liquid: 6.0 - 4.2 = 1.8oz
+        self.assertEqual(data['ingredients']['payload_filler']['volume_oz'], 1.8)
+        self.assertEqual(data['ingredients']['dairy_or_filler']['volume_oz'], 1.8)
 
     def test_modifier_hierarchy(self) -> None:
         response = self.client.post(
@@ -1941,15 +1946,15 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         data = response.json()
         mods = data['ingredients']['modifiers']
         # Total modifier budget: 1.0 + 0.5 = 1.5oz.
-        # Max modifier cap: 12.0 * 0.15 = 1.8oz (1.5oz is within cap).
-        # Caramel Syrup matches Dark Roast (chocolate) perfectly -> Dominant (60% of 1.5 = 0.9oz)
-        # Strawberry Syrup is Accent (40% of 1.5 = 0.6oz)
+        # Over 1 modifier cap: reduced to 10% of liquid budget (12.0 * 0.10 = 1.2oz).
+        # Caramel Syrup matches Dark Roast (chocolate) perfectly -> Dominant (60% of 1.2 = 0.72oz)
+        # Strawberry Syrup is Accent (40% of 1.2 = 0.48oz)
         caramel_mod = next(m for m in mods if "Caramel" in m['name'])
         strawberry_mod = next(m for m in mods if "Strawberry" in m['name'])
         self.assertIn("Dominant", caramel_mod['name'])
         self.assertIn("Accent", strawberry_mod['name'])
-        self.assertEqual(caramel_mod['volume_oz'], 0.9)
-        self.assertEqual(strawberry_mod['volume_oz'], 0.6)
+        self.assertEqual(caramel_mod['volume_oz'], 0.72)
+        self.assertEqual(strawberry_mod['volume_oz'], 0.48)
 
     def test_hot_coffee_espresso_water_dilution(self) -> None:
         response = self.client.post(
@@ -1970,13 +1975,14 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['hot_water_volume_oz'], 0.9)
+        # 12oz cup size = 2 shots = 1.8oz espresso base
+        self.assertEqual(data['hot_water_volume_oz'], 1.8)
         base_mix = data['ingredients']['coffee_base_mix']
         self.assertEqual(len(base_mix), 2)
         bean_part = next(c for c in base_mix if c['name'] == 'Espresso Bean')
         water_part = next(c for c in base_mix if c['name'] == 'Hot Water')
-        self.assertEqual(bean_part['volume_oz'], 0.9)
-        self.assertEqual(water_part['volume_oz'], 0.9)
+        self.assertEqual(bean_part['volume_oz'], 1.8)
+        self.assertEqual(water_part['volume_oz'], 1.8)
 
 
 class BeverageLabRecommendationExclusionTest(TestCase):
