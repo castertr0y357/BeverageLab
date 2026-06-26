@@ -1,6 +1,7 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Split recommendation and naming engine logic into modular subclasses (`SodaEngine`, `CoffeeEngine`, `CryoEngine`) under a new `soda_mixer/flavors/engines/` package to align with modularity guidelines.
 - [x] Added a 12oz batch size option for Soda synthesis alongside existing 1L and 0.5L bottles, and overhauled Cryo/Slushie batch sizes to strictly 16oz, 32oz, 48oz, and 64oz to align with the physical limits of the Ninja slushie machine.
 - [x] Separated Dairy & Plant Milks from other Additives: Introduced new `DAIRY` ingredient type (keeping Heavy Cream as `ADDITIVE` to prevent over-scaling), auto-migrated Whole Milk and database milks to `DAIRY`, updated AI prompts, recommendations step-2 routing, default form amounts (50ml for dairy, 15ml for additives), and Javascript scaling logic (only dairy fills the cup). Added a standard to `AGENTS.md` and project rules files to verify and push back on unrealistic classifications.
 - [x] Overhauled Coffee Lab wizard UI to remove the manual shots / brew volume selector, automatically calculating the base amount from Style, Size, and Base selectors, showing/hiding base selector containers, and displaying detailed extraction parameters (number of shots for espresso, or oz volume for standard brew) on the compound registry card, hiding the dry gram weights from the user-facing card.
@@ -96,6 +97,7 @@
 - PostgreSQL database isolated within the internal Docker network, backing model data.
 - Gunicorn web server configured with gevent async workers.
 - Modular Views Package under `soda_mixer/flavors/views/` containing `main.py`, `ingredients.py`, `recipes.py`, `ai.py`, `auth.py`, and `settings.py`.
+- Modular Recommendation Engine Package under `soda_mixer/flavors/engines/` containing `base.py`, `soda.py`, `coffee.py`, `cryo.py`, and `__init__.py`.
 - Configurable `CSRF_TRUSTED_ORIGINS` via environment variables to allow flexible hosting configurations.
 - Formatted log messages following standard laboratory pattern: `[Job/Operation] - [Category/Level] - [Detail Message]`.
 - Mock-isolated test suite to ensure stable, reliable runs.
