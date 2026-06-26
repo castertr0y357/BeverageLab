@@ -112,12 +112,20 @@
                     <!-- Dedicated tablet-friendly large buttons container for Soda settings -->
                     <div id="scaleContainerSoda" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
                         <div class="row g-3">
-                            <div class="col-md-8 col-sm-12 mx-auto">
+                            <div class="col-md-6 col-sm-12">
                                 <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SODA BATCH SCALE</label>
                                 <div class="btn-group w-100" id="sodaScaleBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L Bottle</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale05L" onclick="setBottleScale(0.5)">0.5L Bottle</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale12oz" onclick="setBottleScale(0.355)">12oz Glass</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-sm-12">
+                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SWEETNESS STYLE</label>
+                                <div class="btn-group w-100" id="sodaSweetnessStyleBtns">
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="sweetnessCrisp" onclick="setSodaSweetnessStyle('CRISP')">🍃 Crisp</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="sweetnessCraft" onclick="setSodaSweetnessStyle('CRAFT')">🧪 Craft</button>
+                                    <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="sweetnessFountain" onclick="setSodaSweetnessStyle('FOUNTAIN')">🥤 Fountain</button>
                                 </div>
                             </div>
                         </div>
@@ -300,8 +308,10 @@
     let currentLabMode = 'SODA';
     let recommendationMode = 'standard';
     let selectedIngredients = []; 
-    let bottleScale = 1.0; 
+        let bottleScale = 1.0; 
     let latestCoffeeChemistryData = null;
+    let latestSodaChemistryData = null;
+    let sodaSweetnessStyle = localStorage.getItem('soda_sweetness_style') || 'CRAFT';
     let currentStepKey = '';
     let stepExcludingIds = [];
     let stepExcludingNames = [];
@@ -442,6 +452,50 @@
         } catch (err) {
             console.error("Error updating coffee chemistry wizard:", err);
         }
+    }
+
+    async function updateSodaChemistryWizard() {
+        if (currentLabMode !== 'SODA' || selectedIngredients.length === 0) {
+            latestSodaChemistryData = null;
+            return;
+        }
+
+        try {
+            const r = await fetch('/api/soda/chemistry/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    sweetness_style: sodaSweetnessStyle,
+                    bottle_scale: bottleScale,
+                    ingredients: selectedIngredients.map((ing) => {
+                        const ingCopy = { ...ing };
+                        ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                        return ingCopy;
+                    })
+                })
+            });
+            const data = await r.json();
+            latestSodaChemistryData = data;
+        } catch (err) {
+            console.error("Error updating soda chemistry wizard:", err);
+        }
+    }
+
+    function setSodaSweetnessStyle(style) {
+        sodaSweetnessStyle = style;
+        localStorage.setItem('soda_sweetness_style', style);
+        
+        ['sweetnessCrisp', 'sweetnessCraft', 'sweetnessFountain'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active-lab-mode', (id === 'sweetnessCrisp' && style === 'CRISP') || (id === 'sweetnessCraft' && style === 'CRAFT') || (id === 'sweetnessFountain' && style === 'FOUNTAIN'));
+        });
+        
+        updateSodaChemistryWizard().then(() => {
+            updateSelectedArea();
+            if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                triggerFlavorSynthesis();
+            }
+        });
     } 
 
     // 🧪 Progress updates queue variables
@@ -1253,6 +1307,14 @@
                     }
                     fetchRecommendations();
                 });
+            } else if (currentLabMode === 'SODA' && !silent) {
+                updateSodaChemistryWizard().then(() => {
+                    updateSelectedArea();
+                    if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                        triggerFlavorSynthesis();
+                    }
+                    fetchRecommendations();
+                });
             } else {
                 updateSelectedArea();
                 if (!silent) {
@@ -1339,6 +1401,18 @@
         
         if (currentLabMode === 'COFFEE' && !silent) {
             updateCoffeeChemistryWizard().then(() => {
+                updateSelectedArea(isDone);
+                if (isDone) {
+                    isMixSealed = true;
+                    document.getElementById('stepContainer').style.display = 'none';
+                    triggerFlavorSynthesis();
+                } else {
+                    fetchRecommendations();
+                    triggerProactiveSuggestion();
+                }
+            });
+        } else if (currentLabMode === 'SODA' && !silent) {
+            updateSodaChemistryWizard().then(() => {
                 updateSelectedArea(isDone);
                 if (isDone) {
                     isMixSealed = true;
@@ -1646,6 +1720,155 @@
                 } else {
                     reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
                 }
+            } else if (currentLabMode === 'SODA') {
+                const mappedIngredients = selectedIngredients.map((ing) => {
+                    const ingCopy = { ...ing };
+                    ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                    return ingCopy;
+                });
+
+                const chemistryPromise = fetch('/api/soda/chemistry/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        sweetness_style: sodaSweetnessStyle,
+                        bottle_scale: bottleScale,
+                        ingredients: mappedIngredients
+                    })
+                });
+
+                const aiProfilePromise = fetch('/api/ai/synthesize/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        ingredients: mappedIngredients,
+                        drink_type: currentLabMode
+                    })
+                });
+
+                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const data = await chemRes.json();
+                let aiProfileData = null;
+                try {
+                    aiProfileData = await aiRes.json();
+                } catch (e) {
+                    console.error("AI profile synthesis failed", e);
+                }
+
+                if (data.recipe_validation) {
+                    let validationClass = "bg-success border-success text-success";
+                    let validationIcon = "bi-check-circle-fill";
+                    if (data.recipe_validation.toLowerCase().includes("warning")) {
+                        validationClass = "bg-warning border-warning text-warning";
+                        validationIcon = "bi-exclamation-triangle-fill";
+                    } else if (data.recipe_validation.toLowerCase().includes("fail")) {
+                        validationClass = "bg-danger border-danger text-danger";
+                        validationIcon = "bi-x-circle-fill";
+                    }
+
+                    // Water card volume detail
+                    let waterHtml = '';
+                    if (data.ingredients && data.ingredients.carbonated_water) {
+                        const cw = data.ingredients.carbonated_water;
+                        waterHtml = `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${cw.name}</span>
+                                <span>${cw.volume_ml} ml</span>
+                            </div>
+                        `;
+                    }
+
+                    // Syrups list
+                    let modifiersHtml = '';
+                    if (data.ingredients && data.ingredients.modifiers && data.ingredients.modifiers.length > 0) {
+                        modifiersHtml = data.ingredients.modifiers.map(m => `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${m.name} (${m.role})</span>
+                                <span>${m.volume_ml} ml (${m.percentage_of_syrup}%)</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        modifiersHtml = '<div class="text-dim">None</div>';
+                    }
+
+                    let prepStepsHtml = '';
+                    if (data.preparation_steps && data.preparation_steps.length > 0) {
+                        prepStepsHtml = `
+                            <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
+                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS</h6>
+                                <ol class="small text-white opacity-90 ps-3 mb-0">
+                                    ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
+                                </ol>
+                            </div>
+                        `;
+                    }
+
+                    let targetLabel = '';
+                    if (Math.abs(bottleScale - 1.0) < 0.01) targetLabel = '1.0L Bottle';
+                    else if (Math.abs(bottleScale - 0.5) < 0.01) targetLabel = '0.5L Bottle';
+                    else if (Math.abs(bottleScale - 0.355) < 0.01) targetLabel = '12oz Glass';
+
+                    reportBody.innerHTML = `
+                        <div class="card bg-dark bg-opacity-50 border-white border-opacity-10 rounded-3 mb-3">
+                            <div class="card-body p-3">
+                                <div class="alert ${validationClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3">
+                                    <i class="bi ${validationIcon}"></i>
+                                    <div class="fw-bold small">${data.recipe_validation}</div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">CHEMISTRY METRICS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Sweetness Rating</span> <span class="fw-bold">${data.extraction_analysis.sweetness}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Acidity Score</span> <span class="fw-bold">${data.extraction_analysis.acidity}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Bitterness Score</span> <span class="fw-bold">${data.extraction_analysis.bitterness}/5.0</span></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Sweetness Style</span> <span class="fw-bold">${data.drink_metrics.sweetness_style}</span></div>
+                                            <div class="d-flex justify-content-between"><span>Batch Scale</span> <span class="fw-bold">${targetLabel}</span></div>
+                                            <div class="d-flex justify-content-between"><span>Carbonated Water</span> <span class="fw-bold">${data.drink_metrics.water_volume_ml} ml</span></div>
+                                            <div class="d-flex justify-content-between"><span>Total Syrup Volume</span> <span class="fw-bold">${data.drink_metrics.total_syrup_volume_ml} ml / ${data.drink_metrics.maximum_syrup_limit_ml} ml max</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3 mb-3">
+                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTS</h6>
+                                    <div class="small">
+                                        <div class="mb-2">
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">WATER BASE</span>
+                                            ${waterHtml}
+                                        </div>
+                                        <div>
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">MONIN FLAVOR SYRUPS</span>
+                                            ${modifiersHtml}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                                    <p class="mb-0 italic small text-dim mb-3">"${data.barista_notes}"</p>
+                                </div>
+
+                                ${prepStepsHtml}
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Scroll to report
+                    reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
+                }
             } else {
                 const r = await fetch('/api/ai/synthesize/', {
                     method: 'POST',
@@ -1852,10 +2075,18 @@
             selectedIngredients = [];
             bottleScale = 1.0;
             latestCoffeeChemistryData = null;
+            latestSodaChemistryData = null;
+            sodaSweetnessStyle = localStorage.getItem('soda_sweetness_style') || 'CRAFT';
             isMixSealed = false;
             currentStepKey = '';
             stepExcludingIds = [];
             stepExcludingNames = [];
+
+            // Reset sweetness style UI
+            ['sweetnessCrisp', 'sweetnessCraft', 'sweetnessFountain'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('active-lab-mode', (id === 'sweetnessCrisp' && sodaSweetnessStyle === 'CRISP') || (id === 'sweetnessCraft' && sodaSweetnessStyle === 'CRAFT') || (id === 'sweetnessFountain' && sodaSweetnessStyle === 'FOUNTAIN'));
+            });
             
             // Reset soda/slushie scale UI
             ['scale1L', 'scale05L', 'scale12oz'].forEach(id => {
@@ -1898,6 +2129,15 @@
             
             if (currentLabMode === 'COFFEE') {
                 updateCoffeeChemistryWizard().then(() => {
+                    updateSelectedArea();
+                    fetchRecommendations();
+                    
+                    if (selectedIngredients.length === 0) {
+                        resetMixer();
+                    }
+                });
+            } else if (currentLabMode === 'SODA') {
+                updateSodaChemistryWizard().then(() => {
                     updateSelectedArea();
                     fetchRecommendations();
                     
@@ -2428,6 +2668,20 @@
                 </div>
             `;
         }
+        if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.recipe_validation && latestSodaChemistryData.recipe_validation !== 'Pass') {
+            let alertClass = 'alert-warning border-warning text-warning';
+            let iconClass = 'bi-exclamation-triangle-fill';
+            if (latestSodaChemistryData.recipe_validation.toLowerCase().includes('fail')) {
+                alertClass = 'alert-danger border-danger text-danger';
+                iconClass = 'bi-x-circle-fill';
+            }
+            warningBannerHtml = `
+                <div class="alert ${alertClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3 py-2 rounded-3 w-100">
+                    <i class="bi ${iconClass}"></i>
+                    <div class="fw-bold small">${latestSodaChemistryData.recipe_validation}</div>
+                </div>
+            `;
+        }
 
         let html = warningBannerHtml + '<div class="row g-2 mb-3">';
         let hiddenInputs = '';
@@ -2466,11 +2720,16 @@
         
         // 💧 Inject virtual Carbonated Water card for Soda mode to the left of the base ingredient
         if (currentLabMode === 'SODA' && !hasRtdBase) {
-            const bottleCapacity = bottleScale * 1000;
-            const waterToFillLine = bottleCapacity - totalSyrup;
-            const finalWater = Math.max(0, waterToFillLine);
-            const syrupLimit = 160 * bottleScale;
-            const isOverflow = totalSyrup > syrupLimit;
+            let finalWater = 840.0 * bottleScale;
+            let isOverflow = false;
+            if (latestSodaChemistryData && latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.carbonated_water) {
+                finalWater = latestSodaChemistryData.ingredients.carbonated_water.volume_ml;
+            }
+            if (latestSodaChemistryData && latestSodaChemistryData.recipe_validation) {
+                isOverflow = latestSodaChemistryData.recipe_validation.toLowerCase().includes('fail');
+            } else {
+                isOverflow = totalSyrup > (160.0 * bottleScale);
+            }
             
             const warningHtml = isOverflow ? `
                 <div class="badge bg-danger text-white px-2 py-1 mt-2" style="font-size: 0.55rem;">
@@ -2544,6 +2803,12 @@
             const ingUnit = (isDry || isDryCoffee) ? 'g' : 'ml';
 
             let alignedItem = null;
+            let sodaAligned = null;
+            if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
+                const list = latestSodaChemistryData.ingredients.modifiers || [];
+                sodaAligned = list.find(m => m.id == ing.id);
+            }
+
             let displayVolume;
             let dualLabel;
             let mainName = ing.name;
@@ -2608,6 +2873,11 @@
                         dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)}`;
                     }
                 }
+            } else if (sodaAligned) {
+                amount = sodaAligned.volume_ml;
+                role = sodaAligned.role;
+                displayVolume = amount.toFixed(1);
+                dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)} (${sodaAligned.percentage_of_syrup}% of budget)`;
             } else {
                 if (hasRtdBase && index === firstRtdIndex) {
                     amount = rtdBaseAmount;
