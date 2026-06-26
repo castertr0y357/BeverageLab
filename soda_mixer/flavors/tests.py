@@ -2413,6 +2413,135 @@ class SodaChemistryEngineTest(TestCase):
         self.assertEqual(data['recipe_validation'], 'Pass')
 
 
+class CryoChemistryTests(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="cryo_tech", password="secure_password_123")
+        self.client.login(username="cryo_tech", password="secure_password_123")
+
+    def test_cryo_chemistry_success_default(self) -> None:
+        # Test 32oz batch target of 946ml, 13% Brix solving with Water filler (0% sugar).
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 2, 'amount': 40.0},
+                    {'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        metrics = data['drink_metrics']
+        self.assertEqual(metrics['target_volume_ml'], 946.0)
+        self.assertAlmostEqual(metrics['achieved_brix'], 13.0, places=1)
+        self.assertAlmostEqual(metrics['filler_volume_ml'], 756.8, places=1)
+        self.assertAlmostEqual(metrics['total_syrup_volume_ml'], 189.2, places=1)
+
+    def test_cryo_chemistry_juice_filler(self) -> None:
+        # Test 32oz batch (946ml) with Juice filler (10% sugar).
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 2, 'amount': 40.0},
+                    {'name': 'Apple Juice', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        metrics = data['drink_metrics']
+        self.assertEqual(metrics['target_volume_ml'], 946.0)
+        self.assertAlmostEqual(metrics['achieved_brix'], 13.0, places=1)
+        self.assertAlmostEqual(metrics['filler_volume_ml'], 894.4, places=1)
+        self.assertAlmostEqual(metrics['total_syrup_volume_ml'], 51.6, places=1)
+
+    def test_cryo_chemistry_menthol_cap(self) -> None:
+        # Test 32oz batch (946ml) with Mint ingredient.
+        # Menthol limit is 3% of 946ml = 28.38ml.
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Peppermint Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Fail: Sugar density check failed", data['recipe_validation'])
+        self.assertAlmostEqual(data['ingredients']['modifiers'][0]['volume_ml'], 28.4, places=1)
+
+    def test_cryo_chemistry_sweetness_tax(self) -> None:
+        # Modifier with sweetness >= 4 (Strawberry Syrup has sweetness=4).
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 4, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 2, 'amount': 40.0},
+                    {'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        mods = data['ingredients']['modifiers']
+        strawberry = next(m for m in mods if 'Strawberry' in m['name'])
+        vanilla = next(m for m in mods if 'Vanilla' in m['name'])
+        self.assertAlmostEqual(strawberry['volume_ml'], 128.2, places=1)
+        self.assertAlmostEqual(vanilla['volume_ml'], 61.0, places=1)
+
+    def test_cryo_chemistry_carbonation_ban(self) -> None:
+        # Sparkling Water in slushie ingredients should trigger validation failure
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Sparkling Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Fail: Carbonation Hard-Ban", data['recipe_validation'])
+
+    def test_cryo_chemistry_ginger_beer(self) -> None:
+        # Ginger Beer should be treated as a flavor syrup reagent and bypass carbonation ban
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Ginger Beer Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+
+
 
 
 

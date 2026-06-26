@@ -311,6 +311,7 @@
         let bottleScale = 1.0; 
     let latestCoffeeChemistryData = null;
     let latestSodaChemistryData = null;
+    let latestCryoChemistryData = null;
     let sodaSweetnessStyle = localStorage.getItem('soda_sweetness_style') || 'CRAFT';
     let currentStepKey = '';
     let stepExcludingIds = [];
@@ -481,6 +482,32 @@
         }
     }
 
+    async function updateCryoChemistryWizard() {
+        if (currentLabMode !== 'SLUSHIE' || selectedIngredients.length === 0) {
+            latestCryoChemistryData = null;
+            return;
+        }
+
+        try {
+            const r = await fetch('/api/cryo/chemistry/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    bottle_scale: bottleScale,
+                    ingredients: selectedIngredients.map((ing) => {
+                        const ingCopy = { ...ing };
+                        ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                        return ingCopy;
+                    })
+                })
+            });
+            const data = await r.json();
+            latestCryoChemistryData = data;
+        } catch (err) {
+            console.error("Error updating cryo chemistry wizard:", err);
+        }
+    }
+
     function setSodaSweetnessStyle(style) {
         sodaSweetnessStyle = style;
         localStorage.setItem('soda_sweetness_style', style);
@@ -597,7 +624,23 @@
             if (el) el.classList.toggle('active-lab-mode', Math.abs(bottleScale - parseFloat(val)) < 0.01);
         });
 
-        updateSelectedArea();
+        if (currentLabMode === 'SODA') {
+            updateSodaChemistryWizard().then(() => {
+                updateSelectedArea();
+                if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                    triggerFlavorSynthesis();
+                }
+            });
+        } else if (currentLabMode === 'SLUSHIE') {
+            updateCryoChemistryWizard().then(() => {
+                updateSelectedArea();
+                if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                    triggerFlavorSynthesis();
+                }
+            });
+        } else {
+            updateSelectedArea();
+        }
     }
 
     // ☕ Coffee drink format controls
@@ -1315,6 +1358,14 @@
                     }
                     fetchRecommendations();
                 });
+            } else if (currentLabMode === 'SLUSHIE' && !silent) {
+                updateCryoChemistryWizard().then(() => {
+                    updateSelectedArea();
+                    if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                        triggerFlavorSynthesis();
+                    }
+                    fetchRecommendations();
+                });
             } else {
                 updateSelectedArea();
                 if (!silent) {
@@ -1413,6 +1464,18 @@
             });
         } else if (currentLabMode === 'SODA' && !silent) {
             updateSodaChemistryWizard().then(() => {
+                updateSelectedArea(isDone);
+                if (isDone) {
+                    isMixSealed = true;
+                    document.getElementById('stepContainer').style.display = 'none';
+                    triggerFlavorSynthesis();
+                } else {
+                    fetchRecommendations();
+                    triggerProactiveSuggestion();
+                }
+            });
+        } else if (currentLabMode === 'SLUSHIE' && !silent) {
+            updateCryoChemistryWizard().then(() => {
                 updateSelectedArea(isDone);
                 if (isDone) {
                     isMixSealed = true;
@@ -1869,6 +1932,156 @@
                 } else {
                     reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
                 }
+            } else if (currentLabMode === 'SLUSHIE') {
+                const mappedIngredients = selectedIngredients.map((ing) => {
+                    const ingCopy = { ...ing };
+                    ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                    return ingCopy;
+                });
+
+                const chemistryPromise = fetch('/api/cryo/chemistry/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        bottle_scale: bottleScale,
+                        ingredients: mappedIngredients
+                    })
+                });
+
+                const aiProfilePromise = fetch('/api/ai/synthesize/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({
+                        ingredients: mappedIngredients,
+                        drink_type: currentLabMode
+                    })
+                });
+
+                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const data = await chemRes.json();
+                let aiProfileData = null;
+                try {
+                    aiProfileData = await aiRes.json();
+                } catch (e) {
+                    console.error("AI profile synthesis failed", e);
+                }
+
+                if (data.recipe_validation) {
+                    let validationClass = "bg-success border-success text-success";
+                    let validationIcon = "bi-check-circle-fill";
+                    if (data.recipe_validation.toLowerCase().includes("warning")) {
+                        validationClass = "bg-warning border-warning text-warning";
+                        validationIcon = "bi-exclamation-triangle-fill";
+                    } else if (data.recipe_validation.toLowerCase().includes("fail")) {
+                        validationClass = "bg-danger border-danger text-danger";
+                        validationIcon = "bi-x-circle-fill";
+                    }
+
+                    // Filler card volume detail
+                    let fillerHtml = '';
+                    if (data.ingredients && data.ingredients.filler) {
+                        const filler = data.ingredients.filler;
+                        fillerHtml = `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${filler.name}</span>
+                                <span>${filler.volume_ml.toFixed(1)} ml</span>
+                            </div>
+                        `;
+                    }
+
+                    // Syrups list
+                    let modifiersHtml = '';
+                    if (data.ingredients && data.ingredients.modifiers && data.ingredients.modifiers.length > 0) {
+                        modifiersHtml = data.ingredients.modifiers.map(m => `
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">${m.name}</span>
+                                <span>${m.volume_ml.toFixed(1)} ml (${m.percentage_of_batch}%)</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        modifiersHtml = '<div class="text-dim">None</div>';
+                    }
+
+                    let prepStepsHtml = '';
+                    if (data.preparation_steps && data.preparation_steps.length > 0) {
+                        prepStepsHtml = `
+                            <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
+                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS (SOLUBILITY & FREEZING)</h6>
+                                <ol class="small text-white opacity-90 ps-3 mb-0">
+                                    ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
+                                </ol>
+                            </div>
+                        `;
+                    }
+
+                    let targetLabel = '';
+                    if (Math.abs(bottleScale - 0.5) < 0.01) targetLabel = '16oz Batch (473ml)';
+                    else if (Math.abs(bottleScale - 1.0) < 0.01) targetLabel = '32oz Batch (946ml)';
+                    else if (Math.abs(bottleScale - 1.5) < 0.01) targetLabel = '48oz Batch (1420ml)';
+                    else if (Math.abs(bottleScale - 2.0) < 0.01) targetLabel = '64oz Batch (1892ml)';
+
+                    reportBody.innerHTML = `
+                        <div class="card bg-dark bg-opacity-50 border-white border-opacity-10 rounded-3 mb-3">
+                            <div class="card-body p-3">
+                                <div class="alert ${validationClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3">
+                                    <i class="bi ${validationIcon}"></i>
+                                    <div class="fw-bold small">${data.recipe_validation}</div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">FREEZING PHYSICS METRICS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Sugar Density (Brix)</span> <span class="fw-bold">${data.drink_metrics.achieved_brix}% Brix</span></div>
+                                            <div class="d-flex justify-content-between"><span>Perceived Sweetness</span> <span class="fw-bold">${data.extraction_analysis.sweetness}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Acidity Score</span> <span class="fw-bold">${data.extraction_analysis.acidity}/5.0</span></div>
+                                            <div class="d-flex justify-content-between"><span>Bitterness Score</span> <span class="fw-bold">${data.extraction_analysis.bitterness}/5.0</span></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <div class="d-flex flex-column gap-1 small">
+                                            <div class="d-flex justify-content-between"><span>Batch Scale Target</span> <span class="fw-bold">${targetLabel}</span></div>
+                                            <div class="d-flex justify-content-between"><span>Total Liquid Inputs</span> <span class="fw-bold">${data.drink_metrics.target_volume_ml} ml</span></div>
+                                            <div class="d-flex justify-content-between"><span>Dynamic Volume Filler</span> <span class="fw-bold">${data.drink_metrics.filler_volume_ml} ml</span></div>
+                                            <div class="d-flex justify-content-between"><span>Total Modifiers Volume</span> <span class="fw-bold">${data.drink_metrics.total_syrup_volume_ml} ml</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3 mb-3">
+                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTS</h6>
+                                    <div class="small">
+                                        <div class="mb-2">
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">DYNAMIC VOLUME FILLER</span>
+                                            ${fillerHtml}
+                                        </div>
+                                        <div>
+                                            <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">FLAVOR MODIFIERS & SYRUPS</span>
+                                            ${modifiersHtml}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                                    <p class="mb-0 italic small text-dim mb-3">"${data.mixologist_notes}"</p>
+                                </div>
+
+                                ${prepStepsHtml}
+
+                                <div class="border-top border-white border-opacity-10 pt-3">
+                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Scroll to report
+                    reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
+                }
             } else {
                 const r = await fetch('/api/ai/synthesize/', {
                     method: 'POST',
@@ -2076,6 +2289,7 @@
             bottleScale = 1.0;
             latestCoffeeChemistryData = null;
             latestSodaChemistryData = null;
+            latestCryoChemistryData = null;
             sodaSweetnessStyle = localStorage.getItem('soda_sweetness_style') || 'CRAFT';
             isMixSealed = false;
             currentStepKey = '';
@@ -2138,6 +2352,15 @@
                 });
             } else if (currentLabMode === 'SODA') {
                 updateSodaChemistryWizard().then(() => {
+                    updateSelectedArea();
+                    fetchRecommendations();
+                    
+                    if (selectedIngredients.length === 0) {
+                        resetMixer();
+                    }
+                });
+            } else if (currentLabMode === 'SLUSHIE') {
+                updateCryoChemistryWizard().then(() => {
                     updateSelectedArea();
                     fetchRecommendations();
                     
@@ -2682,34 +2905,62 @@
                 </div>
             `;
         }
+        if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.recipe_validation && latestCryoChemistryData.recipe_validation !== 'Pass') {
+            let alertClass = 'alert-warning border-warning text-warning';
+            let iconClass = 'bi-exclamation-triangle-fill';
+            if (latestCryoChemistryData.recipe_validation.toLowerCase().includes('fail')) {
+                alertClass = 'alert-danger border-danger text-danger';
+                iconClass = 'bi-x-circle-fill';
+            }
+            warningBannerHtml = `
+                <div class="alert ${alertClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3 py-2 rounded-3 w-100">
+                    <i class="bi ${iconClass}"></i>
+                    <div class="fw-bold small">${latestCryoChemistryData.recipe_validation}</div>
+                </div>
+            `;
+        }
 
         let html = warningBannerHtml + '<div class="row g-2 mb-3">';
         let hiddenInputs = '';
 
         // 💧 Inject virtual Water card for Slushie mode to the left of the base ingredient
         if (currentLabMode === 'SLUSHIE' && !hasRtdBase) {
-            const bottleCapacity = bottleScale * 946.35;
-            const waterToFillLine = bottleCapacity - totalSyrup;
-            const finalWater = Math.max(0, waterToFillLine);
-            const syrupLimit = 160 * bottleScale;
-            const isOverflow = totalSyrup > syrupLimit;
+            let finalWater = Math.max(0, bottleScale * 946.0 - totalSyrup);
+            let fillerName = "Water";
+            let isOverflow = false;
+            
+            if (latestCryoChemistryData && latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.filler) {
+                finalWater = latestCryoChemistryData.ingredients.filler.volume_ml;
+                fillerName = latestCryoChemistryData.ingredients.filler.name;
+            }
+            if (latestCryoChemistryData && latestCryoChemistryData.recipe_validation) {
+                isOverflow = latestCryoChemistryData.recipe_validation.toLowerCase().includes('fail');
+            } else {
+                isOverflow = totalSyrup > (bottleScale * 946.0);
+            }
             
             const warningHtml = isOverflow ? `
                 <div class="badge bg-danger text-white px-2 py-1 mt-2" style="font-size: 0.55rem;">
-                    <i class="bi bi-exclamation-triangle-fill"></i> OVERFLOW
+                    <i class="bi bi-exclamation-triangle-fill"></i> OVERFLOW / CAUTION
                 </div>
             ` : '';
+
+            let targetLabel = '';
+            if (Math.abs(bottleScale - 0.5) < 0.01) targetLabel = '16oz';
+            else if (Math.abs(bottleScale - 1.0) < 0.01) targetLabel = '32oz';
+            else if (Math.abs(bottleScale - 1.5) < 0.01) targetLabel = '48oz';
+            else if (Math.abs(bottleScale - 2.0) < 0.01) targetLabel = '64oz';
 
             html += `
                 <div class="col-auto animate-fade-in">
                     <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
-                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">Water <i class="bi bi-droplets text-info ms-1"></i></div>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">${fillerName} <i class="bi bi-droplets text-info ms-1"></i></div>
                         <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
                         <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                             <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
                                 <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">FILL LINE</span></div>
-                                <div class="d-flex justify-content-between"><span>TARGET</span> <span>${(bottleScale * 32).toFixed(0)}oz</span></div>
+                                <div class="d-flex justify-content-between"><span>TARGET</span> <span>${targetLabel}</span></div>
                             </div>
                             ${warningHtml}
                         </div>
@@ -2804,9 +3055,13 @@
 
             let alignedItem = null;
             let sodaAligned = null;
+            let cryoAligned = null;
             if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
                 const list = latestSodaChemistryData.ingredients.modifiers || [];
                 sodaAligned = list.find(m => m.id == ing.id);
+            } else if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
+                const list = latestCryoChemistryData.ingredients.modifiers || [];
+                cryoAligned = list.find(m => m.id == ing.id);
             }
 
             let displayVolume;
@@ -2878,6 +3133,11 @@
                 role = sodaAligned.role;
                 displayVolume = amount.toFixed(1);
                 dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)} (${sodaAligned.percentage_of_syrup}% of budget)`;
+            } else if (cryoAligned) {
+                amount = cryoAligned.volume_ml;
+                role = cryoAligned.role;
+                displayVolume = amount.toFixed(1);
+                dualLabel = `${displayVolume}${ingUnit} / ${formatImperialVolume(displayVolume)} (${cryoAligned.percentage_of_batch}% of batch)`;
             } else {
                 if (hasRtdBase && index === firstRtdIndex) {
                     amount = rtdBaseAmount;
