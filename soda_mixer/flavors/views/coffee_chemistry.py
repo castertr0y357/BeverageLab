@@ -184,9 +184,8 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         else:
             modified_list.append(mod)
 
-    if flavor_clash:
-        recipe_validation = "Warning"
-        validation_notes = "Warning: High-acidity blend may clash with caramelized syrups. Modifiers adjusted to neutral profiles."
+    # Resolve Americano Toggle
+    americano_toggle = data.get('americano_toggle', False) or data.get('americano', False) or (espresso_hot_mode == 'water')
 
     # 3. Flavor Balancing & "Modifier Crowding" Rules
     requested_modifier_total = 0.0
@@ -205,10 +204,18 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             has_modifier_amounts = True
 
     num_modifiers = len(modified_list)
+    # Baseline modifier cap: 15% of liquid budget.
+    # Sweetness Safety Valve: 10% cap if num_modifiers > 1 OR combined_swe > 5.
     if num_modifiers > 1 or combined_swe > 5:
-        modifier_cap = liquid_budget_oz * 0.10
+        modifier_cap_pct = 0.10
     else:
-        modifier_cap = liquid_budget_oz * 0.15
+        modifier_cap_pct = 0.15
+
+    # Cold Sugar Tax: expand modifier cap by absolute +2% if drink style is Iced.
+    if "iced" in drink_cat_lower:
+        modifier_cap_pct += 0.02
+
+    modifier_cap = liquid_budget_oz * modifier_cap_pct
 
     if not modified_list:
         modifier_budget = 0.0
@@ -268,6 +275,19 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                     "volume_oz": round(vol, 2)
                 })
 
+    # Viscosity Protection
+    is_thin_warning = False
+    if num_modifiers > 0 and calculated_bitterness >= 4:
+        all_syrups = True
+        for m in modified_list:
+            name_lower = m.get('name', '').lower()
+            desc_lower = str(m.get('description', '')).lower() if m.get('description') else ''
+            if 'sauce' in name_lower or 'sauce' in desc_lower:
+                all_syrups = False
+                break
+        if all_syrups:
+            is_thin_warning = True
+
     # 4. Base-Specific Processing Guardrails
     if is_espresso_base:
         if cup_size_oz <= 4.0:
@@ -285,7 +305,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         if is_short_milk:
             hot_water_vol = 0.0
         else:
-            if "iced" not in drink_cat_lower and espresso_hot_mode == 'water':
+            if americano_toggle:
                 hot_water_vol = coffee_base_vol  # 1:1 dilution ratio
             else:
                 hot_water_vol = 0.0
@@ -312,12 +332,65 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         ice_melt_water_vol = round(secondary_liquid_vol * 0.10, 2)
         secondary_liquid_vol = round(secondary_liquid_vol * 0.90, 2)
 
-    # Note: Body dilution penalty is removed from ratio volumes per overhaul rules, 
-    # but we retain the validation warnings/notes.
+    # Fat Buffer Requirement
+    fat_content_score = 3
+    if dairy_inputs:
+        payload_ing = dairy_inputs[0]
+        if 'fat_content_score' in payload_ing:
+            fat_content_score = int(payload_ing['fat_content_score'])
+        elif 'fat_content' in payload_ing:
+            fat_content_score = int(payload_ing['fat_content'])
+        else:
+            p_name = payload_ing.get('name', '').lower()
+            if 'cream' in p_name or 'half' in p_name:
+                fat_content_score = 4
+            elif 'whole' in p_name or 'dairy' in p_name:
+                fat_content_score = 3
+            elif 'skim' in p_name or 'nonfat' in p_name or 'fat free' in p_name:
+                fat_content_score = 1
+            elif 'oat' in p_name or 'almond' in p_name or 'soy' in p_name or 'coconut' in p_name or 'plant' in p_name:
+                fat_content_score = 2
+
+    is_fat_buffer_warning = False
+    if calculated_bitterness >= 4 and len(dairy_inputs) > 0 and fat_content_score < 3:
+        is_fat_buffer_warning = True
+
+    # pH Curdling Protection
+    citrus_fruit_keywords = {'citrus', 'lemon', 'lime', 'orange', 'grapefruit', 'cherry', 'fruit', 'fruity', 'berry', 'berries', 'raspberry', 'strawberry', 'blueberry', 'blackberry', 'hibiscus'}
+    has_citrus_modifier = False
+    for m in modified_list:
+        if m.get('category') in ['citrus', 'berry', 'sour']:
+            has_citrus_modifier = True
+            break
+        name_lower = m.get('name', '').lower()
+        notes_lower = str(m.get('flavor_notes', '')).lower()
+        desc_lower = str(m.get('description', '')).lower() if m.get('description') else ''
+        if any(kw in name_lower or kw in notes_lower or kw in desc_lower for kw in citrus_fruit_keywords):
+            has_citrus_modifier = True
+            break
+
+    is_curdling_risk = False
+    if "iced" not in drink_cat_lower and len(dairy_inputs) > 0:
+        if calculated_acidity >= 4 or has_citrus_modifier:
+            is_curdling_risk = True
+
+    # Gather Warnings and Failures
+    warnings = []
+    if flavor_clash:
+        warnings.append("Warning: High-acidity blend may clash with caramelized syrups. Modifiers adjusted to neutral profiles.")
     if body_dilution:
-        if recipe_validation == "Pass":
-            recipe_validation = "Warning"
-            validation_notes = "Warning: Low aggregate body intensity detected."
+        warnings.append("Warning: Low aggregate body intensity detected.")
+    if is_thin_warning:
+        warnings.append("Warning: Bitterness score >= 4 combined with thin syrups may result in a watery mouthfeel. Recommending a sauce modifier or a higher fat payload.")
+    if is_fat_buffer_warning:
+        warnings.append("Warning: Low-fat payload may not properly mask coffee bitterness.")
+
+    if is_curdling_risk:
+        recipe_validation = "Fail: High acidity poses a milk curdling risk under hot configurations."
+    elif warnings:
+        recipe_validation = " ".join(warnings)
+    else:
+        recipe_validation = "Pass"
 
     # Round final volumes
     coffee_base_vol = round(coffee_base_vol, 2)
@@ -340,9 +413,40 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     # Dairy or Filler formatting
     dairy_name = dairy_inputs[0].get('name', 'Whole Milk') if dairy_inputs else ("Hot Water" if not is_espresso_base and not dairy_inputs else "Whole Milk")
     
-    # Barista Notes
-    barista_notes = "Extraction and chemistry parameters are balanced. Serve and enjoy!"
+    # Barista Notes & Prepare Step-by-Step Preparation Steps (Solubility)
+    prep_steps = []
+    
+    # Check for dry reagents (powder)
+    has_powder = any(ing.get('is_dry') or 'powder' in str(ing.get('name', '')).lower() for ing in modifier_inputs)
+    
+    prep_steps.append("Step 1: Combine all liquid modifiers (syrups/sauces) and dry reagents (POWDER) into the serving vessel first.")
+    if has_powder:
+        prep_steps.append("Step 2: Extract the hot coffee base directly over the modifiers. Stir thoroughly to agitate and dissolve the powder into a warm slurry.")
+    else:
+        prep_steps.append("Step 2: Extract the hot coffee base directly over the modifiers.")
+        
+    is_plant_milk = False
+    for d in dairy_inputs:
+        name_lower = str(d.get('name', '')).lower()
+        if any(plant_keyword in name_lower for plant_keyword in ['oat', 'almond', 'soy', 'plant', 'coconut', 'cashew']):
+            is_plant_milk = True
+            break
+            
+    if "iced" not in drink_cat_lower:
+        if is_plant_milk:
+            prep_steps.append("Step 3: Incorporate the Payload (steamed plant milk). Steam to a temperature ceiling of 130°F.")
+        else:
+            prep_steps.append("Step 3: Incorporate the Payload (steamed dairy). Steam to a temperature ceiling of 140°F.")
+    else:
+        prep_steps.append("Step 3: Incorporate the Payload (Milk/Water filler).")
+        
     if "iced" in drink_cat_lower:
+        prep_steps.append("Step 4: Top with Ice last to preserve structural integrity.")
+
+    barista_notes = "Extraction and chemistry parameters are balanced. Serve and enjoy!"
+    if is_curdling_risk:
+        barista_notes = "Curdling Risk: High acidity poses a milk curdling risk under hot configurations."
+    elif "iced" in drink_cat_lower:
         if is_espresso_base:
             barista_notes = "Hot espresso melts ice rapidly; consider pulling shots over ice directly to manage dilution."
         else:
@@ -351,10 +455,12 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         barista_notes = "Adjusted caramelized modifiers to Vanilla Syrup to avoid clashing with the bright, high-acidity/citrus profile of the coffee base."
     elif body_dilution:
         barista_notes = "Low aggregate body intensity detected. Dairy volume penalized by 10% to preserve coffee flavor definition."
+    elif is_thin_warning:
+        barista_notes = "Bitterness score >= 4 combined with thin syrups may result in a watery mouthfeel. Recommending a sauce modifier or a higher fat payload."
 
-    # Construct final v3.0 JSON output format
+    # Construct final JSON output format
     res_data = {
-        "recipe_validation": validation_notes if validation_notes else recipe_validation,
+        "recipe_validation": recipe_validation,
         "drink_metrics": {
             "style": style_str,
             "cup_size_oz": cup_size_oz,
@@ -403,6 +509,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             ]
         },
         "barista_notes": barista_notes,
+        "preparation_steps": prep_steps,
         # backward compatibility keys for UI:
         "aggregate_base_metrics": {
             "calculated_body": calculated_body,

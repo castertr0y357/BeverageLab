@@ -770,7 +770,7 @@
                     } else if (coffeeBaseType === 'espresso' && isVolumeFiller) {
                         const liquidBudget = (coffeeStyle === 'iced') ? coffeeSizeOz * 0.6 : coffeeSizeOz;
                         const espressoVol = coffeeBaseAmount * 0.9;
-                        const hotWaterVol = (coffeeStyle !== 'iced' && coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
+                        const hotWaterVol = (coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
                         
                         let modifierVolOz = 0;
                         let numModifiers = 0;
@@ -788,7 +788,12 @@
                                 }
                             }
                         });
-                        const maxModifiersOz = (numModifiers > 1 || combinedSwe > 5) ? (liquidBudget * 0.10) : (liquidBudget * 0.15);
+                        
+                        let capPct = (numModifiers > 1 || combinedSwe > 5) ? 0.10 : 0.15;
+                        if (coffeeStyle === 'iced') {
+                            capPct += 0.02;
+                        }
+                        const maxModifiersOz = liquidBudget * capPct;
                         if (modifierVolOz > maxModifiersOz) {
                             modifierVolOz = maxModifiersOz;
                         }
@@ -838,7 +843,7 @@
             iceDetailEl.innerHTML = `${iceOz} oz / ~${iceMl} ml`;
         }
 
-        const showHotWater = (drinkType === 'COFFEE' && coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water');
+        const showHotWater = (drinkType === 'COFFEE' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water');
         const hotWaterCard = document.getElementById('hotWaterCardContainer');
         if (hotWaterCard) {
             hotWaterCard.style.display = showHotWater ? 'block' : 'none';
@@ -988,6 +993,18 @@
             const metrics = data.aggregate_base_metrics || {};
             const notesHtml = (metrics.combined_notes || []).map(n => `<span class="badge-fizz bg-secondary text-white me-1 mb-1">${n}</span>`).join('');
 
+            let prepStepsHtml = '';
+            if (data.preparation_steps && data.preparation_steps.length > 0) {
+                prepStepsHtml = `
+                    <div class="pt-2 border-top border-white border-opacity-5">
+                        <span class="readout-label d-block text-dim mb-2" style="font-size: 0.65rem;">PREPARATION STEPS (SOLUBILITY)</span>
+                        <ol class="small text-white opacity-90 ps-3 mb-3">
+                            ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
+                        </ol>
+                    </div>
+                `;
+            }
+
             chemistryContainer.innerHTML = `
                 ${validationBadge}
                 
@@ -1039,6 +1056,8 @@
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">BARISTA RECOMMENDATION</span>
                     <p class="mb-0 small text-dim italic mb-3">"${data.barista_notes}"</p>
                 </div>
+
+                ${prepStepsHtml}
 
                 <div class="pt-2 border-top border-white border-opacity-5">
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">OVERALL PROFILE DESCRIPTION</span>

@@ -1984,6 +1984,151 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         self.assertEqual(bean_part['volume_oz'], 1.8)
         self.assertEqual(water_part['volume_oz'], 1.8)
 
+    def test_cold_sugar_tax_modifier_cap_expansion(self) -> None:
+        # Iced coffee should expand cap by absolute +2% of liquid budget.
+        # Target cup: 10.0oz. Liquid budget = 6.0oz.
+        # Single modifier: default cap 15% -> expanded to 17% (6.0 * 0.17 = 1.02oz).
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Iced Coffee',
+                'cup_size_oz': 10.0,
+                'ingredients': [
+                    {
+                        'name': 'Drip Blend',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'coffee_base_type': 'standard_brew',
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Vanilla Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 2.0  # exceeding cap
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        mods = data['ingredients']['modifiers']
+        self.assertEqual(mods[0]['volume_oz'], 1.02)
+
+    def test_viscosity_protection_warning(self) -> None:
+        # Coffee bitterness >= 4 and all modifiers are syrups -> warning.
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Bitter Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'bitterness_score': 4,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Vanilla Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 1.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Warning", data['recipe_validation'])
+        self.assertIn("watery mouthfeel", data['recipe_validation'])
+
+    def test_fat_buffer_sensory_warning(self) -> None:
+        # Bitterness >= 4 and low-fat payload (skim milk = 1) -> warning.
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Bitter Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'bitterness_score': 4,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Skim Milk',
+                        'ingredient_type': 'DAIRY',
+                        'fat_content_score': 1
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Warning", data['recipe_validation'])
+        self.assertIn("properly mask coffee bitterness", data['recipe_validation'])
+
+    def test_ph_curdling_protection_failure(self) -> None:
+        # Hot drink + Dairy payload + high acidity (acidity >= 4) -> Fail curdling risk.
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Acidic Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'acidity_score': 4,
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY'
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Fail", data['recipe_validation'])
+        self.assertIn("milk curdling risk", data['recipe_validation'])
+
+    def test_preparation_steps_solubility(self) -> None:
+        # Verify preparation steps are returned
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Hot Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Espresso Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Cocoa Powder',
+                        'ingredient_type': 'ADDITIVE',
+                        'is_dry': True,
+                        'amount': 10.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        steps = data['preparation_steps']
+        self.assertEqual(len(steps), 3)
+        self.assertIn("Step 1", steps[0])
+        self.assertIn("Step 2", steps[1])
+        self.assertIn("agitate and dissolve the powder", steps[1])
+        self.assertIn("Step 3", steps[2])
+
 
 class BeverageLabRecommendationExclusionTest(TestCase):
     """Test case for recommendation exclusion and fallback logic."""

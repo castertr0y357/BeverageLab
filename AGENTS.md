@@ -7,8 +7,8 @@ You **MUST** run the project verification command after every code change to gua
 
 ### Rebuild and Verify Command
 Run the following command from the workspace root:
-```bash
-docker compose run --rm web python manage.py test
+```powershell
+docker compose run --rm web python manage.py test; docker compose down; docker compose up -d --build
 ```
 
 > [!IMPORTANT]

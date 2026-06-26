@@ -958,7 +958,7 @@
         if (baseType === 'espresso' && isVolumeFiller) {
             const liquidBudget = (coffeeStyle === 'iced') ? sizeOz * 0.6 : sizeOz;
             const espressoVol = coffeeBaseAmount * 0.9;
-            const hotWaterVol = (coffeeStyle !== 'iced' && coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
+            const hotWaterVol = (coffeeEspressoHotMode === 'water') ? espressoVol : 0.0;
             
             let modifierVolOz = 0;
             let numModifiers = 0;
@@ -973,7 +973,12 @@
                     modifierVolOz += volMl / 29.5735;
                 }
             });
-            const maxModifiersOz = (numModifiers > 1 || combinedSwe > 5) ? (liquidBudget * 0.10) : (liquidBudget * 0.15);
+            
+            let capPct = (numModifiers > 1 || combinedSwe > 5) ? 0.10 : 0.15;
+            if (coffeeStyle === 'iced') {
+                capPct += 0.02;
+            }
+            const maxModifiersOz = liquidBudget * capPct;
             if (modifierVolOz > maxModifiersOz) {
                 modifierVolOz = maxModifiersOz;
             }
@@ -1560,6 +1565,18 @@
                         modifiersHtml = '<div class="text-dim">None</div>';
                     }
 
+                    let prepStepsHtml = '';
+                    if (data.preparation_steps && data.preparation_steps.length > 0) {
+                        prepStepsHtml = `
+                            <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
+                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS (SOLUBILITY)</h6>
+                                <ol class="small text-white opacity-90 ps-3 mb-0">
+                                    ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
+                                </ol>
+                            </div>
+                        `;
+                    }
+
                     reportBody.innerHTML = `
                         <div class="card bg-dark bg-opacity-50 border-white border-opacity-10 rounded-3 mb-3">
                             <div class="card-body p-3">
@@ -1614,6 +1631,8 @@
                                     <h6 class="readout-label text-gradient-lab mb-1">BARISTA RECOMMENDATIONS</h6>
                                     <p class="mb-0 italic small text-dim mb-3">"${data.barista_notes}"</p>
                                 </div>
+
+                                ${prepStepsHtml}
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
