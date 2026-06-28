@@ -2904,8 +2904,41 @@
         const hasRtdBase = selectedIngredients.some(ing => ing.isReadyToDrink);
         const firstRtdIndex = selectedIngredients.findIndex(ing => ing.isReadyToDrink);
 
+        let allCryoAligned = false;
+        if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
+            const list = latestCryoChemistryData.ingredients.modifiers || [];
+            allCryoAligned = true;
+            selectedIngredients.forEach((ing) => {
+                const type = (ing.type || ing.ingredient_type || '').toUpperCase();
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                    const matched = list.find(m => m.id == ing.id);
+                    if (!matched) {
+                        allCryoAligned = false;
+                    }
+                }
+            });
+        }
+
+        let allSodaAligned = false;
+        if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
+            const list = latestSodaChemistryData.ingredients.modifiers || [];
+            allSodaAligned = true;
+            selectedIngredients.forEach((ing) => {
+                const type = (ing.type || ing.ingredient_type || '').toUpperCase();
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                    const matched = list.find(m => m.id == ing.id);
+                    if (!matched) {
+                        allSodaAligned = false;
+                    }
+                }
+            });
+        }
+
         let initialTotal = 0;
-        const limit = (160 * (bottleScale || 1.0));
+        let limit = (160 * (bottleScale || 1.0));
+        if (currentLabMode === 'SLUSHIE') {
+            limit = (189.2 * (bottleScale || 1.0));
+        }
         
         // Calculate initial amounts for expansion factor if hasRtdBase is false
         if (!hasRtdBase) {
@@ -2936,7 +2969,11 @@
         let totalSyrup = 0;
         let rtdBaseAmount = 0;
         
-        if (hasRtdBase && currentLabMode !== 'COFFEE') {
+        if (allCryoAligned) {
+            totalSyrup = latestCryoChemistryData.drink_metrics.total_syrup_volume_ml;
+        } else if (allSodaAligned) {
+            totalSyrup = latestSodaChemistryData.drink_metrics.total_syrup_volume_ml;
+        } else if (hasRtdBase && currentLabMode !== 'COFFEE') {
             const bottleCapacity = (currentLabMode === 'SODA') ? (bottleScale * 1000) : (bottleScale * 946.35);
             let nonFillerTotal = 0;
             
@@ -3034,11 +3071,11 @@
             let fillerName = "Water";
             let isOverflow = false;
             
-            if (latestCryoChemistryData && latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.filler) {
+            if (allCryoAligned && latestCryoChemistryData && latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.filler) {
                 finalWater = latestCryoChemistryData.ingredients.filler.volume_ml;
                 fillerName = latestCryoChemistryData.ingredients.filler.name;
             }
-            if (latestCryoChemistryData && latestCryoChemistryData.recipe_validation) {
+            if (allCryoAligned && latestCryoChemistryData && latestCryoChemistryData.recipe_validation) {
                 isOverflow = latestCryoChemistryData.recipe_validation.toLowerCase().includes('capacity') || latestCryoChemistryData.recipe_validation.toLowerCase().includes('overflow');
             } else {
                 isOverflow = totalSyrup > (bottleScale * 946.0);
@@ -3061,7 +3098,7 @@
                     <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
                         <div class="fw-bold mb-1" style="font-size: 0.9rem;">${fillerName} <i class="bi bi-droplets text-info ms-1"></i></div>
-                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
+                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(1)}ml / ${formatImperialVolume(finalWater)}</div>
                         <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                             <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
                                 <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">FILL LINE</span></div>
@@ -3078,10 +3115,10 @@
         if (currentLabMode === 'SODA' && !hasRtdBase) {
             let finalWater = 840.0 * bottleScale;
             let isOverflow = false;
-            if (latestSodaChemistryData && latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.carbonated_water) {
+            if (allSodaAligned && latestSodaChemistryData && latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.carbonated_water) {
                 finalWater = latestSodaChemistryData.ingredients.carbonated_water.volume_ml;
             }
-            if (latestSodaChemistryData && latestSodaChemistryData.recipe_validation) {
+            if (allSodaAligned && latestSodaChemistryData && latestSodaChemistryData.recipe_validation) {
                 isOverflow = latestSodaChemistryData.recipe_validation.toLowerCase().includes('fail');
             } else {
                 isOverflow = totalSyrup > (160.0 * bottleScale);
@@ -3156,10 +3193,10 @@
             let alignedItem = null;
             let sodaAligned = null;
             let cryoAligned = null;
-            if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
+            if (currentLabMode === 'SODA' && allSodaAligned && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
                 const list = latestSodaChemistryData.ingredients.modifiers || [];
                 sodaAligned = list.find(m => m.id == ing.id);
-            } else if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
+            } else if (currentLabMode === 'SLUSHIE' && allCryoAligned && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
                 const list = latestCryoChemistryData.ingredients.modifiers || [];
                 cryoAligned = list.find(m => m.id == ing.id);
             }
