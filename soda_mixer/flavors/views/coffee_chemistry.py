@@ -355,6 +355,25 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     if calculated_bitterness >= 4 and len(dairy_inputs) > 0 and fat_content_score < 3:
         is_fat_buffer_warning = True
 
+    # Dairy or Filler baseline name determination
+    dairy_name = dairy_inputs[0].get('name', 'Whole Milk') if dairy_inputs else ("Hot Water" if not is_espresso_base and not dairy_inputs else "Whole Milk")
+
+    # Autonomic Mouthfeel Correction Protocol (Action Override)
+    is_corrected = False
+    primary_filler_name = dairy_name
+    primary_filler_vol = secondary_liquid_vol
+    texturizer_vol = 0.0
+    texturizer_name = "Heavy Cream"
+
+    if is_thin_warning and secondary_liquid_vol > 0.0 and dairy_name != "Hot Water":
+        is_corrected = True
+        texturizer_vol = round(secondary_liquid_vol * 0.20, 2)
+        primary_filler_vol = round(secondary_liquid_vol - texturizer_vol, 2)
+        
+        # Suppress alerts since they have been programmatically resolved
+        is_thin_warning = False
+        is_fat_buffer_warning = False
+
     # pH Curdling Protection
     citrus_fruit_keywords = {'citrus', 'lemon', 'lime', 'orange', 'grapefruit', 'cherry', 'fruit', 'fruity', 'berry', 'berries', 'raspberry', 'strawberry', 'blueberry', 'blackberry', 'hibiscus'}
     has_citrus_modifier = False
@@ -396,6 +415,9 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     coffee_base_vol = round(coffee_base_vol, 2)
     secondary_liquid_vol = round(secondary_liquid_vol, 2)
     hot_water_vol = round(hot_water_vol, 2)
+    if is_corrected:
+        primary_filler_vol = round(primary_filler_vol, 2)
+        texturizer_vol = round(texturizer_vol, 2)
 
     # Base Modifiers format
     base_modifiers_output = []
@@ -410,9 +432,6 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             "volume_oz": ice_melt_water_vol
         })
 
-    # Dairy or Filler formatting
-    dairy_name = dairy_inputs[0].get('name', 'Whole Milk') if dairy_inputs else ("Hot Water" if not is_espresso_base and not dairy_inputs else "Whole Milk")
-    
     # Barista Notes & Prepare Step-by-Step Preparation Steps (Solubility)
     prep_steps = []
     
@@ -433,12 +452,17 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             break
             
     if "iced" not in drink_cat_lower:
-        if is_plant_milk:
+        if is_corrected:
+            prep_steps.append(f"Step 3: Incorporate the corrected payload ({primary_filler_vol}oz steamed {primary_filler_name} + {texturizer_vol}oz steamed {texturizer_name}). Steam to a temperature ceiling of 140°F.")
+        elif is_plant_milk:
             prep_steps.append("Step 3: Incorporate the Payload (steamed plant milk). Steam to a temperature ceiling of 130°F.")
         else:
             prep_steps.append("Step 3: Incorporate the Payload (steamed dairy). Steam to a temperature ceiling of 140°F.")
     else:
-        prep_steps.append("Step 3: Incorporate the Payload (Milk/Water filler).")
+        if is_corrected:
+            prep_steps.append(f"Step 3: Incorporate the corrected payload ({primary_filler_vol}oz cold {primary_filler_name} + {texturizer_vol}oz cold {texturizer_name}).")
+        else:
+            prep_steps.append("Step 3: Incorporate the Payload (Milk/Water filler).")
         
     if "iced" in drink_cat_lower:
         prep_steps.append("Step 4: Top with Ice last to preserve structural integrity.")
@@ -446,6 +470,8 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     barista_notes = "Extraction and chemistry parameters are balanced. Serve and enjoy!"
     if is_curdling_risk:
         barista_notes = "Curdling Risk: High acidity poses a milk curdling risk under hot configurations."
+    elif is_corrected:
+        barista_notes = f"Autonomic Mouthfeel Correction Protocol activated: Bitter coffee base combined with thin syrups detected. Re-engineered the payload to include a 20% splash of {texturizer_name} to optimize texture and mask bitterness."
     elif "iced" in drink_cat_lower:
         if is_espresso_base:
             barista_notes = "Hot espresso melts ice rapidly; consider pulling shots over ice directly to manage dilution."
@@ -457,6 +483,40 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         barista_notes = "Low aggregate body intensity detected. Dairy volume penalized by 10% to preserve coffee flavor definition."
     elif is_thin_warning:
         barista_notes = "Bitterness score >= 4 combined with thin syrups may result in a watery mouthfeel. Recommending a sauce modifier or a higher fat payload."
+
+    payload_filler_data = {
+        "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
+        "volume_oz": secondary_liquid_vol
+    }
+    if is_corrected and secondary_liquid_vol > 0.0:
+        pri_ml = round(primary_filler_vol * 29.5735)
+        tex_ml = round(texturizer_vol * 29.5735)
+        payload_filler_data = {
+            "name": f"{dairy_name}: {pri_ml}ml (Primary Filler) and Heavy Cream: {tex_ml}ml (Texture Anchor)",
+            "volume_oz": secondary_liquid_vol,
+            "is_corrected": True,
+            "primary_name": dairy_name,
+            "primary_volume_oz": primary_filler_vol,
+            "texturizer_name": "Heavy Cream",
+            "texturizer_volume_oz": texturizer_vol
+        }
+
+    dairy_or_filler_data = {
+        "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
+        "volume_oz": secondary_liquid_vol,
+        "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2)
+    }
+    if is_corrected and secondary_liquid_vol > 0.0:
+        dairy_or_filler_data = {
+            "name": payload_filler_data["name"],
+            "volume_oz": secondary_liquid_vol,
+            "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2),
+            "is_corrected": True,
+            "primary_name": dairy_name,
+            "primary_volume_oz": primary_filler_vol,
+            "texturizer_name": "Heavy Cream",
+            "texturizer_volume_oz": texturizer_vol
+        }
 
     # Construct final JSON output format
     res_data = {
@@ -474,10 +534,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                 "volume_oz": coffee_base_vol
             },
             "base_modifiers": base_modifiers_output,
-            "payload_filler": {
-                "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
-                "volume_oz": secondary_liquid_vol
-            },
+            "payload_filler": payload_filler_data,
             "flavor_modifiers": flavor_modifiers_output,
             # backward compatibility keys for UI:
             "coffee_base_mix": [
@@ -494,11 +551,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                     "percentage_of_liquid": round((hot_water_vol / liquid_budget_oz) * 100, 2)
                 }
             ] if hot_water_vol > 0.0 else []),
-            "dairy_or_filler": {
-                "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
-                "volume_oz": secondary_liquid_vol,
-                "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2)
-            },
+            "dairy_or_filler": dairy_or_filler_data,
             "modifiers": [
                 {
                     "name": m["name"],

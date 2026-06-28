@@ -2019,7 +2019,7 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         response = self.client.post(
             reverse('coffee_chemistry_api'),
             data=json.dumps({
-                'drink_category': 'Hot Coffee',
+                'drink_category': 'Standard Brew Hot Coffee',
                 'cup_size_oz': 12.0,
                 'ingredients': [
                     {
@@ -2128,6 +2128,59 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         self.assertIn("Step 2", steps[1])
         self.assertIn("agitate and dissolve the powder", steps[1])
         self.assertIn("Step 3", steps[2])
+
+    def test_autonomic_mouthfeel_correction_protocol(self) -> None:
+        # Bitter base (bitterness_score = 5) + thin syrup (Vanilla Syrup, no 'sauce') + Whole Milk
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Iced Coffee',
+                'cup_size_oz': 12.0,
+                'ingredients': [
+                    {
+                        'name': 'Dark Bitter Roast',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'body_intensity': 3.0,
+                        'acidity_score': 2.0,
+                        'bitterness_score': 5.0,
+                        'flavor_notes': ['smoky', 'charred'],
+                        'amount': 18.0
+                    },
+                    {
+                        'name': 'Vanilla Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'sweetness_score': 4.0,
+                        'amount': 15.0
+                    },
+                    {
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY',
+                        'amount': 100.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Validation should be clean / clear of thin or low-fat warnings
+        self.assertNotIn("watery mouthfeel", data['recipe_validation'])
+        self.assertNotIn("Low-fat payload", data['recipe_validation'])
+        
+        # Check payload_filler properties
+        pf = data['ingredients']['payload_filler']
+        self.assertTrue(pf.get('is_corrected'))
+        self.assertEqual(pf.get('primary_name'), 'Whole Milk')
+        self.assertEqual(pf.get('texturizer_name'), 'Heavy Cream')
+        
+        # Check volumetric preservation: primary + texturizer = total volume
+        total_vol = pf.get('volume_oz')
+        pri_vol = pf.get('primary_volume_oz')
+        tex_vol = pf.get('texturizer_volume_oz')
+        self.assertAlmostEqual(pri_vol + tex_vol, total_vol)
+        self.assertAlmostEqual(pri_vol, total_vol * 0.8)
+        self.assertAlmostEqual(tex_vol, total_vol * 0.2)
 
 
 class BeverageLabRecommendationExclusionTest(TestCase):

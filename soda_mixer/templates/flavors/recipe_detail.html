@@ -541,6 +541,7 @@
         if (shotsBtn) shotsBtn.classList.toggle('active-lab-mode', coffeeEspressoHotMode === 'shots');
     }
 
+    let latestCoffeeChemistryData = null;
     const savedCoffeeStyle = "{{ recipe.coffee_style|default:'hot' }}";
     const savedCoffeeBaseType = "{{ recipe.coffee_base_type|default:'espresso' }}";
 
@@ -850,8 +851,25 @@
                     }
                     
                     el.setAttribute('data-calculated-amount', amount);
-                    const displayVolume = Math.round(amount);
-                    el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
+                    let isCorrected = false;
+                    let priVol = 0;
+                    let texVol = 0;
+                    let texName = "";
+                    if (latestCoffeeChemistryData && latestCoffeeChemistryData.ingredients && latestCoffeeChemistryData.ingredients.payload_filler) {
+                        const pf = latestCoffeeChemistryData.ingredients.payload_filler;
+                        if (pf.is_corrected && isVolumeFiller) {
+                            isCorrected = true;
+                            priVol = Math.round(pf.primary_volume_oz * 29.5735);
+                            texVol = Math.round(pf.texturizer_volume_oz * 29.5735);
+                            texName = pf.texturizer_name;
+                        }
+                    }
+                    if (isCorrected) {
+                        el.innerHTML = `${priVol}ml (Primary Filler) & ${texName}: ${texVol}ml (Texture Anchor)`;
+                    } else {
+                        const displayVolume = Math.round(amount);
+                        el.innerHTML = `${displayVolume} ml / ${formatImperialVolume(amount)}`;
+                    }
                 }
             } else {
                 let amount;
@@ -1415,6 +1433,8 @@
 
             const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
             const data = await chemRes.json();
+            latestCoffeeChemistryData = data;
+            updateAmounts();
             let aiProfileData = null;
             try {
                 aiProfileData = await aiRes.json();

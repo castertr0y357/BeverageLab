@@ -391,7 +391,12 @@
                 return {
                     name: pf.name,
                     volume_oz: pf.volume_oz,
-                    percentage_of_liquid: pct
+                    percentage_of_liquid: pct,
+                    is_corrected: pf.is_corrected || false,
+                    primary_name: pf.primary_name || '',
+                    primary_volume_oz: pf.primary_volume_oz || 0,
+                    texturizer_name: pf.texturizer_name || '',
+                    texturizer_volume_oz: pf.texturizer_volume_oz || 0
                 };
             }
         } else if (itypeCategory === 'modifier') {
@@ -1693,12 +1698,27 @@
                     if (data.ingredients && data.ingredients.payload_filler) {
                         const pf = data.ingredients.payload_filler;
                         if (pf.name !== 'None') {
-                            dairyHtml = `
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold">${pf.name}</span>
-                                    <span>${pf.volume_oz} oz (${getPct(pf.volume_oz)}%)</span>
-                                </div>
-                            `;
+                            if (pf.is_corrected) {
+                                const pri_vol_ml = Math.round(pf.primary_volume_oz * 29.5735);
+                                const tex_vol_ml = Math.round(pf.texturizer_volume_oz * 29.5735);
+                                dairyHtml = `
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold">${pf.primary_name}: ${pri_vol_ml}ml (Primary Filler)</span>
+                                        <span>${pf.primary_volume_oz.toFixed(2)} oz (${getPct(pf.primary_volume_oz)}%)</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold">${pf.texturizer_name}: ${tex_vol_ml}ml (Texture Anchor)</span>
+                                        <span>${pf.texturizer_volume_oz.toFixed(2)} oz (${getPct(pf.texturizer_volume_oz)}%)</span>
+                                    </div>
+                                `;
+                            } else {
+                                dairyHtml = `
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold">${pf.name}</span>
+                                        <span>${pf.volume_oz} oz (${getPct(pf.volume_oz)}%)</span>
+                                    </div>
+                                `;
+                            }
                         } else {
                             dairyHtml = '<div class="text-dim">None</div>';
                         }
@@ -3138,6 +3158,10 @@
                         } else {
                             dualLabel = `${alignedItem.volume_oz.toFixed(1)}oz (${parseFloat(amount).toFixed(1)}g)`;
                         }
+                    } else if (alignedItem.is_corrected) {
+                        const pri_ml = Math.round(alignedItem.primary_volume_oz * 29.5735);
+                        const tex_ml = Math.round(alignedItem.texturizer_volume_oz * 29.5735);
+                        dualLabel = `${pri_ml}ml (Primary Filler) & Heavy Cream: ${tex_ml}ml (Texture Anchor)`;
                     } else {
                         dualLabel = `${displayVolume}${ingUnit} / ${alignedItem.volume_oz}oz`;
                     }
