@@ -243,9 +243,17 @@
                 {% endif %}
                 {% for ri in recipe.recipe_ingredients.all %}
                 <div class="col-md-6">
-                    <div class="glass-card p-3 border-white border-opacity-10 bg-dark bg-opacity-25 h-100">
+                    <div class="glass-card p-3 border-white border-opacity-10 bg-dark bg-opacity-25 h-100 {% if recipe.drink_type == 'SODA' and ri.is_primary %}border-warning{% endif %}"
+                         style="{% if recipe.drink_type == 'SODA' and ri.is_primary %}box-shadow: 0 0 12px rgba(255, 193, 7, 0.2); border-color: rgba(255, 193, 7, 0.4) !important;{% endif %}">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="fw-bold fs-5">{{ ri.ingredient.name }}</div>
+                            <div class="fw-bold fs-5">
+                                {{ ri.ingredient.name }}
+                                {% if recipe.drink_type == 'SODA' and ri.is_primary %}
+                                    <span class="badge bg-warning text-dark ms-2" style="font-size: 0.55rem;" title="Primary Flavor Anchor">
+                                        <i class="bi bi-star-fill me-1"></i>PRIMARY ANCHOR
+                                    </span>
+                                {% endif %}
+                            </div>
                             <span class="badge-fizz bg-{{ ri.ingredient.category }}">{{ ri.ingredient.category }}</span>
                         </div>
                         
@@ -279,7 +287,8 @@
                                      data-coffee-style="{{ recipe.coffee_style }}"
                                      data-drink-size-oz="{{ recipe.drink_size_oz }}"
                                      data-is-ready-to-drink="{{ ri.ingredient.is_ready_to_drink|yesno:'true,false' }}"
-                                     data-is-dry="{{ ri.ingredient.is_dry|yesno:'true,false' }}">
+                                     data-is-dry="{{ ri.ingredient.is_dry|yesno:'true,false' }}"
+                                     data-is-primary="{{ ri.is_primary|yesno:'true,false' }}">
                                     {% if ri.ingredient.is_dry or recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}
                                         {{ ri.amount|floatformat:1 }} g
                                     {% else %}
@@ -959,7 +968,8 @@
                 acidity_score: parseInt(el.getAttribute('data-acidity-score') || 3),
                 bitterness_score: parseInt(el.getAttribute('data-bitterness-score') || 3),
                 flavor_notes: el.getAttribute('data-flavor-notes') || '',
-                amount: parseFloat(el.getAttribute('data-calculated-amount') || el.getAttribute('data-original-amount'))
+                amount: parseFloat(el.getAttribute('data-calculated-amount') || el.getAttribute('data-original-amount')),
+                is_primary: el.getAttribute('data-is-primary') === 'true'
             });
         });
 
@@ -979,6 +989,7 @@
                     ingredients: ingredients.map(ing => {
                         const copy = { ...ing };
                         copy.ingredient_type = ing.ingredient_type || ing.type;
+                        copy.is_primary = ing.is_primary;
                         return copy;
                     })
                 })
@@ -991,6 +1002,7 @@
                     ingredients: ingredients.map(ing => {
                         const copy = { ...ing };
                         copy.ingredient_type = ing.ingredient_type || ing.type;
+                        copy.is_primary = ing.is_primary;
                         return copy;
                     }),
                     drink_type: 'SODA'

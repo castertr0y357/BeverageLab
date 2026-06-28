@@ -85,27 +85,14 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
 
     syrup_budget_ml = base_syrup_budget * bottle_scale
 
-    # Partition ingredients
-    delicate_ingredients = []
-    blender_ingredients = []
-    accent_ingredients = []
-
+    # Partition ingredients using the Primary Flavor Anchor Protocol
+    flavor_modifiers = []
     for ing in ingredients_input:
         itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
-        # Filter only flavor modifiers (exclude water and dry items if any)
         if itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not ing.get('is_dry', False):
-            name = ing.get('name', 'Syrup')
-            intensity = int(ing.get('intensity', 3))
-            classification = classify_soda_ingredient(name, intensity)
-            
-            if classification == 'DELICATE':
-                delicate_ingredients.append(ing)
-            elif classification == 'BLENDER':
-                blender_ingredients.append(ing)
-            else:
-                accent_ingredients.append(ing)
+            flavor_modifiers.append(ing)
 
-    total_ingredients_count = len(delicate_ingredients) + len(blender_ingredients) + len(accent_ingredients)
+    total_ingredients_count = len(flavor_modifiers)
 
     if total_ingredients_count == 0:
         logger.warning("SodaChemistry - Warning - No flavor modifiers provided.")
@@ -132,72 +119,101 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
             }
         })
 
-    # Calculate category shares
-    d_count = len(delicate_ingredients)
-    b_count = len(blender_ingredients)
-    a_count = len(accent_ingredients)
+    # Identify Primary Base (Anchor)
+    primary_base_ing = None
+    primary_idx = -1
+    for idx, ing in enumerate(flavor_modifiers):
+        is_prim = ing.get('is_primary')
+        if is_prim is None:
+            is_prim = ing.get('primary')
+        if is_prim is True or is_prim == 'true':
+            primary_base_ing = ing
+            primary_idx = idx
+            break
+    
+    if not primary_base_ing and flavor_modifiers:
+        primary_base_ing = flavor_modifiers[0]
+        primary_idx = 0
 
-    if d_count > 0 and b_count > 0 and a_count > 0:
-        d_share, b_share, a_share = 0.65, 0.25, 0.10
-    elif d_count > 0 and b_count > 0 and a_count == 0:
-        d_share, b_share, a_share = 0.70, 0.30, 0.0
-    elif d_count > 0 and b_count == 0 and a_count > 0:
-        d_share, b_share, a_share = 0.85, 0.0, 0.15
-    elif d_count == 0 and b_count > 0 and a_count > 0:
-        d_share, b_share, a_share = 0.0, 0.85, 0.15
-    elif d_count > 0:
-        d_share, b_share, a_share = 1.0, 0.0, 0.0
-    elif b_count > 0:
-        d_share, b_share, a_share = 0.0, 1.0, 0.0
-    elif a_count > 0:
-        d_share, b_share, a_share = 0.0, 0.0, 1.0
+    # Partition the remaining modifiers
+    remaining_modifiers = [ing for idx, ing in enumerate(flavor_modifiers) if idx != primary_idx]
+    rem_blenders = []
+    rem_accents = []
+    for ing in remaining_modifiers:
+        name = ing.get('name', 'Syrup')
+        intensity = int(ing.get('intensity', 3))
+        classification = classify_soda_ingredient(name, intensity)
+        if classification in ['DELICATE', 'BLENDER']:
+            rem_blenders.append(ing)
+        else:
+            rem_accents.append(ing)
+
+    N_accent = len(rem_accents)
+    N_blender = len(rem_blenders)
+
+    # Calculate proportions
+    if total_ingredients_count == 1:
+        primary_share = 1.0
+        blender_share = 0.0
+        accent_share = 0.0
     else:
-        d_share, b_share, a_share = 0.0, 0.0, 0.0
+        primary_share = 0.60
+        if N_blender > 0 and N_accent > 0:
+            accent_share = 0.075
+            blender_share = (0.40 - N_accent * 0.075) / N_blender
+        elif N_blender > 0 and N_accent == 0:
+            accent_share = 0.0
+            blender_share = 0.40 / N_blender
+        else: # N_blender == 0 and N_accent > 0
+            accent_share = 0.075
+            blender_share = 0.0
+            primary_share = 1.0 - N_accent * 0.075
 
     # Proportional volume distribution
     modifiers_output = []
     total_calculated_volume = 0.0
 
-    # Delicate
-    d_vol_each = (d_share * syrup_budget_ml) / d_count if d_count > 0 else 0.0
-    for ing in delicate_ingredients:
-        modifiers_output.append({
-            "id": ing.get('id'),
-            "name": ing.get('name'),
-            "volume_ml": round(d_vol_each, 1),
-            "percentage_of_syrup": round(d_share * 100 / d_count, 1) if d_count > 0 else 0.0,
-            "role": "Delicate Base"
-        })
-        total_calculated_volume += d_vol_each
+    # 1. Primary Base
+    p_vol = primary_share * syrup_budget_ml
+    modifiers_output.append({
+        "id": primary_base_ing.get('id'),
+        "name": primary_base_ing.get('name'),
+        "volume_ml": round(p_vol, 1),
+        "percentage_of_syrup": round(primary_share * 100, 1),
+        "role": "Primary Base"
+    })
+    total_calculated_volume += p_vol
 
-    # Blender
-    b_vol_each = (b_share * syrup_budget_ml) / b_count if b_count > 0 else 0.0
-    for ing in blender_ingredients:
-        modifiers_output.append({
-            "id": ing.get('id'),
-            "name": ing.get('name'),
-            "volume_ml": round(b_vol_each, 1),
-            "percentage_of_syrup": round(b_share * 100 / b_count, 1) if b_count > 0 else 0.0,
-            "role": "Complementary Blender"
-        })
-        total_calculated_volume += b_vol_each
+    # 2. Remaining Blenders/Delicates
+    if N_blender > 0:
+        b_vol = blender_share * syrup_budget_ml
+        for ing in rem_blenders:
+            modifiers_output.append({
+                "id": ing.get('id'),
+                "name": ing.get('name'),
+                "volume_ml": round(b_vol, 1),
+                "percentage_of_syrup": round(blender_share * 100, 1),
+                "role": "Complementary Blender"
+            })
+            total_calculated_volume += b_vol
 
-    # Accent
-    a_vol_each = (a_share * syrup_budget_ml) / a_count if a_count > 0 else 0.0
-    for ing in accent_ingredients:
-        modifiers_output.append({
-            "id": ing.get('id'),
-            "name": ing.get('name'),
-            "volume_ml": round(a_vol_each, 1),
-            "percentage_of_syrup": round(a_share * 100 / a_count, 1) if a_count > 0 else 0.0,
-            "role": "Aggressive Accent"
-        })
-        total_calculated_volume += a_vol_each
+    # 3. Remaining Accents
+    if N_accent > 0:
+        a_vol = accent_share * syrup_budget_ml
+        for ing in rem_accents:
+            modifiers_output.append({
+                "id": ing.get('id'),
+                "name": ing.get('name'),
+                "volume_ml": round(a_vol, 1),
+                "percentage_of_syrup": round(accent_share * 100, 1),
+                "role": "Aggressive Accent"
+            })
+            total_calculated_volume += a_vol
 
     # 4. Extraction Analysis Output Logic (Sweetness, Acidity, Bitterness)
     # Perceived Sweetness rating and high-acid penalty check
     sweetness_score = baseline_sweetness
-    accent_acidity_scores = [float(ing.get('acidity_score', ing.get('acidity', 3.0))) for ing in accent_ingredients]
+    accent_acidity_scores = [float(ing.get('acidity_score', ing.get('acidity', 3.0))) for ing in rem_accents]
     if len(accent_acidity_scores) > 0:
         avg_accent_acidity = sum(accent_acidity_scores) / len(accent_acidity_scores)
         if avg_accent_acidity >= 4.0:

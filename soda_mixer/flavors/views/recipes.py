@@ -66,11 +66,13 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
             try:
                 amount = float(request.POST.get(f'amount_{ingredient_id}', 1.0))
                 notes = request.POST.get(f'notes_{ingredient_id}', '')
+                is_primary = request.POST.get(f'is_primary_{ingredient_id}') == 'true'
                 RecipeIngredient.objects.create(
                     recipe=recipe,
                     ingredient_id=int(ingredient_id),
                     amount=amount,
-                    notes=notes
+                    notes=notes,
+                    is_primary=is_primary
                 )
             except (ValueError, ValidationError, IntegrityError) as e:
                 logger.error(f"RecipeCreation - Error - Failed to attach ingredient {ingredient_id} to recipe {recipe.id}: {e}")
@@ -124,6 +126,7 @@ def edit_recipe(request: HttpRequest, pk: int) -> HttpResponse:
                     ingredient_id = int(key.replace('amount_', ''))
                     amount = float(value)
                     notes = request.POST.get(f'notes_{ingredient_id}', '')
+                    is_primary = request.POST.get(f'is_primary_{ingredient_id}') == 'true'
                     
                     # Capture synthesized profile overrides
                     profile_overrides: Dict[str, int] = {}
@@ -137,6 +140,7 @@ def edit_recipe(request: HttpRequest, pk: int) -> HttpResponse:
                         ingredient_id=ingredient_id,
                         amount=amount,
                         notes=notes,
+                        is_primary=is_primary,
                         **profile_overrides
                     )
                 except (ValueError, TypeError, Ingredient.DoesNotExist, IntegrityError) as e:

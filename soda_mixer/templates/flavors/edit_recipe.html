@@ -115,6 +115,7 @@
                                 <tr>
                                     <th class="border-0">MATERIEL</th>
                                     <th class="border-0">QUANTITY</th>
+                                    <th class="border-0 anchor-header" style="display: none;">PRIMARY ANCHOR</th>
                                     <th class="border-0">NOTES</th>
                                     <th class="border-0 text-center">MOLECULAR BALANCE (I|S|A|B)</th>
                                     <th class="border-0 text-end">CONTROL</th>
@@ -135,6 +136,14 @@
                                                 {% if ri.ingredient.is_dry or recipe.drink_type == 'COFFEE' and ri.ingredient.ingredient_type == 'COFFEE_BEAN' %}g{% elif recipe.drink_type == 'SLUSHIE' %}oz{% else %}ml{% endif %}
                                             </span>
                                         </div>
+                                    </td>
+                                    <td class="border-white border-opacity-5 text-center anchor-cell" style="display: none;">
+                                        {% if ri.ingredient.ingredient_type in 'SODA_SYRUP ADDITIVE OTHER' and not ri.ingredient.is_dry %}
+                                        <input type="radio" name="primary_anchor_choice" value="{{ ri.ingredient.id }}" {% if ri.is_primary %}checked{% endif %} onchange="updatePrimaryAnchorInputs()">
+                                        <input type="hidden" name="is_primary_{{ ri.ingredient.id }}" id="is_primary_{{ ri.ingredient.id }}" value="{% if ri.is_primary %}true{% else %}false{% endif %}">
+                                        {% else %}
+                                        <span class="text-dim small">-</span>
+                                        {% endif %}
                                     </td>
                                     <td class="border-white border-opacity-5">
                                         <input type="text" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
@@ -228,6 +237,16 @@
             coffeeParams.style.display = 'none';
         }
 
+        const anchorHeaders = document.querySelectorAll('.anchor-header');
+        const anchorCells = document.querySelectorAll('.anchor-cell');
+        if (type === 'SODA') {
+            anchorHeaders.forEach(el => el.style.display = 'table-cell');
+            anchorCells.forEach(el => el.style.display = 'table-cell');
+        } else {
+            anchorHeaders.forEach(el => el.style.display = 'none');
+            anchorCells.forEach(el => el.style.display = 'none');
+        }
+
         const rowUnits = document.querySelectorAll('.row-unit');
         rowUnits.forEach(el => {
             const ingType = el.getAttribute('data-ingredient-type');
@@ -276,6 +295,7 @@
                             <tr>
                                 <th class="border-0">MATERIEL</th>
                                 <th class="border-0">QUANTITY</th>
+                                <th class="border-0 anchor-header" style="display: none;">PRIMARY ANCHOR</th>
                                 <th class="border-0">NOTES</th>
                                 <th class="border-0 text-center">MOLECULAR BALANCE (I|S|A|B)</th>
                                 <th class="border-0 text-end">CONTROL</th>
@@ -295,6 +315,25 @@
         const defaultAmount = type === 'COFFEE' ? (isBean ? '18.0' : (ingredientType === 'DAIRY' ? '50.0' : '15.0')) : (isDry ? '15.0' : '1.0');
         const rowUnit = isDry || (type === 'COFFEE' && isBean) ? 'g' : (type === 'SLUSHIE' ? 'oz' : 'ml');
 
+        const isFlavor = ['SODA_SYRUP', 'ADDITIVE', 'OTHER'].includes(ingredientType.toUpperCase()) && !isDry;
+        const displayStyle = type === 'SODA' ? 'display: table-cell;' : 'display: none;';
+        
+        let anchorTd = '';
+        if (isFlavor) {
+            const checkedRadio = document.querySelector('input[name="primary_anchor_choice"]:checked');
+            const isChecked = !checkedRadio ? 'checked' : '';
+            anchorTd = `
+                <td class="border-white border-opacity-5 text-center anchor-cell" style="${displayStyle}">
+                    <input type="radio" name="primary_anchor_choice" value="${id}" ${isChecked} onchange="updatePrimaryAnchorInputs()">
+                    <input type="hidden" name="is_primary_${id}" id="is_primary_${id}" value="${isChecked ? 'true' : 'false'}">
+                </td>
+            `;
+        } else {
+            anchorTd = `
+                <td class="border-white border-opacity-5 text-center anchor-cell text-dim small" style="${displayStyle}">-</td>
+            `;
+        }
+
         const row = `
             <tr id="ingredient-row-${id}" class="align-middle">
                 <td class="border-white border-opacity-5">
@@ -308,6 +347,7 @@
                         <span class="small text-dim row-unit" data-ingredient-type="${ingredientType}" data-is-dry="${isDry}">${rowUnit}</span>
                     </div>
                 </td>
+                ${anchorTd}
                 <td class="border-white border-opacity-5">
                     <input type="text" class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white" 
                            name="notes_${id}" placeholder="Sensory note...">
@@ -374,6 +414,21 @@
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
+    }
+
+    function updatePrimaryAnchorInputs() {
+        const chosenId = document.querySelector('input[name="primary_anchor_choice"]:checked')?.value;
+        const rows = document.querySelectorAll('#ingredientsTableBody tr');
+        rows.forEach(row => {
+            const match = row.id.match(/^ingredient-row-(.+)$/);
+            if (match) {
+                const id = match[1];
+                const el = document.getElementById(`is_primary_${id}`);
+                if (el) {
+                    el.value = (id == chosenId) ? 'true' : 'false';
+                }
+            }
+        });
     }
 
     function removeIngredientRow(id) {

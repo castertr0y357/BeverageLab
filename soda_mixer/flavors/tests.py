@@ -2332,9 +2332,9 @@ class SodaChemistryEngineTest(TestCase):
         watermelon = next(m for m in modifiers if 'Watermelon' in m['name'])
         coconut = next(m for m in modifiers if 'Coconut' in m['name'])
         ginger = next(m for m in modifiers if 'Ginger' in m['name'])
-        self.assertAlmostEqual(watermelon['volume_ml'], 78.0)  # 65% of 120
-        self.assertAlmostEqual(coconut['volume_ml'], 30.0)    # 25% of 120
-        self.assertAlmostEqual(ginger['volume_ml'], 12.0)     # 10% of 120
+        self.assertAlmostEqual(watermelon['volume_ml'], 72.0)  # Primary Base: 60% of 120
+        self.assertAlmostEqual(coconut['volume_ml'], 39.0)     # Blender: (40% - 7.5%) of 120 = 32.5% of 120
+        self.assertAlmostEqual(ginger['volume_ml'], 9.0)       # Accent: 7.5% of 120
 
         # Check prep steps
         steps = data['preparation_steps']
@@ -2361,12 +2361,12 @@ class SodaChemistryEngineTest(TestCase):
         self.assertEqual(metrics['water_volume_ml'], 420.0)
         self.assertAlmostEqual(metrics['total_syrup_volume_ml'], 52.5)
 
-        # Delicate and blender are present (70% / 30% split)
+        # Delicate and blender are present (60% / 40% split)
         modifiers = data['ingredients']['modifiers']
         peach = next(m for m in modifiers if 'Peach' in m['name'])
         vanilla = next(m for m in modifiers if 'Vanilla' in m['name'])
-        self.assertAlmostEqual(peach['volume_ml'], 36.8)  # 70% of 52.5 = 36.75 (rounded to 36.8)
-        self.assertAlmostEqual(vanilla['volume_ml'], 15.8)  # 30% of 52.5 = 15.75 (rounded to 15.8)
+        self.assertAlmostEqual(peach['volume_ml'], 31.5)  # 60% of 52.5 = 31.5
+        self.assertAlmostEqual(vanilla['volume_ml'], 21.0)  # 40% of 52.5 = 21.0
 
         steps = data['preparation_steps']
         self.assertIn("exactly 420ml of cold water", steps[1])
@@ -2411,6 +2411,60 @@ class SodaChemistryEngineTest(TestCase):
         self.assertEqual(metrics['water_volume_ml'], 298.2)
         self.assertEqual(metrics['total_syrup_volume_ml'], 49.7)
         self.assertEqual(data['recipe_validation'], 'Pass')
+
+    def test_soda_chemistry_primary_flavor_anchor_protocol(self) -> None:
+        # Test Primary Flavor Anchor Protocol with designated primary base
+        response = self.client.post(
+            reverse('soda_chemistry_api'),
+            data=json.dumps({
+                'sweetness_style': 'CRAFT',
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'is_primary': True},
+                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1},
+                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1},
+                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        modifiers = data['ingredients']['modifiers']
+        self.assertEqual(len(modifiers), 4)
+        
+        grapefruit = next(m for m in modifiers if 'Grapefruit' in m['name'])
+        coconut = next(m for m in modifiers if 'Coconut' in m['name'])
+        mint = next(m for m in modifiers if 'Mint' in m['name'])
+        lime = next(m for m in modifiers if 'Lime' in m['name'])
+        
+        self.assertAlmostEqual(grapefruit['volume_ml'], 72.0)  # 60% of 120ml
+        self.assertAlmostEqual(coconut['volume_ml'], 30.0)    # 25% of 120ml
+        self.assertAlmostEqual(mint['volume_ml'], 9.0)        # 7.5% of 120ml
+        self.assertAlmostEqual(lime['volume_ml'], 9.0)        # 7.5% of 120ml
+        self.assertAlmostEqual(data['drink_metrics']['total_syrup_volume_ml'], 120.0)
+        
+        # Test fallback: no is_primary provided, should default to first flavor (Grapefruit)
+        response_fallback = self.client.post(
+            reverse('soda_chemistry_api'),
+            data=json.dumps({
+                'sweetness_style': 'CRAFT',
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1},
+                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1},
+                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1},
+                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response_fallback.status_code, 200)
+        data_fallback = response_fallback.json()
+        modifiers_fallback = data_fallback['ingredients']['modifiers']
+        
+        grapefruit_fb = next(m for m in modifiers_fallback if 'Grapefruit' in m['name'])
+        self.assertAlmostEqual(grapefruit_fb['volume_ml'], 72.0)
 
 
 class CryoChemistryTests(TestCase):

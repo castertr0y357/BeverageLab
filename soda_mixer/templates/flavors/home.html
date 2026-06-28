@@ -461,6 +461,18 @@
             return;
         }
 
+        // Ensure a primary anchor is designated if any flavor modifier exists
+        const hasPrim = selectedIngredients.some(x => x.isPrimary);
+        if (!hasPrim) {
+            const firstFlavor = selectedIngredients.find(x => {
+                const t = (x.type || x.ingredient_type || '').toUpperCase();
+                return ['SODA_SYRUP', 'ADDITIVE', 'OTHER'].includes(t) && !x.isDry;
+            });
+            if (firstFlavor) {
+                firstFlavor.isPrimary = true;
+            }
+        }
+
         try {
             const r = await fetch('/api/soda/chemistry/', {
                 method: 'POST',
@@ -471,6 +483,7 @@
                     ingredients: selectedIngredients.map((ing) => {
                         const ingCopy = { ...ing };
                         ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                        ingCopy.is_primary = ing.isPrimary || false;
                         return ingCopy;
                     })
                 })
@@ -1419,7 +1432,8 @@
             bitterness_score: profileObj ? profileObj.bitterness : parseInt(bitterness),
             flavor_notes: parsedNotes,
             is_decaf: isDecaf || (profileObj ? (profileObj.is_decaf === true || profileObj.is_decaf === 'true') : false) || name.toLowerCase().includes('decaf'),
-            profile: profileObj
+            profile: profileObj,
+            isPrimary: false
         });
 
         // Split grams budget equally among all coffee beans in the mix only if the new ingredient is a coffee bean
@@ -1787,6 +1801,7 @@
                 const mappedIngredients = selectedIngredients.map((ing) => {
                     const ingCopy = { ...ing };
                     ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                    ingCopy.is_primary = ing.isPrimary || false;
                     return ingCopy;
                 });
 
@@ -2376,6 +2391,18 @@
                     resetMixer();
                 }
             }
+        }
+
+        function setPrimaryAnchor(id) {
+            selectedIngredients.forEach((ing) => {
+                ing.isPrimary = (ing.id == id);
+            });
+            updateSodaChemistryWizard().then(() => {
+                updateSelectedArea();
+                if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
+                    triggerFlavorSynthesis();
+                }
+            });
         }
 
         async function fetchRecommendations() {
@@ -3196,10 +3223,38 @@
                 `;
             }
             
+            const ingTypeForPrim = (ing.type || ing.ingredient_type || '').toUpperCase();
+            const isFlavorModifier = ['SODA_SYRUP', 'ADDITIVE', 'OTHER'].includes(ingTypeForPrim) && !isDry;
+            const isSodaPrim = currentLabMode === 'SODA' && isFlavorModifier && ing.isPrimary;
+            const borderGlowClass = isSodaPrim ? 'border-warning' : (ing.isAiBalanced ? 'border-neural glow-neural' : '');
+            const extraStyle = isSodaPrim ? 'box-shadow: 0 0 12px rgba(255, 193, 7, 0.35); border-color: rgba(255, 193, 7, 0.5) !important;' : '';
+
+            let anchorTogglerHtml = '';
+            if (currentLabMode === 'SODA' && isFlavorModifier) {
+                if (ing.isPrimary) {
+                    anchorTogglerHtml = `
+                        <div class="mb-2">
+                            <span class="badge bg-warning text-dark px-2 py-0.5 cursor-pointer" onclick="setPrimaryAnchor('${ing.id}')" style="font-size: 0.55rem;" title="Core featured flavor anchor">
+                                <i class="bi bi-star-fill me-1"></i>PRIMARY ANCHOR
+                            </span>
+                        </div>
+                    `;
+                } else {
+                    anchorTogglerHtml = `
+                        <div class="mb-2">
+                            <span class="badge border border-white border-opacity-25 text-dim px-2 py-0.5 cursor-pointer hover-lime" onclick="setPrimaryAnchor('${ing.id}')" style="font-size: 0.55rem;" title="Set as primary flavor anchor">
+                                <i class="bi bi-star me-1"></i>SET ANCHOR
+                            </span>
+                        </div>
+                    `;
+                }
+            }
+
             html += `
-                <div class="col-auto">
-                    <div class="glass-card p-2 text-center px-4 ${ing.isAiBalanced ? 'border-neural glow-neural' : ''}" style="min-width: 150px; position: relative;">
+                <div class="col-auto animate-fade-in">
+                    <div class="glass-card p-2 text-center px-4 ${borderGlowClass}" style="min-width: 150px; position: relative; ${extraStyle}">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">${role}</span>
+                        ${anchorTogglerHtml}
                         <div class="fw-bold mb-1" style="font-size: 0.9rem;">${mainName} ${balanceIndicator}</div>
                         ${renameWarningHtml}
                         <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${dualLabel}</div>
@@ -3561,6 +3616,15 @@
             amountInput.value = amount;
             amountInput.className = 'dynamic-mix-input';
             mixerForm.appendChild(amountInput);
+
+            if (currentLabMode === 'SODA') {
+                const primaryInput = document.createElement('input');
+                primaryInput.type = 'hidden';
+                primaryInput.name = `is_primary_${ing.id}`;
+                primaryInput.value = ing.isPrimary ? 'true' : 'false';
+                primaryInput.className = 'dynamic-mix-input';
+                mixerForm.appendChild(primaryInput);
+            }
  
             const notesInput = document.createElement('input');
             notesInput.type = 'hidden';

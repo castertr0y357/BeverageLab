@@ -263,6 +263,10 @@ class RecipeIngredient(models.Model):
         default=1.0
     )
     notes = models.CharField(max_length=200, blank=True)
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="Designates this ingredient as the primary flavor anchor for Soda synthesis."
+    )
     
     # 🧪 Synthesized Profile Overrides (optional AI fine-tuning)
     intensity = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
