@@ -1963,6 +1963,7 @@ class BeverageLabCoffeeChemistryTest(TestCase):
                 'drink_category': 'Hot Coffee',
                 'cup_size_oz': 12.0,
                 'espresso_hot_mode': 'water',
+                'americano_toggle': True,
                 'ingredients': [
                     {
                         'name': 'Espresso Bean',

@@ -369,6 +369,17 @@
         }
         
         if (itypeCategory === 'coffee') {
+            const mix = latestCoffeeChemistryData.ingredients.coffee_base_mix || [];
+            const matchedMix = mix.find(x => x.id == ing.id);
+            if (matchedMix) {
+                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                const pct = budget > 0 ? ((matchedMix.volume_oz / budget) * 100).toFixed(1) : '0';
+                return {
+                    name: matchedMix.name,
+                    volume_oz: matchedMix.volume_oz,
+                    percentage_of_liquid: pct
+                };
+            }
             const cb = latestCoffeeChemistryData.ingredients.coffee_base;
             if (cb) {
                 const coffeeBeans = selectedIngredients.filter(x => (x.type || x.ingredient_type || '').toUpperCase() === 'COFFEE_BEAN');
@@ -386,21 +397,33 @@
         } else if (itypeCategory === 'dairy') {
             const pf = latestCoffeeChemistryData.ingredients.payload_filler;
             if (pf && pf.name !== 'None') {
-                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
-                const pct = budget > 0 ? ((pf.volume_oz / budget) * 100).toFixed(1) : '0';
-                return {
-                    name: pf.name,
-                    volume_oz: pf.volume_oz,
-                    percentage_of_liquid: pct,
-                    is_corrected: pf.is_corrected || false,
-                    primary_name: pf.primary_name || '',
-                    primary_volume_oz: pf.primary_volume_oz || 0,
-                    texturizer_name: pf.texturizer_name || '',
-                    texturizer_volume_oz: pf.texturizer_volume_oz || 0
-                };
+                if (pf.id == ing.id || countInCat === 0) {
+                    const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                    const pct = budget > 0 ? ((pf.volume_oz / budget) * 100).toFixed(1) : '0';
+                    return {
+                        name: pf.name,
+                        volume_oz: pf.volume_oz,
+                        percentage_of_liquid: pct,
+                        is_corrected: pf.is_corrected || false,
+                        primary_name: pf.primary_name || '',
+                        primary_volume_oz: pf.primary_volume_oz || 0,
+                        texturizer_name: pf.texturizer_name || '',
+                        texturizer_volume_oz: pf.texturizer_volume_oz || 0
+                    };
+                }
             }
         } else if (itypeCategory === 'modifier') {
             const list = latestCoffeeChemistryData.ingredients.flavor_modifiers || [];
+            const matchedFm = list.find(fm => fm.id == ing.id);
+            if (matchedFm) {
+                const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
+                const pct = budget > 0 ? ((matchedFm.volume_oz / budget) * 100).toFixed(1) : '0';
+                return {
+                    name: matchedFm.name,
+                    volume_oz: matchedFm.volume_oz,
+                    percentage_of_liquid: pct
+                };
+            }
             if (countInCat < list.length) {
                 const fm = list[countInCat];
                 const budget = latestCoffeeChemistryData.drink_metrics.total_liquid_budget_oz || 1.0;
@@ -1628,6 +1651,8 @@
                         drink_category: drinkCategory,
                         cup_size_oz: coffeeSizeOz,
                         espresso_hot_mode: coffeeEspressoHotMode,
+                        americano_toggle: (coffeeEspressoHotMode === 'water'),
+                        americano: (coffeeEspressoHotMode === 'water'),
                         ingredients: mappedIngredients
                     })
                 });
@@ -1701,9 +1726,14 @@
                             if (pf.is_corrected) {
                                 const pri_vol_ml = Math.round(pf.primary_volume_oz * 29.5735);
                                 const tex_vol_ml = Math.round(pf.texturizer_volume_oz * 29.5735);
+                                let displayName = pf.primary_name;
+                                const matchedIng = selectedIngredients.find(ing => ing.id == pf.id);
+                                if (matchedIng) {
+                                    displayName = matchedIng.name;
+                                }
                                 dairyHtml = `
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="fw-bold">${pf.primary_name}: ${pri_vol_ml}ml (Primary Filler)</span>
+                                        <span class="fw-bold">${displayName}: ${pri_vol_ml}ml (Primary Filler)</span>
                                         <span>${pf.primary_volume_oz.toFixed(2)} oz (${getPct(pf.primary_volume_oz)}%)</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -1712,9 +1742,14 @@
                                     </div>
                                 `;
                             } else {
+                                let displayName = pf.name;
+                                const matchedIng = selectedIngredients.find(ing => ing.id == pf.id);
+                                if (matchedIng) {
+                                    displayName = matchedIng.name;
+                                }
                                 dairyHtml = `
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="fw-bold">${pf.name}</span>
+                                        <span class="fw-bold">${displayName}</span>
                                         <span>${pf.volume_oz} oz (${getPct(pf.volume_oz)}%)</span>
                                     </div>
                                 `;
@@ -1726,12 +1761,21 @@
 
                     let modifiersHtml = '';
                     if (data.ingredients && data.ingredients.flavor_modifiers && data.ingredients.flavor_modifiers.length > 0) {
-                        modifiersHtml = data.ingredients.flavor_modifiers.map(m => `
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold">${m.name}</span>
-                                <span>${m.volume_oz} oz (${getPct(m.volume_oz)}%)</span>
-                            </div>
-                        `).join('');
+                        modifiersHtml = data.ingredients.flavor_modifiers.map(m => {
+                            let displayName = m.name;
+                            const matchedIng = selectedIngredients.find(ing => ing.id == m.id);
+                            if (matchedIng) {
+                                const role = m.name.match(/\((Dominant|Accent)\)$/i);
+                                const roleSuffix = role ? ` ${role[0]}` : '';
+                                displayName = `${matchedIng.name}${roleSuffix}`;
+                            }
+                            return `
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold">${displayName}</span>
+                                    <span>${m.volume_oz} oz (${getPct(m.volume_oz)}%)</span>
+                                </div>
+                            `;
+                        }).join('');
                     } else {
                         modifiersHtml = '<div class="text-dim">None</div>';
                     }

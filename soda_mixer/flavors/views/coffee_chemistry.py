@@ -185,7 +185,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             modified_list.append(mod)
 
     # Resolve Americano Toggle
-    americano_toggle = data.get('americano_toggle', False) or data.get('americano', False) or (espresso_hot_mode == 'water')
+    americano_toggle = data.get('americano_toggle', False) or data.get('americano', False)
 
     # 3. Flavor Balancing & "Modifier Crowding" Rules
     requested_modifier_total = 0.0
@@ -231,6 +231,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         if len(modified_list) == 1:
             name = modified_list[0].get('name', 'Syrup')
             flavor_modifiers_output.append({
+                "id": modified_list[0].get('id'),
                 "name": f"{name} (Dominant)",
                 "volume_oz": round(modifier_budget, 2)
             })
@@ -271,6 +272,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
                     role = "(Accent)"
                 
                 flavor_modifiers_output.append({
+                    "id": m.get('id'),
                     "name": f"{name} {role}",
                     "volume_oz": round(vol, 2)
                 })
@@ -484,7 +486,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     elif is_thin_warning:
         barista_notes = "Bitterness score >= 4 combined with thin syrups may result in a watery mouthfeel. Recommending a sauce modifier or a higher fat payload."
 
+    dairy_id = dairy_inputs[0].get('id') if dairy_inputs else None
+
     payload_filler_data = {
+        "id": dairy_id,
         "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
         "volume_oz": secondary_liquid_vol
     }
@@ -492,6 +497,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         pri_ml = round(primary_filler_vol * 29.5735)
         tex_ml = round(texturizer_vol * 29.5735)
         payload_filler_data = {
+            "id": dairy_id,
             "name": f"{dairy_name}: {pri_ml}ml (Primary Filler) and Heavy Cream: {tex_ml}ml (Texture Anchor)",
             "volume_oz": secondary_liquid_vol,
             "is_corrected": True,
@@ -502,12 +508,14 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         }
 
     dairy_or_filler_data = {
+        "id": dairy_id,
         "name": dairy_name if secondary_liquid_vol > 0.0 else "None",
         "volume_oz": secondary_liquid_vol,
         "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2)
     }
     if is_corrected and secondary_liquid_vol > 0.0:
         dairy_or_filler_data = {
+            "id": dairy_id,
             "name": payload_filler_data["name"],
             "volume_oz": secondary_liquid_vol,
             "percentage_of_liquid": round((secondary_liquid_vol / liquid_budget_oz) * 100, 2),
@@ -539,6 +547,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             # backward compatibility keys for UI:
             "coffee_base_mix": [
                 {
+                    "id": coffee_inputs[idx].get('id'),
                     "name": coffee_inputs[idx].get('name', 'Coffee'),
                     "volume_oz": round(coffee_base_vol * ratios[idx], 2),
                     "percentage_of_liquid": round((coffee_base_vol * ratios[idx] / liquid_budget_oz) * 100, 2)
@@ -554,6 +563,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             "dairy_or_filler": dairy_or_filler_data,
             "modifiers": [
                 {
+                    "id": m.get("id"),
                     "name": m["name"],
                     "volume_oz": m["volume_oz"],
                     "percentage_of_liquid": round((m["volume_oz"] / liquid_budget_oz) * 100, 2)
