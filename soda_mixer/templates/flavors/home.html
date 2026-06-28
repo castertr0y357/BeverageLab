@@ -2904,6 +2904,8 @@
         const hasRtdBase = selectedIngredients.some(ing => ing.isReadyToDrink);
         const firstRtdIndex = selectedIngredients.findIndex(ing => ing.isReadyToDrink);
 
+        let finalWater = 0;
+
         let allCryoAligned = false;
         if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
             const list = latestCryoChemistryData.ingredients.modifiers || [];
@@ -2971,8 +2973,14 @@
         
         if (allCryoAligned) {
             totalSyrup = latestCryoChemistryData.drink_metrics.total_syrup_volume_ml;
+            if (hasRtdBase && latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.filler) {
+                rtdBaseAmount = latestCryoChemistryData.ingredients.filler.volume_ml;
+            }
         } else if (allSodaAligned) {
             totalSyrup = latestSodaChemistryData.drink_metrics.total_syrup_volume_ml;
+            if (hasRtdBase && latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.carbonated_water) {
+                rtdBaseAmount = latestSodaChemistryData.ingredients.carbonated_water.volume_ml;
+            }
         } else if (hasRtdBase && currentLabMode !== 'COFFEE') {
             const bottleCapacity = (currentLabMode === 'SODA') ? (bottleScale * 1000) : (bottleScale * 946.35);
             let nonFillerTotal = 0;
@@ -3013,6 +3021,10 @@
                     }
                 }
             });
+        }
+
+        if (currentLabMode === 'SLUSHIE' && hasRtdBase) {
+            finalWater = rtdBaseAmount;
         }
 
         let warningBannerHtml = '';
@@ -3067,7 +3079,7 @@
 
         // 💧 Inject virtual Water card for Slushie mode to the left of the base ingredient
         if (currentLabMode === 'SLUSHIE' && !hasRtdBase) {
-            let finalWater = Math.max(0, bottleScale * 946.0 - totalSyrup);
+            finalWater = Math.max(0, bottleScale * 946.0 - totalSyrup);
             let fillerName = "Water";
             let isOverflow = false;
             
@@ -3294,7 +3306,11 @@
                 } else {
                     amount = amount * (bottleScale || 1.0) * expansionFactor;
                 }
-                displayVolume = isDry ? amount.toFixed(1) : amount.toFixed(0);
+                if (currentLabMode === 'SLUSHIE' && hasRtdBase && index === firstRtdIndex) {
+                    displayVolume = amount.toFixed(1);
+                } else {
+                    displayVolume = isDry ? amount.toFixed(1) : amount.toFixed(0);
+                }
 
                 if (isDry) {
                     dualLabel = `${displayVolume} g`;
@@ -3459,7 +3475,78 @@
 
 
         
-        if (isDone || selectedIngredients.length >= maxIngredients) {
+        let hasZeroValueMismatch = false;
+        if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData) {
+            // Check filler (Water)
+            if (latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.filler) {
+                const backendFillerVol = latestCryoChemistryData.ingredients.filler.volume_ml;
+                if (backendFillerVol > 0 && finalWater <= 0.05) {
+                    hasZeroValueMismatch = true;
+                }
+            }
+            // Check modifiers
+            const backendModifiers = (latestCryoChemistryData.ingredients && latestCryoChemistryData.ingredients.modifiers) || [];
+            selectedIngredients.forEach((ing, index) => {
+                const type = (ing.type || ing.ingredient_type || '').toUpperCase();
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                    const matched = backendModifiers.find(m => m.id == ing.id);
+                    if (matched) {
+                        const backendVol = matched.volume_ml;
+                        let renderedVol = ing.amount;
+                        if (allCryoAligned) {
+                            renderedVol = matched.volume_ml;
+                        } else {
+                            if (hasRtdBase && index === firstRtdIndex) {
+                                renderedVol = rtdBaseAmount;
+                            } else if (ing.isDry === true || ing.isDry === 'true') {
+                                renderedVol = (ing.amount || 15.0) * bottleScale;
+                            } else {
+                                const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
+                                renderedVol = (ing.amount || baseVolume) * bottleScale * expansionFactor;
+                            }
+                        }
+                        if (backendVol > 0 && renderedVol <= 0.05) {
+                            hasZeroValueMismatch = true;
+                        }
+                    }
+                }
+            });
+        }
+        if (currentLabMode === 'SODA' && latestSodaChemistryData) {
+            if (latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.carbonated_water) {
+                const backendFillerVol = latestSodaChemistryData.ingredients.carbonated_water.volume_ml;
+                const waterVol = (allSodaAligned && latestSodaChemistryData.ingredients.carbonated_water) ? latestSodaChemistryData.ingredients.carbonated_water.volume_ml : (840.0 * bottleScale);
+                if (backendFillerVol > 0 && waterVol <= 0.05) {
+                    hasZeroValueMismatch = true;
+                }
+            }
+            const backendModifiers = (latestSodaChemistryData.ingredients && latestSodaChemistryData.ingredients.modifiers) || [];
+            selectedIngredients.forEach((ing, index) => {
+                const type = (ing.type || ing.ingredient_type || '').toUpperCase();
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                    const matched = backendModifiers.find(m => m.id == ing.id);
+                    if (matched) {
+                        const backendVol = matched.volume_ml;
+                        let renderedVol = ing.amount;
+                        if (allSodaAligned) {
+                            renderedVol = matched.volume_ml;
+                        } else {
+                            if (ing.isDry === true || ing.isDry === 'true') {
+                                renderedVol = (ing.amount || 15.0) * bottleScale;
+                            } else {
+                                const baseVolume = index === 0 ? 80.0 : (index === 1 ? 40.0 : 20.0);
+                                renderedVol = (ing.amount || baseVolume) * bottleScale * expansionFactor;
+                            }
+                        }
+                        if (backendVol > 0 && renderedVol <= 0.05) {
+                            hasZeroValueMismatch = true;
+                        }
+                    }
+                }
+            });
+        }
+
+        if ((isDone || selectedIngredients.length >= maxIngredients) && !hasZeroValueMismatch) {
             html += `<div class="alert bg-success bg-opacity-10 border border-success border-opacity-20 text-success small py-2">
                         <i class="bi bi-check2-circle"></i> Formulation complete. Synthesis ready for indexing.
                     </div>`;
