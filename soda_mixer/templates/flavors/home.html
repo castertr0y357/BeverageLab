@@ -328,7 +328,12 @@
         if (type === 'COFFEE_BEAN') {
             itypeCategory = 'coffee';
         } else if (type === 'DAIRY') {
-            itypeCategory = 'dairy';
+            const firstDairyIdx = selectedIngredients.findIndex(x => (x.type || x.ingredient_type || '').toUpperCase() === 'DAIRY');
+            if (idx === firstDairyIdx) {
+                itypeCategory = 'dairy';
+            } else {
+                itypeCategory = 'modifier';
+            }
         } else if (type === 'ADDITIVE' || type === 'OTHER' || type === 'SODA_SYRUP') {
             itypeCategory = 'modifier';
         } else {
@@ -3115,19 +3120,14 @@
                 const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
                 if (ingType === 'COFFEE_BEAN') {
                     role = 'COFFEE BASE';
-                } else if (ingType === 'DAIRY' && index === 1) {
+                } else if (ingType === 'DAIRY') {
                     role = 'PAYLOAD';
+                } else if (ingType === 'ADDITIVE') {
+                    role = 'ACCENT';
+                } else if (ingType === 'SODA_SYRUP') {
+                    role = 'FINAL';
                 } else {
-                    // Accent roles: count how many accents are before this one
-                    let prevAccents = 0;
-                    for (let i = 0; i < index; i++) {
-                        const prevIngType = (selectedIngredients[i].type || selectedIngredients[i].ingredient_type || '').toUpperCase();
-                        if (prevIngType !== 'COFFEE_BEAN' && prevIngType !== 'DAIRY') {
-                            prevAccents++;
-                        }
-                    }
-                    const accentRoles = ['ACCENT', 'DEEP ACCENT', 'STABILIZER'];
-                    role = (isLast && isFull) ? 'FINAL' : (accentRoles[prevAccents] || 'MODIFIER');
+                    role = 'FINAL';
                 }
             } else {
                 role = (isLast && isFull) ? 'FINAL' : (roles[index] || 'MODIFIER');
