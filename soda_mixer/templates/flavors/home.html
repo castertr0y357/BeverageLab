@@ -2094,11 +2094,17 @@
 
                     let prepStepsHtml = '';
                     if (data.preparation_steps && data.preparation_steps.length > 0) {
+                        const updatedSteps = data.preparation_steps.map(step => {
+                            if (step.startsWith("Step 2:")) {
+                                return `Step 2: Add exactly ${data.ingredients.filler.volume_ml.toFixed(1)}ml of ${data.ingredients.filler.name} to the pitcher. Whisk vigorously for 30-45 seconds to achieve full molecular suspension.`;
+                            }
+                            return step;
+                        });
                         prepStepsHtml = `
                             <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
                                 <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS (SOLUBILITY & FREEZING)</h6>
                                 <ol class="small text-white opacity-90 ps-3 mb-0">
-                                    ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
+                                    ${updatedSteps.map(step => `<li class="mb-1">${step}</li>`).join('')}
                                 </ol>
                             </div>
                         `;
@@ -2910,9 +2916,10 @@
         if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.ingredients) {
             const list = latestCryoChemistryData.ingredients.modifiers || [];
             allCryoAligned = true;
-            selectedIngredients.forEach((ing) => {
+            selectedIngredients.forEach((ing, index) => {
                 const type = (ing.type || ing.ingredient_type || '').toUpperCase();
-                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                const isBase = hasRtdBase && index === firstRtdIndex;
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water' && !isBase) {
                     const matched = list.find(m => m.id == ing.id);
                     if (!matched) {
                         allCryoAligned = false;
@@ -2925,9 +2932,10 @@
         if (currentLabMode === 'SODA' && latestSodaChemistryData && latestSodaChemistryData.ingredients) {
             const list = latestSodaChemistryData.ingredients.modifiers || [];
             allSodaAligned = true;
-            selectedIngredients.forEach((ing) => {
+            selectedIngredients.forEach((ing, index) => {
                 const type = (ing.type || ing.ingredient_type || '').toUpperCase();
-                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water') {
+                const isBase = hasRtdBase && index === firstRtdIndex;
+                if (type !== 'COFFEE_BEAN' && type !== 'DAIRY' && ing.id !== 'virtual_water' && !isBase) {
                     const matched = list.find(m => m.id == ing.id);
                     if (!matched) {
                         allSodaAligned = false;

@@ -22,8 +22,10 @@ def get_cryo_sugar_fraction(name: str, type_str: str) -> float:
     if 'juice' in name_lower:
         return 0.10
         
-    # 3. Water / Coconut Water (0%)
-    if 'water' in name_lower or 'coconut water' in name_lower:
+    # 3. Water (0%) / Coconut Water (3%)
+    if 'coconut water' in name_lower:
+        return 0.03
+    if 'water' in name_lower:
         return 0.0
         
     # 4. Monin Syrups (65%)

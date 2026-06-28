@@ -2653,6 +2653,30 @@ class CryoChemistryTests(TestCase):
         self.assertAlmostEqual(metrics['filler_volume_ml'], 894.4, places=1)
         self.assertAlmostEqual(metrics['total_syrup_volume_ml'], 51.6, places=1)
 
+    def test_cryo_chemistry_coconut_water_filler(self) -> None:
+        # Test 32oz batch (946ml) with Coconut Water filler (3% sugar).
+        # Target syrup volume should be ~152.6ml, filler volume ~793.4ml.
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 80.0},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 2, 'amount': 40.0},
+                    {'name': 'Coconut Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        metrics = data['drink_metrics']
+        self.assertEqual(metrics['target_volume_ml'], 946.0)
+        self.assertAlmostEqual(metrics['achieved_brix'], 13.0, places=1)
+        self.assertAlmostEqual(metrics['filler_volume_ml'], 793.4, places=1)
+        self.assertAlmostEqual(metrics['total_syrup_volume_ml'], 152.6, places=1)
+
     def test_cryo_chemistry_menthol_cap(self) -> None:
         # Test 32oz batch (946ml) with Mint ingredient.
         # Menthol limit is 3% of 946ml = 28.38ml.
