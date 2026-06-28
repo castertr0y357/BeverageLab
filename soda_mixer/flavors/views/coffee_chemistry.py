@@ -450,18 +450,70 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             "volume_oz": ice_melt_water_vol
         })
 
+    def format_list_with_and(items: List[str]) -> str:
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} and {items[1]}"
+        return ", ".join(items[:-1]) + f", and {items[-1]}"
+
     # Barista Notes & Prepare Step-by-Step Preparation Steps (Solubility)
     prep_steps = []
     
     # Check for dry reagents (powder)
     has_powder = any(ing.get('is_dry') or 'powder' in str(ing.get('name', '')).lower() for ing in modifier_inputs)
     
-    prep_steps.append("Step 1: Combine all liquid modifiers (syrups/sauces) and dry reagents (POWDER) into the serving vessel first.")
-    if has_powder:
-        prep_steps.append("Step 2: Extract the hot coffee base directly over the modifiers. Stir thoroughly to agitate and dissolve the powder into a warm slurry.")
-    else:
-        prep_steps.append("Step 2: Extract the hot coffee base directly over the modifiers.")
+    # Step 1: Modifiers
+    mod_items = []
+    for m in flavor_modifiers_output:
+        # Find the original input ingredient to check if it is dry
+        orig = next((ing for ing in modifier_inputs if ing.get('id') == m['id']), None)
+        is_dry_modifier = False
+        if orig:
+            is_dry_modifier = orig.get('is_dry') or 'powder' in str(orig.get('name', '')).lower()
         
+        m_name = m['name'].split(' (')[0]
+        if is_dry_modifier:
+            m_amt = orig.get('amount', 0.0)
+            mod_items.append(f"{m_amt:.0f}g of {m_name}")
+        else:
+            m_oz = m['volume_oz']
+            m_ml = round(m_oz * 29.5735)
+            mod_items.append(f"{m_ml}ml ({m_oz:.2f}oz) of {m_name}")
+            
+    if mod_items:
+        step_1_text = f"Dispense {format_list_with_and(mod_items)} into the base of a {cup_size_oz:.0f}oz vessel."
+    else:
+        step_1_text = f"Prepare a {cup_size_oz:.0f}oz vessel."
+    prep_steps.append(f"Step 1: {step_1_text}")
+    
+    # Step 2: Coffee Base
+    coffee_names = [c.get('name', 'Espresso') for c in coffee_inputs]
+    if len(coffee_names) > 1:
+        coffee_desc = f"the {'/'.join(coffee_names)} blend"
+    elif coffee_names:
+        coffee_desc = coffee_names[0]
+    else:
+        coffee_desc = "the espresso base"
+        
+    target_action = "directly over the modifiers" if mod_items else "directly into the vessel"
+    
+    if is_espresso_base:
+        if has_powder:
+            step_2_text = f"Extract {shot_count} shots ({coffee_base_vol:.1f}oz total) of {coffee_desc} {target_action}. Stir thoroughly to agitate and dissolve the powder."
+        else:
+            step_2_text = f"Extract {shot_count} shots ({coffee_base_vol:.1f}oz total) of {coffee_desc} {target_action} and agitate."
+    else:
+        coffee_base_vol_ml = round(coffee_base_vol * 29.5735)
+        if has_powder:
+            step_2_text = f"Pour {coffee_base_vol_ml}ml ({coffee_base_vol:.1f}oz) of brewed {coffee_desc} {target_action}. Stir thoroughly to agitate and dissolve the powder."
+        else:
+            step_2_text = f"Pour {coffee_base_vol_ml}ml ({coffee_base_vol:.1f}oz) of brewed {coffee_desc} {target_action} and agitate."
+    prep_steps.append(f"Step 2: {step_2_text}")
+    
+    # Step 3: Payload
     is_plant_milk = False
     for d in dairy_inputs:
         name_lower = str(d.get('name', '')).lower()
@@ -471,19 +523,27 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             
     if "iced" not in drink_cat_lower:
         if is_corrected:
-            prep_steps.append(f"Step 3: Incorporate the corrected payload ({primary_filler_vol}oz steamed {primary_filler_name} + {texturizer_vol}oz steamed {texturizer_name}). Steam to a temperature ceiling of 140°F.")
-        elif is_plant_milk:
-            prep_steps.append("Step 3: Incorporate the Payload (steamed plant milk). Steam to a temperature ceiling of 130°F.")
+            pri_ml = round(primary_filler_vol * 29.5735)
+            tex_ml = round(texturizer_vol * 29.5735)
+            step_3_text = f"Incorporate {pri_ml}ml ({primary_filler_vol:.2f}oz) of steamed {primary_filler_name} and {tex_ml}ml ({texturizer_vol:.2f}oz) of steamed {texturizer_name} (steam to a temperature ceiling of 140°F)."
         else:
-            prep_steps.append("Step 3: Incorporate the Payload (steamed dairy). Steam to a temperature ceiling of 140°F.")
+            filler_vol_ml = round(secondary_liquid_vol * 29.5735)
+            temp_ceiling = 130 if is_plant_milk else 140
+            step_3_text = f"Incorporate {filler_vol_ml}ml ({secondary_liquid_vol:.2f}oz) of steamed {dairy_name} (steam to a temperature ceiling of {temp_ceiling}°F)."
     else:
         if is_corrected:
-            prep_steps.append(f"Step 3: Incorporate the corrected payload ({primary_filler_vol}oz cold {primary_filler_name} + {texturizer_vol}oz cold {texturizer_name}).")
+            pri_ml = round(primary_filler_vol * 29.5735)
+            tex_ml = round(texturizer_vol * 29.5735)
+            step_3_text = f"Pour in {pri_ml}ml ({primary_filler_vol:.2f}oz) of cold {primary_filler_name} and {tex_ml}ml ({texturizer_vol:.2f}oz) of cold {texturizer_name}."
         else:
-            prep_steps.append("Step 3: Incorporate the Payload (Milk/Water filler).")
-        
+            filler_vol_ml = round(secondary_liquid_vol * 29.5735)
+            step_3_text = f"Pour in {filler_vol_ml}ml ({secondary_liquid_vol:.2f}oz) of cold {dairy_name}."
+    prep_steps.append(f"Step 3: {step_3_text}")
+    
+    # Step 4: Ice
     if "iced" in drink_cat_lower:
-        prep_steps.append("Step 4: Top with Ice last to preserve structural integrity.")
+        ice_str = f"{int(ice_volume_oz)}oz" if ice_volume_oz.is_integer() else f"{ice_volume_oz:.1f}oz"
+        prep_steps.append(f"Step 4: Top with {ice_str} of clean ice to complete the compound.")
 
     barista_notes = "Extraction and chemistry parameters are balanced. Serve and enjoy!"
     if is_curdling_risk:
