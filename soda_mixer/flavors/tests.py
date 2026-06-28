@@ -2729,6 +2729,50 @@ class CryoChemistryTests(TestCase):
         data = response.json()
         self.assertEqual(data['recipe_validation'], 'Pass')
 
+    def test_cryo_chemistry_solitary_flavor_scaling_and_recalculation(self) -> None:
+        # 1. Test Solitary Flavor Predictive Scaling (no user override)
+        # For a 32oz batch target of 946ml, water filler, Pineapple Syrup (sweetness 4, sugar 0.65).
+        # Should solve to exactly 189.2ml (13% Brix).
+        response = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'id': 1, 'name': 'Pineapple Syrup', 'type': 'SODA_SYRUP', 'sweetness': 4, 'intensity': 3, 'amount': 0.0, 'isUserOverridden': False},
+                    {'id': 2, 'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        mods = data['ingredients']['modifiers']
+        self.assertEqual(len(mods), 1)
+        self.assertAlmostEqual(mods[0]['volume_ml'], 189.2, places=1)
+
+        # 2. Test Dynamic Recalculation when a second flavor is added
+        # First modifier should down-scale back to 80ml base, second to 40ml base, and solve.
+        response2 = self.client.post(
+            reverse('cryo_chemistry_api'),
+            data=json.dumps({
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'id': 1, 'name': 'Pineapple Syrup', 'type': 'SODA_SYRUP', 'sweetness': 4, 'intensity': 3, 'amount': 0.0, 'isUserOverridden': False},
+                    {'id': 3, 'name': 'Strawberry Syrup', 'type': 'SODA_SYRUP', 'sweetness': 3, 'intensity': 3, 'amount': 0.0, 'isUserOverridden': False},
+                    {'id': 2, 'name': 'Water', 'type': 'OTHER', 'is_ready_to_drink': True}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response2.status_code, 200)
+        data2 = response2.json()
+        self.assertEqual(data2['recipe_validation'], 'Pass')
+        mods2 = data2['ingredients']['modifiers']
+        self.assertEqual(len(mods2), 2)
+        # Pineapple Syrup should be significantly down-scaled from 189.2ml.
+        self.assertLess(mods2[0]['volume_ml'], 189.2)
+
 
 
 

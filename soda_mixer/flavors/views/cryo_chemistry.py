@@ -126,20 +126,39 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
 
     # Evaluate modifiers sugar mass and volumes
     modifier_volumes = []
+    is_solitary = (len(modifiers) == 1)
 
     for ing in modifiers:
         name = ing.get('name', 'Syrup')
         itype = ing.get('ingredient_type', ing.get('type', 'SODA_SYRUP'))
         sweetness = int(ing.get('sweetness_score', ing.get('sweetness', 3)))
         
-        # Get amount or default based on order
-        amt = float(ing.get('amount', 0.0))
-        if not amt:
-            idx = len(modifier_volumes)
-            amt = 80.0 if idx == 0 else (40.0 if idx == 1 else 20.0)
+        is_user_overridden = ing.get('isUserOverridden', False) or ing.get('is_user_overridden', False)
+        amt = float(ing.get('amount', 0.0)) if is_user_overridden else 0.0
+        
+        if is_solitary and not is_user_overridden:
+            filler_name = filler_ing.get('name', 'Water')
+            filler_type = filler_ing.get('ingredient_type', filler_ing.get('type', 'OTHER'))
+            filler_sugar_frac = get_cryo_sugar_fraction(filler_name, filler_type)
+            
+            sugar_frac = get_cryo_sugar_fraction(name, itype)
+            sugar_diff = sugar_frac - filler_sugar_frac
+            if abs(sugar_diff) > 0.001:
+                required_vol = (0.13 - filler_sugar_frac) * target_volume_ml / sugar_diff
+            else:
+                required_vol = 80.0 * bottle_scale
+            
+            if sweetness >= 4:
+                scaled_amt = required_vol / 1.05
+            else:
+                scaled_amt = required_vol
+        else:
+            if not amt:
+                idx = len(modifier_volumes)
+                amt = 80.0 if idx == 0 else (40.0 if idx == 1 else 20.0)
 
-        # Scale by bottle_scale
-        scaled_amt = amt * bottle_scale
+            # Scale by bottle_scale
+            scaled_amt = amt * bottle_scale
 
         # Apply Cryo-Sweetness Tax
         if sweetness >= 4:

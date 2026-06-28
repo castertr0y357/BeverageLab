@@ -1673,6 +1673,8 @@
 
                 const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
                 const data = await chemRes.json();
+                latestCoffeeChemistryData = data;
+                updateSelectedArea(true);
                 let aiProfileData = null;
                 try {
                     aiProfileData = await aiRes.json();
@@ -1895,6 +1897,8 @@
 
                 const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
                 const data = await chemRes.json();
+                latestSodaChemistryData = data;
+                updateSelectedArea(true);
                 let aiProfileData = null;
                 try {
                     aiProfileData = await aiRes.json();
@@ -2043,6 +2047,8 @@
 
                 const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
                 const data = await chemRes.json();
+                latestCryoChemistryData = data;
+                updateSelectedArea(true);
                 let aiProfileData = null;
                 try {
                     aiProfileData = await aiRes.json();
@@ -3002,18 +3008,21 @@
             `;
         }
         if (currentLabMode === 'SLUSHIE' && latestCryoChemistryData && latestCryoChemistryData.recipe_validation && latestCryoChemistryData.recipe_validation !== 'Pass') {
-            let alertClass = 'alert-warning border-warning text-warning';
-            let iconClass = 'bi-exclamation-triangle-fill';
-            if (latestCryoChemistryData.recipe_validation.toLowerCase().includes('fail')) {
-                alertClass = 'alert-danger border-danger text-danger';
-                iconClass = 'bi-x-circle-fill';
+            const isSugarDensityFailure = latestCryoChemistryData.recipe_validation.toLowerCase().includes('sugar density');
+            if (isMixSealed || !isSugarDensityFailure) {
+                let alertClass = 'alert-warning border-warning text-warning';
+                let iconClass = 'bi-exclamation-triangle-fill';
+                if (latestCryoChemistryData.recipe_validation.toLowerCase().includes('fail')) {
+                    alertClass = 'alert-danger border-danger text-danger';
+                    iconClass = 'bi-x-circle-fill';
+                }
+                warningBannerHtml = `
+                    <div class="alert ${alertClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3 py-2 rounded-3 w-100">
+                        <i class="bi ${iconClass}"></i>
+                        <div class="fw-bold small">${latestCryoChemistryData.recipe_validation}</div>
+                    </div>
+                `;
             }
-            warningBannerHtml = `
-                <div class="alert ${alertClass} bg-opacity-10 border border-opacity-20 d-flex align-items-center gap-2 mb-3 py-2 rounded-3 w-100">
-                    <i class="bi ${iconClass}"></i>
-                    <div class="fw-bold small">${latestCryoChemistryData.recipe_validation}</div>
-                </div>
-            `;
         }
 
         let html = warningBannerHtml + '<div class="row g-2 mb-3">';
@@ -3030,7 +3039,7 @@
                 fillerName = latestCryoChemistryData.ingredients.filler.name;
             }
             if (latestCryoChemistryData && latestCryoChemistryData.recipe_validation) {
-                isOverflow = latestCryoChemistryData.recipe_validation.toLowerCase().includes('fail');
+                isOverflow = latestCryoChemistryData.recipe_validation.toLowerCase().includes('capacity') || latestCryoChemistryData.recipe_validation.toLowerCase().includes('overflow');
             } else {
                 isOverflow = totalSyrup > (bottleScale * 946.0);
             }
