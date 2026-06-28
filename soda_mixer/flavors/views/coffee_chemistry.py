@@ -58,13 +58,18 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     coffee_inputs = []
     dairy_inputs = []
     modifier_inputs = []
+    has_seen_dairy = False
 
-    for ing in ingredients_input:
+    for idx, ing in enumerate(ingredients_input):
         itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
         if itype == 'COFFEE_BEAN':
             coffee_inputs.append(ing)
         elif itype == 'DAIRY':
-            dairy_inputs.append(ing)
+            if has_seen_dairy:
+                modifier_inputs.append(ing)
+            else:
+                dairy_inputs.append(ing)
+                has_seen_dairy = True
         elif itype in ['ADDITIVE', 'OTHER', 'SODA_SYRUP']:
             modifier_inputs.append(ing)
         else:
@@ -368,13 +373,24 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     texturizer_name = "Heavy Cream"
 
     if is_thin_warning and secondary_liquid_vol > 0.0 and dairy_name != "Hot Water":
-        is_corrected = True
-        texturizer_vol = round(secondary_liquid_vol * 0.20, 2)
-        primary_filler_vol = round(secondary_liquid_vol - texturizer_vol, 2)
-        
-        # Suppress alerts since they have been programmatically resolved
-        is_thin_warning = False
-        is_fat_buffer_warning = False
+        # Check if texturizer is manually selected
+        has_manual_texturizer = any(
+            "heavy cream" in str(m.get('name', '')).lower() or "half-and-half" in str(m.get('name', '')).lower() or "half and half" in str(m.get('name', '')).lower()
+            for m in modifier_inputs
+        )
+        if has_manual_texturizer:
+            is_corrected = False
+            # Suppress alerts since it has been manually overridden and resolved
+            is_thin_warning = False
+            is_fat_buffer_warning = False
+        else:
+            is_corrected = True
+            texturizer_vol = round(secondary_liquid_vol * 0.20, 2)
+            primary_filler_vol = round(secondary_liquid_vol - texturizer_vol, 2)
+            
+            # Suppress alerts since they have been programmatically resolved
+            is_thin_warning = False
+            is_fat_buffer_warning = False
 
     # pH Curdling Protection
     citrus_fruit_keywords = {'citrus', 'lemon', 'lime', 'orange', 'grapefruit', 'cherry', 'fruit', 'fruity', 'berry', 'berries', 'raspberry', 'strawberry', 'blueberry', 'blackberry', 'hibiscus'}

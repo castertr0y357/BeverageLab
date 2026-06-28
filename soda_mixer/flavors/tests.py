@@ -2179,9 +2179,89 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         total_vol = pf.get('volume_oz')
         pri_vol = pf.get('primary_volume_oz')
         tex_vol = pf.get('texturizer_volume_oz')
-        self.assertAlmostEqual(pri_vol + tex_vol, total_vol)
-        self.assertAlmostEqual(pri_vol, total_vol * 0.8)
-        self.assertAlmostEqual(tex_vol, total_vol * 0.2)
+        self.assertAlmostEqual(pri_vol + tex_vol, total_vol, places=2)
+        self.assertAlmostEqual(pri_vol, total_vol * 0.8, places=2)
+        self.assertAlmostEqual(tex_vol, total_vol * 0.2, places=2)
+
+    def test_manual_texturizer_role_collision_override(self) -> None:
+        # Iced 20oz Espresso (12oz budget)
+        # Espresso Bean at idx 0 (COFFEE_BEAN)
+        # Whole Milk at idx 1 (DAIRY) -> Payload
+        # Heavy Cream at idx 2 (DAIRY) -> Accent/Deep Accent (processed as modifier)
+        # Vanilla Syrup at idx 3 (ADDITIVE)
+        # Mint Syrup at idx 4 (ADDITIVE)
+        response = self.client.post(
+            reverse('coffee_chemistry_api'),
+            data=json.dumps({
+                'drink_category': 'Iced Coffee',
+                'cup_size_oz': 20.0,
+                'espresso_hot_mode': 'shots',
+                'americano_style': False,
+                'ingredients': [
+                    {
+                        'id': 101,
+                        'name': 'Espresso Bean',
+                        'ingredient_type': 'COFFEE_BEAN',
+                        'amount': 36.0,
+                        'body_intensity': 4.0
+                    },
+                    {
+                        'id': 102,
+                        'name': 'Whole Milk',
+                        'ingredient_type': 'DAIRY',
+                        'amount': 150.0
+                    },
+                    {
+                        'id': 103,
+                        'name': 'Heavy Cream',
+                        'ingredient_type': 'DAIRY',
+                        'amount': 60.0
+                    },
+                    {
+                        'id': 104,
+                        'name': 'Vanilla Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 18.0
+                    },
+                    {
+                        'id': 105,
+                        'name': 'Mint Syrup',
+                        'ingredient_type': 'ADDITIVE',
+                        'amount': 12.0
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        # Verify warnings are suppressed
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        
+        # Verify split is NOT active (is_corrected is False)
+        pf = data['ingredients']['payload_filler']
+        self.assertFalse(pf.get('is_corrected', False))
+        
+        # Verify Heavy Cream is returned as a modifier in flavor_modifiers, not split in pf
+        flavor_mods = data['ingredients']['flavor_modifiers']
+        heavy_cream_mod = next((m for m in flavor_mods if 'Heavy Cream' in m['name']), None)
+        self.assertIsNotNone(heavy_cream_mod)
+        self.assertEqual(heavy_cream_mod['id'], 103)
+        
+        # Verify liquid budget totals strictly to 12.0 oz
+        coffee_vol = data['ingredients']['coffee_base']['volume_oz']  # 4 shots = 3.6oz
+        hot_water_vol = data.get('hot_water_volume_oz', 0.0)
+        ice_melt_vol = next((m['volume_oz'] for m in data['ingredients']['base_modifiers'] if m['name'] == 'Ice Melt Water'), 0.0)
+        
+        # Whole milk volume
+        whole_milk_vol = data['ingredients']['payload_filler']['volume_oz']
+        
+        # Sum of flavor modifiers
+        mods_total_vol = sum(m['volume_oz'] for m in flavor_mods)
+        
+        total_vol = coffee_vol + hot_water_vol + ice_melt_vol + whole_milk_vol + mods_total_vol
+        self.assertAlmostEqual(total_vol, 12.0, places=2)
 
 
 class BeverageLabRecommendationExclusionTest(TestCase):

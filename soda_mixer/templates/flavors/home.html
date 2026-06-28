@@ -3115,7 +3115,7 @@
                 const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
                 if (ingType === 'COFFEE_BEAN') {
                     role = 'COFFEE BASE';
-                } else if (ingType === 'DAIRY') {
+                } else if (ingType === 'DAIRY' && index === 1) {
                     role = 'PAYLOAD';
                 } else {
                     // Accent roles: count how many accents are before this one
