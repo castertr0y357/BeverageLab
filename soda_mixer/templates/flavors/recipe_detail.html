@@ -1418,8 +1418,7 @@
                     drink_category: drinkCategory,
                     cup_size_oz: coffeeSizeOz,
                     espresso_hot_mode: coffeeEspressoHotMode,
-                    americano_toggle: (coffeeEspressoHotMode === 'water'),
-                    americano: (coffeeEspressoHotMode === 'water'),
+                    americano_style: (coffeeStyle === 'hot' && coffeeBaseType === 'espresso' && coffeeEspressoHotMode === 'water'),
                     ingredients: mappedIngredients
                 })
             });

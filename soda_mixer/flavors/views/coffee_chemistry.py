@@ -185,7 +185,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             modified_list.append(mod)
 
     # Resolve Americano Toggle
-    americano_toggle = data.get('americano_toggle', False) or data.get('americano', False)
+    americano_toggle = data.get('americano_style', False) is True
 
     # 3. Flavor Balancing & "Modifier Crowding" Rules
     requested_modifier_total = 0.0
