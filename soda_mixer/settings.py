@@ -90,7 +90,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'soda_mixer.flavors',
+    'soda_mixer.flavors.apps.FlavorsConfig',
 ]
 
 MIDDLEWARE = [

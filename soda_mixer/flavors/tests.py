@@ -414,6 +414,49 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(provider.enable_thinking, False)
         self.assertEqual(provider.thinking_effort, 'low')
 
+    def test_save_llm_provider_api_keep_warm(self) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        url = reverse('save_llm_provider_api')
+        payload = {
+            'name': 'New Ollama Substrate',
+            'provider_type': 'OLLAMA',
+            'base_url': 'http://localhost:11434',
+            'default_model': 'gemma4:12b',
+            'is_enabled': True,
+            'enable_thinking': False,
+            'thinking_effort': 'low',
+            'enable_keep_warm': True
+        }
+        response = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        
+        provider = LLMProvider.objects.get(id=data['id'])
+        self.assertEqual(provider.enable_keep_warm, True)
+
+    @patch('requests.post')
+    def test_keep_warm_provider_ollama(self, mock_post: MagicMock) -> None:
+        provider = LLMProvider.objects.create(
+            name="Ollama Keep Warm Test",
+            provider_type="OLLAMA",
+            base_url="http://localhost:11434",
+            default_model="mistral",
+            is_enabled=True,
+            enable_keep_warm=True
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        from .ai_service import AIAssistant
+        success = AIAssistant.keep_warm_provider(provider)
+        self.assertTrue(success)
+        
+        args, kwargs = mock_post.call_args
+        self.assertEqual(kwargs['json']['model'], 'mistral')
+        self.assertEqual(kwargs['json']['keep_alive'], '15m')
+
     @patch('requests.request')
     def test_ai_bulk_analyze_view_api(self, mock_request: MagicMock) -> None:
         self.client.login(username="director", password="secure_password_123")

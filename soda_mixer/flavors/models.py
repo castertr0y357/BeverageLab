@@ -378,7 +378,7 @@ class LLMProvider(models.Model):
         ('high', 'High'),
     ]
     enable_thinking = models.BooleanField(
-        default=True,
+        default=False,
         help_text="Enable internal model thinking/reasoning if supported by the provider/model."
     )
     thinking_effort = models.CharField(
@@ -386,6 +386,10 @@ class LLMProvider(models.Model):
         choices=THINKING_EFFORT_CHOICES,
         default='medium',
         help_text="Thinking/reasoning effort level (low, medium, high) if supported by provider/model."
+    )
+    enable_keep_warm = models.BooleanField(
+        default=False,
+        help_text="Enable background periodic keep-alive tasks to maintain model in VRAM."
     )
     
     def __str__(self):

@@ -323,13 +323,8 @@ class AIAssistant:
             yield f"data: {error_chunk}\n\n"
 
     @classmethod
-    def keep_warm(cls) -> bool:
-        """
-        Send a lightweight keep-alive pulse to local models to keep them in VRAM.
-        Uses Ollama's /api/show endpoint — returns model metadata instantly with
-        zero token generation, so it never blocks the Ollama request queue.
-        """
-        provider = cls.get_default_provider()
+    def keep_warm_provider(cls, provider: LLMProvider) -> bool:
+        """Send a keep-alive pulse specifically for a given provider configuration."""
         if not provider or provider.provider_type not in ['OLLAMA', 'CUSTOM', 'ANYTHINGLLM']:
             return False
 
@@ -337,8 +332,6 @@ class AIAssistant:
             if provider.provider_type == 'OLLAMA':
                 base = (provider.base_url or "http://localhost:11434").rstrip('/')
                 model = provider.default_model or "mistral"
-                # /api/generate with no prompt forces Ollama to seize VRAM 
-                # and hold the model memory-resident for the keep_alive duration.
                 response = requests.post(
                     f"{base}/api/generate",
                     json={"model": model, "keep_alive": "15m"},
@@ -346,12 +339,20 @@ class AIAssistant:
                 )
                 return response.status_code == 200
             else:
-                # For custom/AnythingLLM, minimal 1-token chat call
+                # Minimal 1-token chat call for generic endpoints
                 cls.chat("ping", history=[], provider=provider)
                 return True
         except Exception as e:
             logger.error(f"AIKeepWarm - Error - Laboratory Wakeup Failure for {provider.name}: {e}")
             return False
+
+    @classmethod
+    def keep_warm(cls) -> bool:
+        """
+        Send a lightweight keep-alive pulse to local models to keep them in VRAM.
+        """
+        provider = cls.get_default_provider()
+        return cls.keep_warm_provider(provider)
 
     @classmethod
     def check_status(cls) -> str:
@@ -818,10 +819,17 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "temperature": 0.7
         }
         if model_name.startswith('o1') or model_name.startswith('o3'):
-            if getattr(provider, 'enable_thinking', True):
+            if getattr(provider, 'enable_thinking', False):
                 data["reasoning_effort"] = getattr(provider, 'thinking_effort', 'medium')
             else:
                 data["reasoning_effort"] = "low"
+        else:
+            # Enforce JSON output mode if a structured data query is detected
+            user_prompt = messages[-1]['content'] if messages else ""
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+            if is_json_request:
+                data["response_format"] = {"type": "json_object"}
+
         response = cls._safe_request('POST', url, headers=headers, json=data, timeout=30)
         result = response.json()
         
@@ -838,7 +846,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         # Ollama /api/chat — native format.
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
         model_name = provider.default_model or "mistral"
-        if getattr(provider, 'enable_thinking', True):
+        if getattr(provider, 'enable_thinking', False):
             if "gpt-oss" in model_name.lower():
                 think_val = getattr(provider, 'thinking_effort', 'medium')
             else:
@@ -855,6 +863,11 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                 "num_predict": 2048
             }
         }
+        user_prompt = messages[-1]['content'] if messages else ""
+        is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+        if is_json_request:
+            data["format"] = "json"
+
         response = cls._safe_request('POST', url, json=data, timeout=120)
         result = response.json()
         
@@ -877,12 +890,24 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         system = messages[0]['content']
         actual_messages = messages[1:]
         
+        model_name = provider.default_model or "claude-3-haiku-20240307"
+        
         data = {
-            "model": provider.default_model or "claude-3-haiku-20240307",
+            "model": model_name,
             "system": system,
             "messages": actual_messages,
             "max_tokens": 1024
         }
+        
+        if "claude-3-7" in model_name.lower() or "sonnet" in model_name.lower():
+            if getattr(provider, 'enable_thinking', False):
+                budget = 1024 if getattr(provider, 'thinking_effort', 'medium') == 'low' else (2048 if getattr(provider, 'thinking_effort', 'medium') == 'medium' else 4096)
+                data["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget
+                }
+                data["max_tokens"] = budget + 1024
+
         response = cls._safe_request('POST', url, headers=headers, json=data, timeout=30)
         return response.json()['content'][0]['text']
 
@@ -904,6 +929,23 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         if system_text:
             data["system_instruction"] = {"parts": [{"text": system_text}]}
             
+        user_prompt = messages[-1]['content'] if messages else ""
+        is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+        
+        generation_config = {}
+        if is_json_request:
+            generation_config["responseMimeType"] = "application/json"
+            
+        if "thinking" in model.lower():
+            if getattr(provider, 'enable_thinking', False):
+                budget = 1024 if getattr(provider, 'thinking_effort', 'medium') == 'low' else (2048 if getattr(provider, 'thinking_effort', 'medium') == 'medium' else 4096)
+                generation_config["thinkingConfig"] = {"thinkingBudget": budget}
+            else:
+                generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+                
+        if generation_config:
+            data["generationConfig"] = generation_config
+
         response = cls._safe_request('POST', url, json=data, timeout=30)
         result = response.json()
         
@@ -928,10 +970,16 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         model_name = provider.default_model or "gpt-3.5-turbo"
         data = {"model": model_name, "messages": messages, "temperature": 0.7, "stream": True}
         if model_name.startswith('o1') or model_name.startswith('o3'):
-            if getattr(provider, 'enable_thinking', True):
+            if getattr(provider, 'enable_thinking', False):
                 data["reasoning_effort"] = getattr(provider, 'thinking_effort', 'medium')
             else:
                 data["reasoning_effort"] = "low"
+        else:
+            user_prompt = messages[-1]['content'] if messages else ""
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+            if is_json_request:
+                data["response_format"] = {"type": "json_object"}
+
         response = requests.post(url, headers=headers, json=data, stream=True, timeout=60)
         response.raise_for_status()
         for line in response.iter_lines():
@@ -952,7 +1000,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
         url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
         model_name = provider.default_model or "mistral"
-        if getattr(provider, 'enable_thinking', True):
+        if getattr(provider, 'enable_thinking', False):
             if "gpt-oss" in model_name.lower():
                 think_val = getattr(provider, 'thinking_effort', 'medium')
             else:
@@ -969,6 +1017,11 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                 "num_predict": 2048
             }
         }
+        user_prompt = messages[-1]['content'] if messages else ""
+        is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+        if is_json_request:
+            data["format"] = "json"
+
         response = requests.post(url, json=data, stream=True, timeout=120)
         response.raise_for_status()
         for line in response.iter_lines():
@@ -985,7 +1038,26 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         headers = {"x-api-key": provider.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
         system = messages[0]['content']
         actual_messages = messages[1:]
-        data = {"model": provider.default_model or "claude-3-haiku-20240307", "system": system, "messages": actual_messages, "max_tokens": 1024, "stream": True}
+        
+        model_name = provider.default_model or "claude-3-haiku-20240307"
+        
+        data = {
+            "model": model_name,
+            "system": system,
+            "messages": actual_messages,
+            "max_tokens": 1024,
+            "stream": True
+        }
+        
+        if "claude-3-7" in model_name.lower() or "sonnet" in model_name.lower():
+            if getattr(provider, 'enable_thinking', False):
+                budget = 1024 if getattr(provider, 'thinking_effort', 'medium') == 'low' else (2048 if getattr(provider, 'thinking_effort', 'medium') == 'medium' else 4096)
+                data["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget
+                }
+                data["max_tokens"] = budget + 1024
+
         response = requests.post(url, headers=headers, json=data, stream=True, timeout=60)
         response.raise_for_status()
         for line in response.iter_lines():
@@ -1011,6 +1083,24 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         contents = [{"role": "user" if m['role'] == 'user' else "model", "parts": [{"text": m['content']}]} for m in actual_messages]
         data = {"contents": contents}
         if system_text: data["system_instruction"] = {"parts": [{"text": system_text}]}
+        
+        user_prompt = messages[-1]['content'] if messages else ""
+        is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+        
+        generation_config = {}
+        if is_json_request:
+            generation_config["responseMimeType"] = "application/json"
+            
+        if "thinking" in model.lower():
+            if getattr(provider, 'enable_thinking', False):
+                budget = 1024 if getattr(provider, 'thinking_effort', 'medium') == 'low' else (2048 if getattr(provider, 'thinking_effort', 'medium') == 'medium' else 4096)
+                generation_config["thinkingConfig"] = {"thinkingBudget": budget}
+            else:
+                generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+                
+        if generation_config:
+            data["generationConfig"] = generation_config
+
         response = requests.post(url, json=data, stream=True, timeout=60)
         response.raise_for_status()
         for line in response.iter_lines():

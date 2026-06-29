@@ -218,16 +218,25 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         if current_ingredients:
             lab_context = f"\n\n[Laboratory Context: Current Compound Contains: {', '.join(current_ingredients)}]"
         
-        # Get full inventory registry for AI context
-        all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
+        # Get active system/drink type to filter inventory context
+        drink_type = data.get('drink_type')
+        if not drink_type and current_ingredients:
+            first_ing = Ingredient.objects.filter(Q(name__iexact=current_ingredients[0]) | Q(brand__iexact=current_ingredients[0])).first()
+            if first_ing and first_ing.compatible_systems:
+                systems = [s.strip().upper() for s in first_ing.compatible_systems.split(',')]
+                if systems:
+                    drink_type = systems[0]
+        if not drink_type:
+            drink_type = 'SODA'
+
+        all_ingredients = Ingredient.objects.filter(is_in_inventory=True, compatible_systems__icontains=drink_type)
         registry: List[str] = []
         for ing in all_ingredients:
             ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
             if ing.ingredient_type == 'COFFEE_BEAN':
-                coffee_details = f"Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acidity: {ing.acidity_score}/5, Bitterness: {ing.bitterness_score}/5, Flavor Notes: {ing.flavor_notes}"
-                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, {coffee_details})")
+                registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
             else:
-                registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5)")
+                registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
         inventory_context = "\n".join(registry)
 
         prompt = user_message + lab_context
@@ -266,10 +275,12 @@ def save_llm_provider_api(request: HttpRequest) -> JsonResponse:
         provider.is_enabled = bool(data.get('is_enabled', False))
         
         enable_thinking = data.get('enable_thinking')
-        provider.enable_thinking = True if enable_thinking is None else bool(enable_thinking)
+        provider.enable_thinking = bool(enable_thinking) if enable_thinking is not None else False
         
         thinking_effort = data.get('thinking_effort')
         provider.thinking_effort = 'medium' if not thinking_effort else str(thinking_effort).strip().lower()
+        
+        provider.enable_keep_warm = bool(data.get('enable_keep_warm', False))
         
         provider.save()
         
@@ -414,10 +425,9 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             for ing in registry_ingredients:
                 ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
                 if ing.ingredient_type == 'COFFEE_BEAN':
-                    coffee_details = f"Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acidity: {ing.acidity_score}/5, Bitterness: {ing.bitterness_score}/5, Flavor Notes: {ing.flavor_notes}"
-                    registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink}, {coffee_details})")
+                    registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
                 else:
-                    registry.append(f"{ing_display} (Type: {ing.ingredient_type}, Category: {ing.category}, Intensity: {ing.intensity}/5, Ready-to-Drink: {ing.is_ready_to_drink})")
+                    registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5, RTD: {ing.is_ready_to_drink})")
             inventory_context = "\n".join(registry)
 
             yield send_progress("Locating matching flavor affinity groups...")
