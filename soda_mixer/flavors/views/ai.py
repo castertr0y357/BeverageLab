@@ -3,7 +3,7 @@
 import json
 import logging
 import random
-from typing import Dict, Any, List, Set, Union, Optional
+from typing import Dict, Any, List, Set, Union, Optional, Callable
 
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpRe
 from django.db.models import Q
 
 from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider
+from ..tasks_registry import submit_task
 from ..recommendations import (
     get_recommendation, get_tiered_recommendation,
     generate_recipe_name, suggest_categories
@@ -593,27 +594,25 @@ def ai_analyze_ingredient_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
-    """Perform a batch synthesis of flavor profiles for all reagents in inventory."""
-    if not request.user.is_staff:
-        logger.warning(f"AIBulkAnalysis - Warning - Unauthorized API attempt to bulk analyze by {request.user}")
-        return JsonResponse({'error': 'Staff authentication required.'}, status=403)
-        
+def ai_bulk_analyze_task(update_progress: Callable[..., None]) -> None:
+    update_progress(5, status='RUNNING')
     try:
         targets = Ingredient.objects.filter(is_in_inventory=True)
-        
         if not targets.exists():
-            return JsonResponse({'status': 'complete', 'message': 'No inventory reagents found to synthesize.'})
+            update_progress(100, status='SUCCESS', result_data={'message': 'No inventory reagents found to synthesize.'})
+            return
             
         target_list = list(targets)
         batch_size = 15
         total_analyzed = 0
+        total_targets = len(target_list)
         
-        for i in range(0, len(target_list), batch_size):
+        for i in range(0, total_targets, batch_size):
             batch = target_list[i : i + batch_size]
             batch_data = [{'name': f"{t.brand} {t.name}" if t.brand else t.name, 'description': t.description or ''} for t in batch]
+            
+            pct = int((i / total_targets) * 90) + 5
+            update_progress(pct, status='RUNNING')
             
             results = AIAssistant.bulk_analyze_flavor_profiles(batch_data)
             
@@ -655,7 +654,6 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         if 'is_dry' in res:
                             match.is_dry = bool(res.get('is_dry'))
                             
-                        # Coffee-specific fields
                         if 'roast_level' in res and res.get('roast_level'):
                             match.roast_level = str(res.get('roast_level')).upper()
                         if 'is_decaf' in res:
@@ -686,14 +684,25 @@ def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
                         match.save()
                         total_analyzed += 1
                         
-        logger.info(f"AIBulkAnalysis - Info - Bulk analysis complete. {total_analyzed} reagents synchronized.")
-        return JsonResponse({
-            'status': 'success', 
-            'message': f'Bulk analysis complete. {total_analyzed} reagents synchronized.'
-        })
+        logger.info(f"AIBulkAnalysisTask - Info - Bulk analysis complete. {total_analyzed} reagents synchronized.")
+        update_progress(100, status='SUCCESS', result_data={'message': f'Bulk analysis complete. {total_analyzed} reagents synchronized.', 'total_analyzed': total_analyzed})
     except Exception as e:
-        logger.error(f"AIBulkAnalysis - Error - Bulk Synthesis Failure: {e}", exc_info=True)
-        return JsonResponse({'error': f"Bulk Synthesis Failure: {str(e)}"}, status=500)
+        logger.error(f"AIBulkAnalysisTask - Error - Bulk Synthesis Failure: {e}", exc_info=True)
+        update_progress(100, status='FAILURE', error_msg=str(e))
+
+
+from typing import Callable
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ai_bulk_analyze_api(request: HttpRequest) -> JsonResponse:
+    """Perform a batch synthesis of flavor profiles for all reagents in inventory."""
+    if not request.user.is_staff:
+        logger.warning(f"AIBulkAnalysis - Warning - Unauthorized API attempt to bulk analyze by {request.user}")
+        return JsonResponse({'error': 'Staff authentication required.'}, status=403)
+        
+    task = submit_task("Bulk AI Flavor Analysis", ai_bulk_analyze_task)
+    return JsonResponse({'status': 'accepted', 'task_id': str(task.uuid)}, status=202)
 
 
 @csrf_exempt

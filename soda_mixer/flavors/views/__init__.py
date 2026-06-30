@@ -24,6 +24,7 @@ from .settings import settings_view, save_settings_api, export_data, import_data
 from .coffee_chemistry import coffee_chemistry_api
 from .soda_chemistry import soda_chemistry_api
 from .cryo_chemistry import cryo_chemistry_api
+from .tasks import task_status_api
 
 __all__ = [
     'home', 'ingredient_list', 'ingredient_detail', 'recipe_list', 'recipe_detail', 'mix_history_list',
@@ -40,5 +41,7 @@ __all__ = [
     'soda_chemistry_api',
     'cryo_chemistry_api',
     'login_view', 'login_api', 'logout_api',
-    'settings_view', 'save_settings_api', 'export_data', 'import_data'
+    'settings_view', 'save_settings_api', 'export_data', 'import_data',
+    'task_status_api'
 ]
+

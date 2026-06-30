@@ -23,11 +23,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
+# Create a non-privileged user and group, and change ownership of the application folder
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
+    chown -R appuser:appgroup /app
+
 # Copy entrypoint script and make it executable
 RUN chmod +x entrypoint.sh
 
 # Expose port 8000
 EXPOSE 8000
+
+# Switch to the non-privileged user
+USER appuser
 
 # Run the entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]

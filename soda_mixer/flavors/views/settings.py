@@ -10,12 +10,14 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.contrib.auth.decorators import user_passes_test
 
 from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, MixHistory, MixHistoryIngredient
 
 logger = logging.getLogger(__name__)
 
 
+@user_passes_test(lambda u: u.is_staff)
 def settings_view(request: HttpRequest) -> HttpResponse:
     """Settings page for backups and system management."""
     config = SystemConfiguration.get_config()
@@ -27,6 +29,7 @@ def settings_view(request: HttpRequest) -> HttpResponse:
     })
 
 
+@user_passes_test(lambda u: u.is_staff)
 @csrf_exempt
 @require_http_methods(["POST"])
 def save_settings_api(request: HttpRequest) -> JsonResponse:
@@ -44,6 +47,7 @@ def save_settings_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'error': str(e)}, status=400)
 
 
+@user_passes_test(lambda u: u.is_staff)
 def export_data(request: HttpRequest) -> HttpResponse:
     """Export all laboratory data to a JSON dossier."""
     try:
@@ -66,6 +70,7 @@ def export_data(request: HttpRequest) -> HttpResponse:
         return HttpResponse(f"Backup Export Failed: {str(e)}", status=500)
 
 
+@user_passes_test(lambda u: u.is_staff)
 @csrf_exempt
 @require_http_methods(["POST"])
 def import_data(request: HttpRequest) -> JsonResponse:
@@ -75,7 +80,24 @@ def import_data(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'error': 'No file provided'}, status=400)
 
     try:
-        raw_data = json.load(request.FILES['backup_file'])
+        uploaded_file = request.FILES['backup_file']
+        header = uploaded_file.read(512)
+        uploaded_file.seek(0)
+        
+        header_str = ""
+        try:
+            if header.startswith(b'\xef\xbb\xbf'):
+                header_str = header[3:].decode('utf-8').strip()
+            else:
+                header_str = header.decode('utf-8').strip()
+        except UnicodeDecodeError:
+            pass
+            
+        if not header_str or not (header_str.startswith('{') or header_str.startswith('[')):
+            logger.warning("DatabaseRestore - Warning - Dossier failed magic signature verification.")
+            return JsonResponse({'error': 'Invalid file signature. File is not a valid JSON dossier.'}, status=400)
+
+        raw_data = json.load(uploaded_file)
         
         # 1. Restore Ingredients (Merge by Name)
         ingredient_map: Dict[int, Ingredient] = {} # old_id -> new_object

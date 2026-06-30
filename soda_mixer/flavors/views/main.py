@@ -129,14 +129,14 @@ def _get_compatible_categories(category: str) -> List[str]:
     return compatibility_map.get(category, [])
 
 
-def ingredient_detail(request: HttpRequest, pk: int) -> HttpResponse:
+def ingredient_detail(request: HttpRequest, uuid: str) -> HttpResponse:
     """Show a single ingredient's details."""
-    ingredient = get_object_or_404(Ingredient, pk=pk)
+    ingredient = get_object_or_404(Ingredient, uuid=uuid)
 
     compatible_cats = _get_compatible_categories(ingredient.category)
     compatible_ingredients = Ingredient.objects.filter(
         category__in=compatible_cats
-    ).exclude(pk=ingredient.pk)[:5]
+    ).exclude(id=ingredient.id)[:5]
 
     return render(request, 'flavors/ingredient_detail.html', {
         'ingredient': ingredient,
@@ -191,9 +191,9 @@ def recipe_list(request: HttpRequest) -> HttpResponse:
     })
 
 
-def recipe_detail(request: HttpRequest, pk: int) -> HttpResponse:
+def recipe_detail(request: HttpRequest, uuid: str) -> HttpResponse:
     """Show a single recipe's details."""
-    recipe = get_object_or_404(Recipe, pk=pk)
+    recipe = get_object_or_404(Recipe, uuid=uuid)
     stats = calculate_recipe_stats(recipe.recipe_ingredients.all())
     all_categories = RecipeCategory.objects.all().order_by('name')
 

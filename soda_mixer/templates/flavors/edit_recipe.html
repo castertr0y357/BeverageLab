@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="{% url 'recipe_detail' recipe.id %}" class="btn btn-sm btn-outline-secondary border-0 text-dim">
+    <a href="{% url 'recipe_detail' recipe.uuid %}" class="btn btn-sm btn-outline-secondary border-0 text-dim">
         <i class="bi bi-arrow-left"></i> Formula Readout
     </a>
 </div>
@@ -435,6 +435,14 @@
         const row = document.getElementById(`ingredient-row-${id}`);
         if (row) row.remove();
     }
+
+    document.getElementById('recipeForm')?.addEventListener('submit', function() {
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+        }
+    });
 
     // Initialize
     toggleDrinkType();

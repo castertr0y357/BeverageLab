@@ -11,6 +11,66 @@ sys.stderr.flush()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def bootstrap_env():
+    import secrets
+    
+    env_path = BASE_DIR / '.env'
+    example_path = BASE_DIR / '.env.example'
+    
+    if not env_path.exists():
+        if example_path.exists():
+            sys.stderr.write("🔬 [Startup] - .env file missing. Bootstrapping from .env.example...\n")
+            sys.stderr.flush()
+            content = example_path.read_text(encoding='utf-8')
+            # Generate a secure random Django SECRET_KEY
+            chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
+            secret_key = ''.join(secrets.choice(chars) for _ in range(50))
+            
+            lines = []
+            for line in content.splitlines():
+                if line.startswith('SECRET_KEY='):
+                    lines.append(f"SECRET_KEY={secret_key}")
+                else:
+                    lines.append(line)
+            content = '\n'.join(lines)
+            
+            try:
+                env_path.write_text(content, encoding='utf-8')
+                if os.name != 'nt':
+                    try:
+                        env_path.chmod(0o600)
+                    except Exception:
+                        pass
+                sys.stderr.write("✅ [Startup] - .env file bootstrapped and secured.\n")
+                sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"⚠️ [Startup] - Failed to write .env file: {e}\n")
+                sys.stderr.flush()
+
+    if env_path.exists():
+        try:
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        k = k.strip()
+                        v = v.strip()
+                        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                            v = v[1:-1]
+                        if k not in os.environ:
+                            os.environ[k] = v
+        except Exception as e:
+            sys.stderr.write(f"⚠️ [Startup] - Error reading .env: {e}\n")
+            sys.stderr.flush()
+
+
+# Run bootstrapping
+bootstrap_env()
+
+
 # Startup configuration validation
 REQUIRED_ENV_VARS = [
     'SECRET_KEY',
@@ -94,6 +154,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'soda_mixer.flavors.middleware_correlation.LaboratoryCorrelationMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

@@ -248,7 +248,7 @@ class BeverageLabViewsTest(TestCase):
     def test_edit_ingredient_unauthorized(self) -> None:
         # Non-staff cannot edit
         self.client.login(username="lab_tech", password="secure_password_123")
-        response = self.client.post(reverse('edit_ingredient', args=[self.ing.id]), {
+        response = self.client.post(reverse('edit_ingredient', args=[self.ing.uuid]), {
             'name': 'Super Soda'
         })
         self.assertEqual(response.status_code, 302)
@@ -257,7 +257,7 @@ class BeverageLabViewsTest(TestCase):
 
     def test_edit_ingredient_authorized(self) -> None:
         self.client.login(username="director", password="secure_password_123")
-        response = self.client.post(reverse('edit_ingredient', args=[self.ing.id]), {
+        response = self.client.post(reverse('edit_ingredient', args=[self.ing.uuid]), {
             'name': 'Sparkling Water',
             'intensity': 2,
             'sweetness': 1,
@@ -273,14 +273,14 @@ class BeverageLabViewsTest(TestCase):
 
     def test_delete_ingredient_authorized(self) -> None:
         self.client.login(username="director", password="secure_password_123")
-        response = self.client.post(reverse('delete_ingredient', args=[self.ing.id]))
+        response = self.client.post(reverse('delete_ingredient', args=[self.ing.uuid]))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Ingredient.objects.filter(id=self.ing.id).exists())
 
     def test_ajax_toggle_inventory(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
         response = self.client.post(
-            reverse('toggle_inventory_api', args=[self.ing.id]),
+            reverse('toggle_inventory_api', args=[self.ing.uuid]),
             data=json.dumps({'is_in_inventory': False}),
             content_type="application/json"
         )
@@ -291,7 +291,7 @@ class BeverageLabViewsTest(TestCase):
     def test_ajax_rate_recipe(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
         response = self.client.post(
-            reverse('rate_recipe_api', args=[self.recipe.id]),
+            reverse('rate_recipe_api', args=[self.recipe.uuid]),
             data=json.dumps({'rating': 4}),
             content_type="application/json"
         )
@@ -313,7 +313,7 @@ class BeverageLabViewsTest(TestCase):
         )
         self.assertEqual(response_save.status_code, 200)
         mix_id = response_save.json()['mix_id']
-        self.assertTrue(MixHistory.objects.filter(id=mix_id).exists())
+        self.assertTrue(MixHistory.objects.filter(uuid=mix_id).exists())
 
         # 2. Promote to Recipe
         response_promote = self.client.post(
@@ -326,7 +326,7 @@ class BeverageLabViewsTest(TestCase):
         )
         self.assertEqual(response_promote.status_code, 200)
         recipe_id = response_promote.json()['recipe_id']
-        self.assertTrue(Recipe.objects.filter(id=recipe_id).exists())
+        self.assertTrue(Recipe.objects.filter(uuid=recipe_id).exists())
 
     def test_get_recommendations_api_virtual_water(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
@@ -522,7 +522,11 @@ class BeverageLabViewsTest(TestCase):
         mock_request.return_value = mock_response
 
         response = self.client.post(reverse('ai_bulk_analyze_api'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        
+        from .views.ai import ai_bulk_analyze_task
+        ai_bulk_analyze_task(update_progress=lambda *args, **kwargs: None)
+        
         self.ing.refresh_from_db()
         self.assertEqual(self.ing.intensity, 1)
         self.assertEqual(self.ing.base_suitability, 1.0)
@@ -562,7 +566,11 @@ class BeverageLabViewsTest(TestCase):
         mock_request.return_value = mock_response
 
         response = self.client.post(reverse('ai_bulk_analyze_api'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        
+        from .views.ai import ai_bulk_analyze_task
+        ai_bulk_analyze_task(update_progress=lambda *args, **kwargs: None)
+        
         self.ing.refresh_from_db()
         self.assertEqual(self.ing.base_suitability, 1.5)
         self.assertEqual(self.ing.accent_suitability, 4.2)
@@ -958,7 +966,7 @@ class BeverageLabBrandTrackingTest(TestCase):
     def test_edit_ingredient_with_brand(self) -> None:
         ing = Ingredient.objects.create(name="Peach Syrup", brand="Torani", category="fruit")
         self.client.login(username="director", password="secure_password_123")
-        response = self.client.post(reverse('edit_ingredient', args=[ing.id]), {
+        response = self.client.post(reverse('edit_ingredient', args=[ing.uuid]), {
             'name': 'Peach Syrup',
             'brand': 'Monin',
             'intensity': 3,
@@ -1029,7 +1037,7 @@ class BeverageLabCoffeeScalingTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         mix_id = response.json()['mix_id']
-        mix = MixHistory.objects.get(id=mix_id)
+        mix = MixHistory.objects.get(uuid=mix_id)
         self.assertEqual(mix.drink_type, 'COFFEE')
         self.assertEqual(mix.mix_ingredients.first().amount, 9.0)
 
@@ -1257,7 +1265,7 @@ class BeverageLabIcedCoffeeTest(TestCase):
         self.assertEqual(recipe.drink_size_oz, 12.0)
         
         # Verify detail page renders successfully
-        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_url = reverse('recipe_detail', args=[recipe.uuid])
         detail_response = self.client.get(detail_url)
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, 'Iced')
@@ -1322,7 +1330,7 @@ class BeverageLabBatchSizesTest(TestCase):
         self.assertEqual(recipe.drink_size_oz, 12.0)
 
         # Verify detail page renders with 12oz details
-        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_url = reverse('recipe_detail', args=[recipe.uuid])
         detail_response = self.client.get(detail_url)
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, '12oz')
@@ -1341,7 +1349,7 @@ class BeverageLabBatchSizesTest(TestCase):
         self.assertEqual(recipe.drink_size_oz, 16.0)
 
         # Verify detail page renders
-        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_url = reverse('recipe_detail', args=[recipe.uuid])
         detail_response = self.client.get(detail_url)
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, '16oz')
@@ -1360,7 +1368,7 @@ class BeverageLabBatchSizesTest(TestCase):
         self.assertEqual(recipe.drink_size_oz, 64.0)
 
         # Verify detail page renders
-        detail_url = reverse('recipe_detail', args=[recipe.id])
+        detail_url = reverse('recipe_detail', args=[recipe.uuid])
         detail_response = self.client.get(detail_url)
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, '64oz')
@@ -1523,7 +1531,10 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         self.assertEqual(self.ing_soda.compatible_systems, "SODA")
         
         response = self.client.post(reverse('ai_bulk_analyze_api'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        
+        from .views.ai import ai_bulk_analyze_task
+        ai_bulk_analyze_task(update_progress=lambda *args, **kwargs: None)
         
         self.ing_soda.refresh_from_db()
         self.assertEqual(self.ing_soda.category, "sweet")
@@ -1532,7 +1543,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
 
     def test_recommendation_filtering_by_system_compatibility(self) -> None:
         # Clear seeded ingredients to have a clean slate for recommendations test
-        Ingredient.objects.all().delete()
+        Ingredient.all_objects.all().delete()
         
         self.ing_soda = Ingredient.objects.create(
             name="Soda Syrup Cola",
@@ -1617,7 +1628,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         mock_request.return_value = mock_response
 
         # Clear existing to prevent duplicate key
-        Ingredient.objects.filter(name="Apple Juice").delete()
+        Ingredient.all_objects.filter(name="Apple Juice").delete()
 
         ing = Ingredient.objects.create(
             name="Apple Juice",
@@ -1627,7 +1638,10 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         )
 
         response = self.client.post(reverse('ai_bulk_analyze_api'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        
+        from .views.ai import ai_bulk_analyze_task
+        ai_bulk_analyze_task(update_progress=lambda *args, **kwargs: None)
         
         ing.refresh_from_db()
         self.assertTrue(ing.is_ready_to_drink)
@@ -1649,7 +1663,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         self.assertTrue(ing.is_dry)
 
         # Test editing ingredient with is_dry=False via POST
-        response = self.client.post(reverse('edit_ingredient', args=[ing.pk]), {
+        response = self.client.post(reverse('edit_ingredient', args=[ing.uuid]), {
             'name': 'Powdered Cane Sugar',
             'brand': 'Lab Brand',
             'ingredient_type': 'ADDITIVE',
@@ -1676,7 +1690,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         mock_request.return_value = mock_response
 
         # Clear existing to prevent duplicate key
-        Ingredient.objects.filter(name="Powdered Cane Sugar").delete()
+        Ingredient.all_objects.filter(name="Powdered Cane Sugar").delete()
 
         ing = Ingredient.objects.create(
             name="Powdered Cane Sugar",
@@ -1686,7 +1700,10 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         )
 
         response = self.client.post(reverse('ai_bulk_analyze_api'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
+        
+        from .views.ai import ai_bulk_analyze_task
+        ai_bulk_analyze_task(update_progress=lambda *args, **kwargs: None)
         
         ing.refresh_from_db()
         self.assertTrue(ing.is_dry)

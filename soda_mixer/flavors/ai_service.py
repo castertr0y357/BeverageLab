@@ -888,6 +888,19 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     @staticmethod
     def _safe_request(method: str, url: str, attempts: int = 3, timeout: int = 30, **kwargs: Any) -> requests.Response:
         """Execute a request with automated retry logic and exponential backoff."""
+        from urllib.parse import urlparse
+        import socket
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+            if hostname:
+                ip = socket.gethostbyname(hostname)
+                if ip == "169.254.169.254" or ip.startswith("169.254."):
+                    raise ValueError("SSRF Block: Link-local and metadata IPs are banned.")
+        except Exception as e:
+            if "SSRF Block" in str(e):
+                raise e
+
         last_error = None
         for i in range(attempts):
             try:
@@ -900,6 +913,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
                 last_error = e
                 # Don't sleep on last attempt
                 if i < attempts - 1:
+                    import time
                     time.sleep(1.5 * (i + 1)) # Exponential backoff: 1.5s, 3s...
                 continue
         

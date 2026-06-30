@@ -44,7 +44,7 @@
                 </div>
                 <div class="print-hide d-flex gap-2">
                     <button class="btn btn-primary btn-sm text-dark fw-bold btn-mealie-export" id="mealieBtn" 
-                            data-recipe-id="{{ recipe.id }}" title="Sync to Mealie">
+                            data-recipe-id="{{ recipe.uuid }}" title="Sync to Mealie">
                         <i class="bi bi-cloud-upload"></i> Push to Mealie
                     </button>
                     <button onclick="window.print()" class="btn btn-outline-secondary border-white border-opacity-10 text-white btn-sm" title="Print Formula">
@@ -54,7 +54,7 @@
             </div>
             
             <div class="mb-4 print-hide d-flex align-items-center gap-3">
-                <div id="ratingUI" class="bg-dark bg-opacity-25 px-3 py-2 rounded-pill border border-white border-opacity-5" data-recipe-id="{{ recipe.id }}">
+                <div id="ratingUI" class="bg-dark bg-opacity-25 px-3 py-2 rounded-pill border border-white border-opacity-5" data-recipe-id="{{ recipe.uuid }}">
                     {% for i in "12345" %}
                     <i class="bi {% if forloop.counter <= recipe.rating %}bi-star-fill text-warning active{% else %}bi-star text-muted{% endif %} rating-star fs-4"
                        data-rating="{{ forloop.counter }}"
@@ -415,10 +415,10 @@
         <div class="glass-surface p-4 mb-4">
             <h6 class="readout-label mb-3">Lab Controls</h6>
             <div class="d-grid gap-2">
-                <a href="{% url 'edit_recipe' recipe.id %}" class="btn btn-outline-primary w-100">
+                <a href="{% url 'edit_recipe' recipe.uuid %}" class="btn btn-outline-primary w-100">
                     <i class="bi bi-pencil-square"></i> Modify Formula
                 </a>
-                <form action="{% url 'delete_recipe' recipe.id %}" method="POST" class="w-100">
+                <form action="{% url 'delete_recipe' recipe.uuid %}" method="POST" class="w-100">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger w-100 border-0" onclick="return confirm('Decommission this formula permanently?')">
                         <i class="bi bi-trash"></i> Decommission
@@ -452,7 +452,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                <button class="btn btn-primary btn-sm w-100 btn-save-recipe-cats" data-recipe-id="{{ recipe.id }}">
+                <button class="btn btn-primary btn-sm w-100 btn-save-recipe-cats" data-recipe-id="{{ recipe.uuid }}">
                     Submit Updates
                 </button>
             </div>
@@ -1620,6 +1620,11 @@ function rateRecipe(recipeId, rating) {
 }
 
 function saveRecipeCategories(recipeId) {
+    const btn = document.querySelector('.btn-save-recipe-cats');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+
     const categoryIds = [...document.querySelectorAll('.recipe-cat-check:checked')]
         .map(el => parseInt(el.value));
 
@@ -1635,8 +1640,42 @@ function saveRecipeCategories(recipeId) {
     .then(data => {
         if (data.status === 'updated') {
             window.location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            alert(data.error || "Save failed.");
         }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        alert("A network error occurred.");
     });
+}
+
+function pollTask(taskId, onProgress, onSuccess, onFailure) {
+    const interval = setInterval(() => {
+        fetch(`/api/tasks/${taskId}/`)
+        .then(r => {
+            if (!r.ok) throw new Error("Task status request rejected by system.");
+            return r.json();
+        })
+        .then(data => {
+            if (data.status === 'SUCCESS') {
+                clearInterval(interval);
+                onSuccess(data.result_data);
+            } else if (data.status === 'FAILURE') {
+                clearInterval(interval);
+                onFailure(data.error_message);
+            } else {
+                onProgress(data.progress);
+            }
+        })
+        .catch(err => {
+            clearInterval(interval);
+            onFailure(err.message || "Laboratory signal loss.");
+        });
+    }, 1000);
 }
 
 function exportToMealie(recipeId) {
@@ -1644,7 +1683,7 @@ function exportToMealie(recipeId) {
     const originalHtml = btn.innerHTML;
     
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Pushing...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Initializing...';
     
     fetch(`/api/recipes/${recipeId}/export/`, {
         method: 'POST',
@@ -1652,19 +1691,35 @@ function exportToMealie(recipeId) {
             'X-CSRFToken': '{{ csrf_token }}'
         }
     })
-    .then(r => r.json())
-    .then(data => {
-        btn.disabled = false;
-        if (data.status === 'success') {
-            btn.innerHTML = '<i class="bi bi-check-lg"></i> Synced!';
-            btn.classList.replace('btn-primary', 'btn-success');
-            setTimeout(() => {
-                btn.innerHTML = originalHtml;
-                btn.classList.replace('btn-success', 'btn-primary');
-            }, 3000);
+    .then(r => {
+        if (r.status === 202) {
+            return r.json().then(data => {
+                pollTask(data.task_id, 
+                    (progress) => {
+                        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing (${progress}%)...`;
+                    },
+                    (result) => {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-check-lg"></i> Synced!';
+                        btn.classList.replace('btn-primary', 'btn-success');
+                        setTimeout(() => {
+                            btn.innerHTML = originalHtml;
+                            btn.classList.replace('btn-success', 'btn-primary');
+                        }, 3000);
+                    },
+                    (errorMsg) => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                        alert("Export Failed: " + errorMsg);
+                    }
+                );
+            });
         } else {
-            btn.innerHTML = originalHtml;
-            alert(data.error);
+            return r.json().then(data => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                alert("Export Failed: " + (data.error || "Internal Error"));
+            });
         }
     })
     .catch(err => {

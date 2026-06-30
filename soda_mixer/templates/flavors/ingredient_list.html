@@ -74,7 +74,7 @@
         <div class="glass-card h-100 p-4 d-flex flex-column border-white border-opacity-10">
             <div class="d-flex justify-content-between align-items-start mb-3">
                 <h4 class="mb-0 d-flex align-items-center flex-wrap gap-2">
-                    <a href="{% url 'ingredient_detail' ingredient.id %}"
+                    <a href="{% url 'ingredient_detail' ingredient.uuid %}"
                         class="text-decoration-none text-white hover-lime fw-bold">{{ ingredient.name }}</a>
                     {% if ingredient.show_brand and ingredient.brand %}
                     <span class="badge border border-white border-opacity-20 text-dim" style="font-size: 0.55rem; padding: 0.15rem 0.35rem; font-weight: 500; letter-spacing: 0.5px;">{{ ingredient.brand|upper }}</span>
@@ -138,14 +138,14 @@
             <div
                 class="mt-auto pt-3 border-top border-white border-opacity-5 d-flex justify-content-between align-items-center">
                 <div class="d-flex gap-2">
-                    <a href="{% url 'ingredient_detail' ingredient.id %}"
+                    <a href="{% url 'ingredient_detail' ingredient.uuid %}"
                         class="btn btn-sm btn-outline-primary px-3 border-white border-opacity-10 text-white">
                         Inspect
                     </a>
                     {% if user.is_staff %}
                     <button type="button"
                         class="btn btn-sm btn-outline-warning border-white border-opacity-10 btn-edit-material"
-                        title="Edit Material" data-id="{{ ingredient.id }}" data-name="{{ ingredient.name }}"
+                        title="Edit Material" data-id="{{ ingredient.uuid }}" data-name="{{ ingredient.name }}"
                         data-brand="{{ ingredient.brand }}"
                         data-type="{{ ingredient.ingredient_type }}" data-category="{{ ingredient.category }}"
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
@@ -169,7 +169,7 @@
                         data-flavor-notes="{{ ingredient.flavor_notes|default:'' }}">
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <form action="{% url 'delete_ingredient' ingredient.id %}" method="post" class="m-0"
+                    <form action="{% url 'delete_ingredient' ingredient.uuid %}" method="post" class="m-0"
                         onsubmit="return confirm('Decommission this material from the laboratory?');">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger border-white border-opacity-10"
@@ -181,7 +181,7 @@
                 </div>
                 <div class="form-check form-switch p-0 d-flex align-items-center gap-2">
                     <label class="readout-label mb-0" style="font-size: 0.6rem;">IN LAB</label>
-                    <input class="neon-check inventory-toggle" type="checkbox" {% if ingredient.is_in_inventory %}checked{% endif %} data-ingredient-id="{{ ingredient.id }}">
+                    <input class="neon-check inventory-toggle" type="checkbox" {% if ingredient.is_in_inventory %}checked{% endif %} data-ingredient-id="{{ ingredient.uuid }}">
                 </div>
             </div>
         </div>
@@ -731,6 +731,7 @@
             chk.addEventListener('change', function () {
                 const ingredientId = this.dataset.ingredientId;
                 const isChecked = this.checked;
+                const checkbox = this;
 
                 fetch(`/api/ingredients/${ingredientId}/toggle_inventory/`, {
                     method: 'POST',
@@ -740,10 +741,17 @@
                     },
                     body: JSON.stringify({ is_in_inventory: isChecked })
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) alert('Failed to update inventory status.');
-                    });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        checkbox.checked = !isChecked;
+                        alert('Failed to update inventory status: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    checkbox.checked = !isChecked;
+                    alert('A network error occurred while updating inventory status.');
+                });
             });
         });
 
@@ -989,39 +997,77 @@
         }
     }
 
+    function pollAnalysisTask(taskId, onProgress, onSuccess, onFailure) {
+        const interval = setInterval(() => {
+            fetch(`/api/tasks/${taskId}/`)
+            .then(r => {
+                if (!r.ok) throw new Error("Task status request rejected by system.");
+                return r.json();
+            })
+            .then(data => {
+                if (data.status === 'SUCCESS') {
+                    clearInterval(interval);
+                    onSuccess(data.result_data);
+                } else if (data.status === 'FAILURE') {
+                    clearInterval(interval);
+                    onFailure(data.error_message);
+                } else {
+                    onProgress(data.progress);
+                }
+            })
+            .catch(err => {
+                clearInterval(interval);
+                onFailure(err.message || "Laboratory signal loss.");
+            });
+        }, 1000);
+    }
+
     // 6. Bulk Analysis Logic
     const btnBulkAnalyze = document.getElementById('btnBulkAnalyze');
     if (btnBulkAnalyze) {
-        btnBulkAnalyze.addEventListener('click', async function() {
+        btnBulkAnalyze.addEventListener('click', function() {
             if (!confirm("Initiate Bulk Chemical Synthesis? This will analyze all reagents in your inventory to capture any updates. This may take 10-30 seconds.")) return;
             
             const originalHtml = btnBulkAnalyze.innerHTML;
             btnBulkAnalyze.disabled = true;
-            btnBulkAnalyze.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> SYNTHESIZING...';
+            btnBulkAnalyze.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> INITIALIZING...';
             
-            try {
-                const response = await fetch('/api/ai/bulk-analyze/', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                });
-                const data = await response.json();
-                
-                if (data.status === 'success' || data.status === 'complete') {
-                    btnBulkAnalyze.innerHTML = '<i class="bi bi-check-all me-1"></i> SYNCED';
-                    btnBulkAnalyze.classList.replace('btn-outline-experimental', 'btn-success');
-                    setTimeout(() => location.reload(), 1500);
+            fetch('/api/ai/bulk-analyze/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(r => {
+                if (r.status === 202) {
+                    return r.json().then(data => {
+                        pollAnalysisTask(data.task_id,
+                            (progress) => {
+                                btnBulkAnalyze.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ANALYZING (${progress}%)...`;
+                            },
+                            (result) => {
+                                btnBulkAnalyze.innerHTML = '<i class="bi bi-check-all me-1"></i> SYNCED';
+                                btnBulkAnalyze.classList.replace('btn-outline-experimental', 'btn-success');
+                                setTimeout(() => location.reload(), 1500);
+                            },
+                            (errorMsg) => {
+                                btnBulkAnalyze.disabled = false;
+                                btnBulkAnalyze.innerHTML = originalHtml;
+                                alert("Analysis Failed: " + errorMsg);
+                            }
+                        );
+                    });
                 } else {
-                    alert("Analysis Failed: " + data.error);
+                    return r.json().then(data => {
+                        btnBulkAnalyze.disabled = false;
+                        btnBulkAnalyze.innerHTML = originalHtml;
+                        alert("Analysis Failed: " + (data.error || "Internal Error"));
+                    });
                 }
-            } catch (err) {
+            })
+            .catch(err => {
+                btnBulkAnalyze.disabled = false;
+                btnBulkAnalyze.innerHTML = originalHtml;
                 alert("Signal Loss: Laboratory Substrate is unreachable.");
-            } finally {
-                setTimeout(() => {
-                    btnBulkAnalyze.disabled = false;
-                    btnBulkAnalyze.innerHTML = originalHtml;
-                    btnBulkAnalyze.classList.replace('btn-success', 'btn-outline-experimental');
-                }, 3000);
-            }
+            });
         });
     }
 </script>

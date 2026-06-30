@@ -92,13 +92,13 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
 
 
 @require_http_methods(["POST"])
-def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
+def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
     """Modify an existing ingredient."""
     if not request.user.is_staff:
-        logger.warning(f"IngredientRegistry - Warning - Unauthorized attempt to edit ingredient {pk} by {request.user}")
+        logger.warning(f"IngredientRegistry - Warning - Unauthorized attempt to edit ingredient {uuid} by {request.user}")
         return redirect('ingredient_list')
         
-    ingredient = get_object_or_404(Ingredient, pk=pk)
+    ingredient = get_object_or_404(Ingredient, uuid=uuid)
     ingredient.name = request.POST.get('name', ingredient.name).strip()
     ingredient.brand = request.POST.get('brand', ingredient.brand).strip()
     ingredient.ingredient_type = request.POST.get('ingredient_type', ingredient.ingredient_type)
@@ -142,7 +142,7 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
         ingredient.base_suitability = float(request.POST.get('base_suitability', ingredient.base_suitability))
         ingredient.accent_suitability = float(request.POST.get('accent_suitability', ingredient.accent_suitability))
     except ValueError as e:
-        logger.warning(f"IngredientRegistry - Warning - Non-numeric stats provided for ingredient {pk}: {e}")
+        logger.warning(f"IngredientRegistry - Warning - Non-numeric stats provided for ingredient {uuid}: {e}")
         
     try:
         ingredient.save()
@@ -157,23 +157,25 @@ def edit_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
 
 @user_passes_test(lambda u: u.is_staff)
 @require_http_methods(["POST"])
-def delete_ingredient(request: HttpRequest, pk: int) -> HttpResponse:
+def delete_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
     """Delete an ingredient, restricted to staff."""
-    ingredient = get_object_or_404(Ingredient, pk=pk)
+    ingredient = get_object_or_404(Ingredient, uuid=uuid)
     name = ingredient.name
-    ingredient.delete()
-    logger.info(f"IngredientRegistry - Info - Successfully deleted ingredient: {name}")
+    force = request.POST.get('force') == 'true' or request.GET.get('force') == 'true'
+    ingredient.delete(force=force)
+    logger.info(f"IngredientRegistry - Info - Successfully deleted ingredient (force={force}): {name}")
     return redirect('ingredient_list')
 
 
 @user_passes_test(lambda u: u.is_staff)
 @require_http_methods(["POST"])
-def delete_category(request: HttpRequest, pk: int) -> HttpResponse:
+def delete_category(request: HttpRequest, uuid: str) -> HttpResponse:
     """Delete a recipe category, restricted to staff."""
-    category = get_object_or_404(RecipeCategory, pk=pk)
+    category = get_object_or_404(RecipeCategory, uuid=uuid)
     name = category.name
-    category.delete()
-    logger.info(f"CategoryRegistry - Info - Successfully deleted category: {name}")
+    force = request.POST.get('force') == 'true' or request.GET.get('force') == 'true'
+    category.delete(force=force)
+    logger.info(f"CategoryRegistry - Info - Successfully deleted category (force={force}): {name}")
     return redirect('ingredient_list')
 
 
@@ -200,19 +202,27 @@ def create_category_api(request: HttpRequest) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def delete_recipe_category_api(request: HttpRequest, pk: int) -> JsonResponse:
+def delete_recipe_category_api(request: HttpRequest, uuid: str) -> JsonResponse:
     """Delete a RecipeCategory via AJAX."""
     if not request.user.is_staff:
-        logger.warning(f"CategoryRegistry - Warning - Unauthorized API attempt to delete category {pk} by {request.user}")
+        logger.warning(f"CategoryRegistry - Warning - Unauthorized API attempt to delete category {uuid} by {request.user}")
         return JsonResponse({'error': 'Forbidden'}, status=403)
     try:
-        cat = get_object_or_404(RecipeCategory, pk=pk)
+        cat = get_object_or_404(RecipeCategory, uuid=uuid)
         name = cat.name
-        cat.delete()
-        logger.info(f"CategoryRegistry - Info - API Category deleted: {name}")
+        
+        force = False
+        try:
+            data = json.loads(request.body)
+            force = data.get('force') is True
+        except Exception:
+            pass
+            
+        cat.delete(force=force)
+        logger.info(f"CategoryRegistry - Info - API Category deleted: {name} (force={force})")
         return JsonResponse({'status': 'success'})
     except Exception as e:
-        logger.error(f"CategoryRegistry - Error - Failed to delete category {pk}: {e}")
+        logger.error(f"CategoryRegistry - Error - Failed to delete category {uuid}: {e}")
         return JsonResponse({'error': str(e)}, status=400)
 
 
@@ -239,9 +249,9 @@ def delete_ingredient_profile_api(request: HttpRequest) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def toggle_inventory_api(request: HttpRequest, pk: int) -> JsonResponse:
+def toggle_inventory_api(request: HttpRequest, uuid: str) -> JsonResponse:
     """Toggle the ingredient inventory status via AJAX."""
-    ingredient = get_object_or_404(Ingredient, pk=pk)
+    ingredient = get_object_or_404(Ingredient, uuid=uuid)
     try:
         data = json.loads(request.body)
         ingredient.is_in_inventory = data.get('is_in_inventory', True)

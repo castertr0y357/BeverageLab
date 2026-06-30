@@ -80,17 +80,17 @@
                 <div class="d-flex gap-2">
                     {% if not mix.promoted_recipe %}
                     <button class="btn btn-primary btn-sm px-3 promote-btn" 
-                            data-mix-id="{{ mix.id }}" 
+                            data-mix-id="{{ mix.uuid }}" 
                             data-ingredients="[{% for mi in mix.mix_ingredients.all %}{{ mi.ingredient.id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
                             style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
                         <i class="bi bi-journal-plus me-1"></i> Index
                     </button>
                     {% else %}
-                    <a href="{% url 'recipe_detail' mix.promoted_recipe.id %}" class="btn btn-sm btn-outline-success border-white border-opacity-10 text-white px-3" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
+                    <a href="{% url 'recipe_detail' mix.promoted_recipe.uuid %}" class="btn btn-sm btn-outline-success border-white border-opacity-10 text-white px-3" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
                         Inspect
                     </a>
                     {% endif %}
-                    <button class="btn btn-outline-danger btn-sm border-0 opacity-25 hover-opacity-100" onclick="decommissionProtocol({{ mix.id }}, this)" title="Decommission Protocol" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                    <button class="btn btn-outline-danger btn-sm border-0 opacity-25 hover-opacity-100" onclick="decommissionProtocol('{{ mix.uuid }}', this)" title="Decommission Protocol" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>

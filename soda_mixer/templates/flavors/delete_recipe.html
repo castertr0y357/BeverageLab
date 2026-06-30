@@ -20,7 +20,7 @@
             <form method="POST">
                 {% csrf_token %}
                 <div class="d-flex flex-column flex-md-row gap-3 justify-content-center">
-                    <a href="{% url 'recipe_detail' recipe.id %}" class="btn btn-outline-secondary px-4 py-2 border-0 text-dim">
+                    <a href="{% url 'recipe_detail' recipe.uuid %}" class="btn btn-outline-secondary px-4 py-2 border-0 text-dim">
                         <i class="bi bi-x-circle me-1"></i> Abort Sequence
                     </a>
                     <button type="submit" class="btn btn-danger px-4 py-2 fw-bold" style="background: linear-gradient(135deg, #ff4d4d, #dc3545); border: none; box-shadow: 0 0 15px rgba(220, 53, 69, 0.4);">

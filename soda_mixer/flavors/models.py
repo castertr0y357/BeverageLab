@@ -1,11 +1,47 @@
 """Models for Soda Mixer flavors and recipes."""
 
+import uuid
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 
-class RecipeCategory(models.Model):
+class SoftDeleteQuerySet(models.QuerySet):
+    def delete(self):
+        return self.update(deleted_at=timezone.now())
+
+    def hard_delete(self):
+        return super().delete()
+
+
+class SoftDeleteManager(models.Manager):
+    def get_queryset(self):
+        return SoftDeleteQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
+
+    def all_objects(self):
+        return SoftDeleteQuerySet(self.model, using=self._db)
+
+
+class SoftDeleteModel(models.Model):
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
+
+    def delete(self, force=False, *args, **kwargs):
+        if force:
+            super().delete(*args, **kwargs)
+        else:
+            self.deleted_at = timezone.now()
+            self.save()
+
+    class Meta:
+        abstract = True
+
+
+class RecipeCategory(SoftDeleteModel):
     """A user-defined tag/category for organizing recipes."""
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     COLOR_CHOICES = [
         ('bg-primary', 'Blue'),
         ('bg-success', 'Green'),
@@ -26,8 +62,9 @@ class RecipeCategory(models.Model):
         verbose_name_plural = "Recipe Categories"
 
 
-class Ingredient(models.Model):
+class Ingredient(SoftDeleteModel):
     """A single ingredient that can be mixed (Soda Syrup, Coffee Bean, etc.)."""
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     INGREDIENT_TYPE_CHOICES = [
         ('SODA_SYRUP', 'Soda Syrup'),
         ('COFFEE_BEAN', 'Coffee Bean'),
@@ -161,8 +198,9 @@ class Ingredient(models.Model):
         unique_together = ['name', 'brand']
 
 
-class Recipe(models.Model):
+class Recipe(SoftDeleteModel):
     """A saved recipe with ingredient combinations."""
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     DRINK_TYPE_CHOICES = [
         ('SODA', 'Soda Synthesis'),
         ('COFFEE', 'Coffee Laboratory'),
@@ -301,8 +339,9 @@ class RecipeIngredient(models.Model):
         unique_together = ['recipe', 'ingredient']
 
 
-class MixHistory(models.Model):
+class MixHistory(SoftDeleteModel):
     """An ad-hoc mix experiment that hasn't been named/saved yet."""
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     drink_type = models.CharField(max_length=10, choices=Recipe.DRINK_TYPE_CHOICES, default='SODA')
     mixed_at = models.DateTimeField(auto_now_add=True)
     promoted_recipe = models.OneToOneField(
@@ -427,3 +466,24 @@ class SystemConfiguration(models.Model):
 
     class Meta:
         verbose_name_plural = "System Configurations"
+
+
+class BackgroundExecutionTask(models.Model):
+    """Tracks asynchronous execution progress and status of laboratory tasks."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('RUNNING', 'Running'),
+        ('SUCCESS', 'Success'),
+        ('FAILURE', 'Failure'),
+    ]
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task_name = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    progress = models.IntegerField(default=0)  # 0 to 100
+    error_message = models.TextField(blank=True, null=True)
+    result_data = models.JSONField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.task_name} ({self.status} - {self.progress}%)"

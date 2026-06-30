@@ -352,6 +352,11 @@
             alert('Please select at least one ingredient.');
             return;
         }
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Initializing...';
+        }
     });
 
     // Initialize filter

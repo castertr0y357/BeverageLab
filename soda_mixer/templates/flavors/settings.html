@@ -211,7 +211,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="readout-label mb-2 d-block">Technology Stack</label>
-                            <select id="pType" class="form-select bg-dark border-white border-opacity-10 text-white" onchange="toggleApiFields()">
+                            <select id="pType" class="form-select bg-dark border-white border-opacity-10 text-white" onchange="toggleApiFields(); toggleThinkingEffort();">
                                 {% for code, label in provider_types %}
                                 <option value="{{ code }}">{{ label }}</option>
                                 {% endfor %}
@@ -279,7 +279,7 @@
                 </div>
                 <div class="modal-footer border-white border-opacity-5">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abort</button>
-                    <button type="submit" class="btn btn-primary px-4 fw-bold text-dark">Apply Configuration</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold text-dark" id="submitProviderBtn">Apply Configuration</button>
                 </div>
             </form>
         </div>
@@ -397,13 +397,33 @@ document.getElementById('settingsForm').addEventListener('submit', function(e) {
 // AI Provider Logic
 let providerModal;
 function toggleThinkingEffort() {
+    const enabled = document.getElementById('pEnabled').checked;
     const thinkingEnabled = document.getElementById('pThinking').checked;
-    const container = document.getElementById('thinkingEffortContainer');
-    if (container) {
+    
+    const thinkingToggle = document.getElementById('pThinking').closest('.form-check');
+    const keepWarmToggle = document.getElementById('keepWarmToggleContainer');
+    const thinkingEffortContainer = document.getElementById('thinkingEffortContainer');
+
+    if (!enabled) {
+        if (thinkingToggle) thinkingToggle.style.display = 'none';
+        if (keepWarmToggle) keepWarmToggle.style.display = 'none';
+        if (thinkingEffortContainer) thinkingEffortContainer.style.display = 'none';
+    } else {
+        if (thinkingToggle) thinkingToggle.style.display = 'block';
+        
+        const type = document.getElementById('pType').value;
+        if (keepWarmToggle) {
+            if (['OLLAMA', 'CUSTOM', 'ANYTHINGLLM'].includes(type)) {
+                keepWarmToggle.style.display = 'block';
+            } else {
+                keepWarmToggle.style.display = 'none';
+            }
+        }
+
         if (thinkingEnabled) {
-            container.style.display = 'block';
+            if (thinkingEffortContainer) thinkingEffortContainer.style.display = 'block';
         } else {
-            container.style.display = 'none';
+            if (thinkingEffortContainer) thinkingEffortContainer.style.display = 'none';
         }
     }
 }
@@ -413,6 +433,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const thinkingCheck = document.getElementById('pThinking');
     if (thinkingCheck) {
         thinkingCheck.addEventListener('change', toggleThinkingEffort);
+    }
+    const enabledCheck = document.getElementById('pEnabled');
+    if (enabledCheck) {
+        enabledCheck.addEventListener('change', toggleThinkingEffort);
     }
 });
 
@@ -517,6 +541,11 @@ document.getElementById('providerForm').addEventListener('submit', function(e) {
         ? document.getElementById('pModelSelect').value 
         : document.getElementById('pModelInput').value;
 
+    const btn = document.getElementById('submitProviderBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+
     const payload = {
         id: document.getElementById('providerId').value,
         name: document.getElementById('pName').value,
@@ -541,11 +570,18 @@ document.getElementById('providerForm').addEventListener('submit', function(e) {
     })
     .then(r => r.json())
     .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
         if (data.status === 'success') {
             location.reload();
         } else {
             alert(data.error);
         }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        alert("An error occurred preserving AI configuration.");
     });
 });
 

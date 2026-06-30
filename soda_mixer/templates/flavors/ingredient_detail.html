@@ -128,7 +128,7 @@
             <div class="row g-3">
                 {% for compat in compatible %}
                 <div class="col-12">
-                    <a href="{% url 'ingredient_detail' compat.id %}" class="glass-card p-3 d-flex justify-content-between align-items-center text-decoration-none border-white border-opacity-10 hover-lime">
+                    <a href="{% url 'ingredient_detail' compat.uuid %}" class="glass-card p-3 d-flex justify-content-between align-items-center text-decoration-none border-white border-opacity-10 hover-lime">
                         <span class="fw-bold text-white">{{ compat.name }}</span>
                         <span class="badge-fizz bg-{{ compat.category }}">{{ compat.category }}</span>
                     </a>
