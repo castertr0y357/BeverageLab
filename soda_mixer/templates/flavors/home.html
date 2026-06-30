@@ -1277,6 +1277,7 @@
     }
 
     function setLabMode(mode, isInit = false) {
+        cancelInFlightLLMCalls();
         mode = mode.toUpperCase();
         currentLabMode = mode;
         selectedIngredients = [];
@@ -1356,6 +1357,69 @@
     // Global state for AI synthesis history
     let aiChatHistory = [];
 
+    // AbortControllers and Debouncing for LLM calls
+    let recommendationsController = null;
+    let synthesisController = null;
+    let surpriseController = null;
+
+    let fetchRecommendationsTimeout = null;
+    let triggerFlavorSynthesisTimeout = null;
+
+    function cancelInFlightLLMCalls() {
+        if (recommendationsController) {
+            recommendationsController.abort();
+            recommendationsController = null;
+        }
+        if (synthesisController) {
+            synthesisController.abort();
+            synthesisController = null;
+        }
+        if (surpriseController) {
+            surpriseController.abort();
+            surpriseController = null;
+        }
+        
+        // Also clear any pending debounce timeouts
+        if (fetchRecommendationsTimeout) {
+            clearTimeout(fetchRecommendationsTimeout);
+            fetchRecommendationsTimeout = null;
+        }
+        if (triggerFlavorSynthesisTimeout) {
+            clearTimeout(triggerFlavorSynthesisTimeout);
+            triggerFlavorSynthesisTimeout = null;
+        }
+    }
+
+    function debouncedFetchRecommendations() {
+        if (fetchRecommendationsTimeout) {
+            clearTimeout(fetchRecommendationsTimeout);
+        }
+        // Cancel currently in-flight suggestion calls immediately for instant responsiveness
+        if (recommendationsController) {
+            recommendationsController.abort();
+            recommendationsController = null;
+        }
+        
+        fetchRecommendationsTimeout = setTimeout(() => {
+            fetchRecommendations();
+        }, 500);
+    }
+
+    function debouncedTriggerFlavorSynthesis() {
+        if (triggerFlavorSynthesisTimeout) {
+            clearTimeout(triggerFlavorSynthesisTimeout);
+        }
+        // Cancel currently in-flight synthesis calls immediately
+        if (synthesisController) {
+            synthesisController.abort();
+            synthesisController = null;
+        }
+        
+        triggerFlavorSynthesisTimeout = setTimeout(() => {
+            triggerFlavorSynthesis();
+        }, 500);
+    }
+
     // Stub for removed assistant window
     function appendChatMessage(role, content) {
         console.log(`[Lab Assistant] ${role}: ${content}`);
@@ -1393,30 +1457,30 @@
                 updateCoffeeChemistryWizard().then(() => {
                     updateSelectedArea();
                     if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
-                        triggerFlavorSynthesis();
+                        debouncedTriggerFlavorSynthesis();
                     }
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                 });
             } else if (currentLabMode === 'SODA' && !silent) {
                 updateSodaChemistryWizard().then(() => {
                     updateSelectedArea();
                     if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
-                        triggerFlavorSynthesis();
+                        debouncedTriggerFlavorSynthesis();
                     }
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                 });
             } else if (currentLabMode === 'SLUSHIE' && !silent) {
                 updateCryoChemistryWizard().then(() => {
                     updateSelectedArea();
                     if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
-                        triggerFlavorSynthesis();
+                        debouncedTriggerFlavorSynthesis();
                     }
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                 });
             } else {
                 updateSelectedArea();
                 if (!silent) {
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                 }
             }
             return;
@@ -1504,9 +1568,9 @@
                 if (isDone) {
                     isMixSealed = true;
                     document.getElementById('stepContainer').style.display = 'none';
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 } else {
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     triggerProactiveSuggestion();
                 }
             });
@@ -1516,9 +1580,9 @@
                 if (isDone) {
                     isMixSealed = true;
                     document.getElementById('stepContainer').style.display = 'none';
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 } else {
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     triggerProactiveSuggestion();
                 }
             });
@@ -1528,9 +1592,9 @@
                 if (isDone) {
                     isMixSealed = true;
                     document.getElementById('stepContainer').style.display = 'none';
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 } else {
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     triggerProactiveSuggestion();
                 }
             });
@@ -1540,9 +1604,9 @@
                 if (isDone) {
                     isMixSealed = true;
                     document.getElementById('stepContainer').style.display = 'none';
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 } else {
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     triggerProactiveSuggestion();
                 }
             }
@@ -1550,11 +1614,13 @@
     }
 
     async function surpriseMe() {
+        cancelInFlightLLMCalls();
         const btn = document.getElementById('surpriseBtn');
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SYNCING...';
 
+        surpriseController = new AbortController();
         try {
             const response = await fetch('/api/random-pairing/', {
                 method: 'POST',
@@ -1565,7 +1631,8 @@
                 body: JSON.stringify({ 
                     drink_type: currentLabMode,
                     mode: recommendationMode
-                })
+                }),
+                signal: surpriseController.signal
             });
             const data = await response.json();
 
@@ -1602,17 +1669,22 @@
                 }
                 const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
                 updateSelectedArea(selectedIngredients.length >= maxIngredients);
-                fetchRecommendations();
+                debouncedFetchRecommendations();
                 if (selectedIngredients.length > 0) {
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 }
             } else {
                 alert(data.error || "Random synthesis failed.");
             }
         } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log("Random pairing fetch aborted.");
+                return;
+            }
             console.error(err);
             alert("Comms Failure: Could not reach substrate.");
         } finally {
+            surpriseController = null;
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
@@ -2381,6 +2453,7 @@
         }
         
         function resetMixer() {
+            cancelInFlightLLMCalls();
             selectedIngredients = [];
             bottleScale = 1.0;
             latestCoffeeChemistryData = null;
@@ -2430,6 +2503,7 @@
         }
 
         function stepBack() {
+            cancelInFlightLLMCalls();
             if (selectedIngredients.length === 0) return;
             
             selectedIngredients.pop();
@@ -2440,7 +2514,7 @@
             if (currentLabMode === 'COFFEE') {
                 updateCoffeeChemistryWizard().then(() => {
                     updateSelectedArea();
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
                         resetMixer();
@@ -2449,7 +2523,7 @@
             } else if (currentLabMode === 'SODA') {
                 updateSodaChemistryWizard().then(() => {
                     updateSelectedArea();
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
                         resetMixer();
@@ -2458,7 +2532,7 @@
             } else if (currentLabMode === 'SLUSHIE') {
                 updateCryoChemistryWizard().then(() => {
                     updateSelectedArea();
-                    fetchRecommendations();
+                    debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
                         resetMixer();
@@ -2466,7 +2540,7 @@
                 });
             } else {
                 updateSelectedArea();
-                fetchRecommendations();
+                debouncedFetchRecommendations();
                 
                 if (selectedIngredients.length === 0) {
                     resetMixer();
@@ -2481,7 +2555,7 @@
             updateSodaChemistryWizard().then(() => {
                 updateSelectedArea();
                 if (document.getElementById('synthesisReportContainer').style.display !== 'none') {
-                    triggerFlavorSynthesis();
+                    debouncedTriggerFlavorSynthesis();
                 }
             });
         }
@@ -2517,7 +2591,7 @@
                 const lib = document.getElementById('partitionedBasesContainer');
                 if (lib) lib.style.display = 'none';
                 updateSelectedArea(true);
-                triggerFlavorSynthesis();
+                debouncedTriggerFlavorSynthesis();
                 return;
             }
 
@@ -2591,11 +2665,17 @@
                 force_type: forceType
             };
 
+            if (recommendationsController) {
+                recommendationsController.abort();
+            }
+            recommendationsController = new AbortController();
+
             try {
                 const r = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: recommendationsController.signal
                 });
 
                 let data;
@@ -2832,9 +2912,16 @@
                         recContainer.innerHTML = recHtml;
                     }
                 }
+                recommendationsController = null;
         } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log("Recommendation fetch aborted.");
+                return;
+            }
             console.error('Synthesis Error:', err);
             container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-danger">Substrate Error: Laboratory signal lost.</p></div>';
+        } finally {
+            recommendationsController = null;
         }
     }
 
@@ -2844,7 +2931,7 @@
         const lib = document.getElementById('partitionedBasesContainer');
         if (lib) lib.style.display = 'none';
         updateSelectedArea(true);
-        triggerFlavorSynthesis();
+        debouncedTriggerFlavorSynthesis();
     }
 
     function updateSelectedArea(isDone = false) {
