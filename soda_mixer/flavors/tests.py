@@ -435,8 +435,8 @@ class BeverageLabViewsTest(TestCase):
         provider = LLMProvider.objects.get(id=data['id'])
         self.assertEqual(provider.enable_keep_warm, True)
 
-    @patch('requests.post')
-    def test_keep_warm_provider_ollama(self, mock_post: MagicMock) -> None:
+    @patch('requests.request')
+    def test_keep_warm_provider_ollama(self, mock_request: MagicMock) -> None:
         provider = LLMProvider.objects.create(
             name="Ollama Keep Warm Test",
             provider_type="OLLAMA",
@@ -447,15 +447,49 @@ class BeverageLabViewsTest(TestCase):
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_post.return_value = mock_response
+        mock_response.json.return_value = {
+            "message": {"content": "ok"}
+        }
+        mock_request.return_value = mock_response
 
         from .ai_service import AIAssistant
         success = AIAssistant.keep_warm_provider(provider)
         self.assertTrue(success)
         
-        args, kwargs = mock_post.call_args
+        args, kwargs = mock_request.call_args
+        self.assertIn("NONE - Initial Synthesis", kwargs['json']['messages'][1]['content'])
         self.assertEqual(kwargs['json']['model'], 'mistral')
-        self.assertEqual(kwargs['json']['keep_alive'], '15m')
+
+    @patch('requests.request')
+    def test_preheat_suggestions_cache(self, mock_request: MagicMock) -> None:
+        provider = LLMProvider.objects.create(
+            name="Mock Ollama Preheat",
+            provider_type="OLLAMA",
+            base_url="http://localhost:11434",
+            default_model="mistral",
+            is_enabled=True
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "message": {"content": "ok"}
+        }
+        mock_request.return_value = mock_response
+
+        from .ai_service import AIAssistant
+        AIAssistant.preheat_suggestions_cache(provider)
+        
+        args, kwargs = mock_request.call_args
+        self.assertIn("NONE - Initial Synthesis", kwargs['json']['messages'][1]['content'])
+        self.assertEqual(kwargs['json']['model'], 'mistral')
+
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.preheat_suggestions_cache')
+    def test_ingredient_change_triggers_preheat_signal(self, mock_preheat: MagicMock) -> None:
+        # Save an ingredient to trigger signal receiver
+        self.ing.is_in_inventory = True
+        self.ing.save()
+        
+        self.assertTrue(mock_preheat.called)
 
     @patch('requests.request')
     def test_ai_bulk_analyze_view_api(self, mock_request: MagicMock) -> None:

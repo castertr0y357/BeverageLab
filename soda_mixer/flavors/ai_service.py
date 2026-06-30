@@ -330,14 +330,9 @@ class AIAssistant:
 
         try:
             if provider.provider_type == 'OLLAMA':
-                base = (provider.base_url or "http://localhost:11434").rstrip('/')
-                model = provider.default_model or "mistral"
-                response = requests.post(
-                    f"{base}/api/generate",
-                    json={"model": model, "keep_alive": "15m"},
-                    timeout=30
-                )
-                return response.status_code == 200
+                # Run preheat suggestions cache to keep KV cache hot and VRAM loaded!
+                cls.preheat_suggestions_cache(provider)
+                return True
             else:
                 # Minimal 1-token chat call for generic endpoints
                 cls.chat("ping", history=[], provider=provider)
@@ -345,6 +340,68 @@ class AIAssistant:
         except Exception as e:
             logger.error(f"AIKeepWarm - Error - Laboratory Wakeup Failure for {provider.name}: {e}")
             return False
+
+    @classmethod
+    def preheat_suggestions_cache(cls, provider: Optional[LLMProvider] = None) -> None:
+        """Pre-heat KV cache for suggestions by sending a dummy suggestions prompt."""
+        if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
+            return
+
+        if not provider:
+            provider = cls.get_default_provider()
+        if not provider:
+            return
+
+        try:
+            # Get full inventory registry for AI context
+            from .models import Ingredient
+            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
+            
+            # Pre-heat for SODA as the default largest context
+            registry = []
+            for ing in all_ingredients:
+                ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+                registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
+            inventory_context = "\n".join(registry)
+
+            # Construct dummy query matching optimized format
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+ 
+Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+ 
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
+4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+ 
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Lemon Syrup": 100.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the carbonation and dilution strategy"
+}}
+
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: NONE - Initial Synthesis
+Lab Type: SODA (Soda Lab)
+Lab Mode: safe and balanced
+"""
+            # Fire request in the background (we discard output; just compiles KV cache)
+            cls.chat(prompt, context=inventory_context, provider=provider)
+            logger.info(f"AIKeepWarm - Info - Preheat KV Cache succeeded for provider '{provider.name}'")
+        except Exception as e:
+            logger.error(f"AIKeepWarm - Error - Preheat KV Cache failed: {e}")
 
     @classmethod
     def keep_warm(cls) -> bool:
@@ -441,11 +498,7 @@ class AIAssistant:
                 force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
                 force_rule = f"\n6. MANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
             
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
- 
-Current Compound: {current_compound_str}
-Lab Type: COFFEE (Espresso Extraction)
-Lab Mode: {tone}{exclude_context}
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
 Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
  
@@ -471,14 +524,15 @@ JSON OUTPUT FORMAT:
     "reasoning": "Brief overview of the coffee balance strategy"
 }}
  
-Inventory Registry for Selection:
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: {current_compound_str}
+Lab Type: COFFEE (Espresso Extraction)
+Lab Mode: {tone}{exclude_context}{retry_context}
 """
         elif drink_type == 'SLUSHIE':
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
- 
-Current Compound: {current_compound_str}
-Lab Type: SLUSHIE (Cryo Lab)
-Lab Mode: {tone}{exclude_context}
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
 Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
  
@@ -503,14 +557,15 @@ JSON OUTPUT FORMAT:
     "reasoning": "Brief overview of the cryo freezing and displacement strategy"
 }}
  
-Inventory Registry for Selection:
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: {current_compound_str}
+Lab Type: SLUSHIE (Cryo Lab)
+Lab Mode: {tone}{exclude_context}{retry_context}
 """
         else:
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].{retry_context}
- 
-Current Compound: {current_compound_str}
-Lab Type: SODA (Soda Lab)
-Lab Mode: {tone}{exclude_context}
+            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
 Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
  
@@ -535,7 +590,12 @@ JSON OUTPUT FORMAT:
     "reasoning": "Brief overview of the carbonation and dilution strategy"
 }}
  
-Inventory Registry for Selection:
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: {current_compound_str}
+Lab Type: SODA (Soda Lab)
+Lab Mode: {tone}{exclude_context}{retry_context}
 """
         response = cls.chat(prompt, context=inventory)
         return cls._extract_json(response)
@@ -599,14 +659,16 @@ Inventory Registry for Selection:
         prompt = f"""[AUTONOMOUS SYNTHESIS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
         
 Task: Select {count_limit} ingredients from the Inventory Registry below to create a cohesive {drink_label} compound.
-Lab Mode: {tone}
 
 {rules}
 
 OUTPUT FORMAT: A raw JSON object.
 {example}
 
-Inventory Registry for Selection:
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Lab Mode: {tone}
 """
         response = cls.chat(prompt, context=inventory)
         return cls._extract_json(response)
