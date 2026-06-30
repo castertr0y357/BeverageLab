@@ -343,7 +343,7 @@ class AIAssistant:
 
     @classmethod
     def preheat_suggestions_cache(cls, provider: Optional[LLMProvider] = None) -> None:
-        """Pre-heat KV cache for suggestions by sending a dummy suggestions prompt."""
+        """Pre-heat KV cache for suggestions across all three drink modes."""
         if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
             return
 
@@ -352,20 +352,91 @@ class AIAssistant:
         if not provider:
             return
 
-        try:
-            # Get full inventory registry for AI context
-            from .models import Ingredient
-            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-            
-            # Pre-heat for SODA as the default largest context
-            registry = []
-            for ing in all_ingredients:
-                ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
-            inventory_context = "\n".join(registry)
+        from .models import Ingredient
+        # Loop through all three active system modes to ensure each prefix is pre-cached
+        for drink_type in ['SODA', 'COFFEE', 'SLUSHIE']:
+            try:
+                all_ingredients = Ingredient.objects.filter(is_in_inventory=True, compatible_systems__icontains=drink_type)
+                
+                registry = []
+                for ing in all_ingredients:
+                    ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
+                    if ing.ingredient_type == 'COFFEE_BEAN':
+                        registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
+                    else:
+                        registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
+                inventory_context = "\n".join(registry)
 
-            # Construct dummy query matching optimized format
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+                # Construct dummy queries matching the optimized format of each mode
+                if drink_type == 'COFFEE':
+                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+ 
+Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
+ 
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
+4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.
+ 
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 15.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Espresso": 18.0,
+        "Whole Milk": 50.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the coffee balance strategy"
+}}
+ 
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: NONE - Initial Synthesis
+Lab Type: COFFEE (Espresso Extraction)
+Lab Mode: safe and balanced
+"""
+                elif drink_type == 'SLUSHIE':
+                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+ 
+Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+ 
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
+2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
+3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
+4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
+5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+ 
+JSON OUTPUT FORMAT:
+{{
+    "suggestions": [
+        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 20.0, "profile": {{...}} }},
+        ...
+    ],
+    "rebalancing": {{
+        "Lemon Syrup": 80.0
+    }},
+    "seal_recommended": true/false,
+    "seal_resonance": 95,
+    "reasoning": "Brief overview of the cryo freezing and displacement strategy"
+}}
+ 
+Inventory Registry for Selection: See context.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Compound: NONE - Initial Synthesis
+Lab Type: SLUSHIE (Cryo Lab)
+Lab Mode: safe and balanced
+"""
+                else:
+                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
 Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
  
@@ -397,11 +468,10 @@ Current Compound: NONE - Initial Synthesis
 Lab Type: SODA (Soda Lab)
 Lab Mode: safe and balanced
 """
-            # Fire request in the background (we discard output; just compiles KV cache)
-            cls.chat(prompt, context=inventory_context, provider=provider)
-            logger.info(f"AIKeepWarm - Info - Preheat KV Cache succeeded for provider '{provider.name}'")
-        except Exception as e:
-            logger.error(f"AIKeepWarm - Error - Preheat KV Cache failed: {e}")
+                cls.chat(prompt, context=inventory_context, provider=provider)
+                logger.info(f"AIKeepWarm - Info - Preheat KV Cache succeeded for mode '{drink_type}' on provider '{provider.name}'")
+            except Exception as e:
+                logger.error(f"AIKeepWarm - Error - Preheat KV Cache failed for mode '{drink_type}': {e}")
 
     @classmethod
     def keep_warm(cls) -> bool:
