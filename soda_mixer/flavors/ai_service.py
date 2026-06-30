@@ -75,6 +75,17 @@ class AIAssistant:
 }"""
 
     @classmethod
+    def _resolve_base_url(cls, provider: LLMProvider, default_url: str = "") -> str:
+        """Resolve base URL, translating localhost/127.0.0.1 to host.docker.internal if running in Docker."""
+        base_url = provider.base_url or default_url
+        if os.path.exists('/.dockerenv'):
+            if "localhost" in base_url:
+                base_url = base_url.replace("localhost", "host.docker.internal")
+            elif "127.0.0.1" in base_url:
+                base_url = base_url.replace("127.0.0.1", "host.docker.internal")
+        return base_url
+
+    @classmethod
     def get_default_provider(cls) -> Optional[LLMProvider]:
         """Get the default LLM provider configured in the system."""
         config = SystemConfiguration.get_config()
@@ -493,7 +504,7 @@ Lab Mode: safe and balanced
 
         try:
             if provider.provider_type == 'OLLAMA':
-                base = (provider.base_url or "http://localhost:11434").rstrip('/')
+                base = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/')
                 model = provider.default_model or "mistral"
                 r = requests.post(f"{base}/api/show", json={"name": model}, timeout=10)
                 if r.status_code == 200:
@@ -922,7 +933,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _list_openai_models(cls, provider: LLMProvider) -> List[str]:
-        url = (provider.base_url or "https://api.openai.com/v1").rstrip('/') + "/models"
+        url = cls._resolve_base_url(provider, "https://api.openai.com/v1").rstrip('/') + "/models"
         headers = {"Authorization": f"Bearer {provider.api_key}"} if provider.api_key else {}
         if provider.provider_type == 'CLAUDE':
             headers = {
@@ -936,7 +947,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _list_ollama_models(cls, provider: LLMProvider) -> List[str]:
-        url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/tags"
+        url = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/') + "/api/tags"
         response = cls._safe_request('GET', url, timeout=10)
         data = response.json()
         return [m['name'] for m in data.get('models', [])]
@@ -953,7 +964,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _call_openai(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
-        url = provider.base_url or "https://api.openai.com/v1/chat/completions"
+        url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
         headers = {
             "Authorization": f"Bearer {provider.api_key}",
             "Content-Type": "application/json"
@@ -990,7 +1001,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
     @classmethod
     def _call_ollama(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
         # Ollama /api/chat — native format.
-        url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
+        url = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/') + "/api/chat"
         model_name = provider.default_model or "mistral"
         if getattr(provider, 'enable_thinking', False):
             if "gpt-oss" in model_name.lower():
@@ -1108,7 +1119,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
-        url = provider.base_url or "https://api.openai.com/v1/chat/completions"
+        url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
         headers = {
             "Authorization": f"Bearer {provider.api_key}",
             "Content-Type": "application/json"
@@ -1144,7 +1155,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
 
     @classmethod
     def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
-        url = (provider.base_url or "http://localhost:11434").rstrip('/') + "/api/chat"
+        url = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/') + "/api/chat"
         model_name = provider.default_model or "mistral"
         if getattr(provider, 'enable_thinking', False):
             if "gpt-oss" in model_name.lower():
