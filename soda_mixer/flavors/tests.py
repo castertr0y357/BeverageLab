@@ -815,11 +815,11 @@ class BeverageLabAIAssistantTest(TestCase):
 
     @patch.dict('os.environ', {'MOCK_MODE': 'True'})
     def test_ai_suggest_autonomous_mock_coffee(self) -> None:
-        res = AIAssistant.suggest_autonomous(["Espresso"], mode="standard", drink_type="COFFEE")
+        res = AIAssistant.suggest_autonomous(["Sumatra Mandheling"], mode="standard", drink_type="COFFEE")
         self.assertIsNotNone(res)
-        self.assertEqual(res['suggestions'][0]['name'], "Espresso")
-        self.assertEqual(res['suggestions'][0]['amount'], 18.0)
-        self.assertEqual(res['rebalancing']['Espresso'], 18.0)
+        self.assertEqual(res['suggestions'][0]['name'], "Vanilla")
+        self.assertEqual(res['suggestions'][0]['amount'], 15.0)
+        self.assertEqual(res['rebalancing']['Sumatra Mandheling'], 18.0)
 
     @patch('requests.request')
     def test_ai_suggest_autonomous_force_type(self, mock_request: MagicMock) -> None:

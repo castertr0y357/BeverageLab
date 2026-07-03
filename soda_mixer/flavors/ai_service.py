@@ -103,22 +103,44 @@ class AIAssistant:
                 return json.dumps({
                     "suggestions": [
                         {
-                            "name": "Espresso",
-                            "reason": "Rich base extraction",
+                            "name": "Vanilla",
+                            "reason": "Adds creamy sweet vanilla notes",
                             "resonance": 95,
-                            "amount": 18.0,
-                            "profile": {"intensity": 5, "sweetness": 1, "acidity": 3, "bitterness": 4, "complexity": 4}
+                            "amount": 15.0,
+                            "profile": {"intensity": 1, "sweetness": 5, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
-                            "name": "Whole Milk",
-                            "reason": "Adds sweetness and creamy texture",
-                            "resonance": 90,
-                            "amount": 50.0,
-                            "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
+                            "name": "Caramel Apple",
+                            "reason": "Adds buttery caramel notes",
+                            "resonance": 92,
+                            "amount": 15.0,
+                            "profile": {"intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3}
+                        },
+                        {
+                            "name": "Mint",
+                            "reason": "Provides a clean, cooling accent",
+                            "resonance": 88,
+                            "amount": 15.0,
+                            "profile": {"intensity": 3, "sweetness": 1, "acidity": 1, "bitterness": 2, "complexity": 2}
+                        },
+                        {
+                            "name": "Cucumber",
+                            "reason": "Adds a crisp refreshing undertone",
+                            "resonance": 85,
+                            "amount": 15.0,
+                            "profile": {"intensity": 2, "sweetness": 1, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        },
+                        {
+                            "name": "Espresso Roast Blend",
+                            "reason": "Reinforces bold dark roast flavor",
+                            "resonance": 80,
+                            "amount": 18.0,
+                            "profile": {"intensity": 5, "sweetness": 2, "acidity": 2, "bitterness": 4, "complexity": 3}
                         }
                     ],
                     "rebalancing": {
-                        "Espresso": 18.0
+                        "Sumatra Mandheling": 18.0,
+                        "Whole Milk": 50.0
                     },
                     "seal_recommended": False,
                     "seal_resonance": 80,
@@ -127,9 +149,9 @@ class AIAssistant:
             return json.dumps({
                 "suggestions": [
                     {
-                        "name": "Lemon Syrup",
+                        "name": "Lemon Lime",
                         "reason": "Acidity balances sweetness",
-                        "resonance": 85,
+                        "resonance": 95,
                         "amount": 25.0,
                         "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}
                     },
@@ -139,6 +161,27 @@ class AIAssistant:
                         "resonance": 90,
                         "amount": 120.0,
                         "profile": {"intensity": 1, "sweetness": 1, "acidity": 2, "bitterness": 1, "complexity": 1}
+                    },
+                    {
+                        "name": "Vanilla",
+                        "reason": "Adds smooth vanilla undertones",
+                        "resonance": 88,
+                        "amount": 15.0,
+                        "profile": {"intensity": 1, "sweetness": 5, "acidity": 1, "bitterness": 1, "complexity": 2}
+                    },
+                    {
+                        "name": "Mint",
+                        "reason": "Provides a clean, cooling finish",
+                        "resonance": 85,
+                        "amount": 15.0,
+                        "profile": {"intensity": 3, "sweetness": 1, "acidity": 1, "bitterness": 2, "complexity": 2}
+                    },
+                    {
+                        "name": "Strawberry",
+                        "reason": "Infuses bright berry sweetness",
+                        "resonance": 82,
+                        "amount": 20.0,
+                        "profile": {"intensity": 2, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2}
                     }
                 ],
                 "rebalancing": {},
@@ -394,8 +437,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 15.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 15.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 15.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 15.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Espresso": 18.0,
@@ -428,8 +474,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 20.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 20.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 20.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 20.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Lemon Syrup": 80.0
@@ -461,8 +510,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 25.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 25.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 25.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Lemon Syrup": 100.0
@@ -593,8 +645,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 15.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 15.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 15.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 15.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Espresso": 18.0,
@@ -627,8 +682,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 20.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 20.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 20.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 20.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Lemon Syrup": 80.0
@@ -660,8 +718,11 @@ Rules:
 JSON OUTPUT FORMAT:
 {{
     "suggestions": [
-        {{ "name": "Ingredient Name", "reason": "...", "resonance": 85, "amount": 25.0, "profile": {{...}} }},
-        ...
+        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
+        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 25.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 25.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
+        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
+        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 25.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
     ],
     "rebalancing": {{
         "Lemon Syrup": 100.0
