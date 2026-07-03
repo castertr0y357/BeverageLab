@@ -2558,6 +2558,66 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         self.assertNotIn(self.ing2.id, recommended_ids)
         self.assertIn(self.ing3.id, recommended_ids)
 
+    def test_algorithmic_recommendation_scaling_rules(self) -> None:
+        # Clear inventory and create a specific number of SODA ingredients to test scaling
+        Ingredient.objects.all().update(is_in_inventory=False)
+        
+        base_ing = Ingredient.objects.create(
+            name="Soda Base Cola Temp",
+            category="cola",
+            ingredient_type="BASE",
+            intensity=3,
+            sweetness=3,
+            acidity=3,
+            bitterness=2,
+            complexity=3,
+            is_ready_to_drink=True,
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        
+        # Scenario A: Less than 5 available candidates. All of them should be recommended.
+        for i in range(3):
+            Ingredient.objects.create(
+                name=f"Soda Ext Temp {i}",
+                category="sweet",
+                ingredient_type="ADDITIVE",
+                intensity=2,
+                sweetness=4,
+                acidity=1,
+                bitterness=1,
+                complexity=2,
+                is_ready_to_drink=True,
+                is_in_inventory=True,
+                compatible_systems="SODA"
+            )
+            
+        res = get_tiered_recommendation(base_ing.id, drink_type="SODA")
+        recommended_ids = [r['ingredient'].id for r in res['recommended']]
+        self.assertEqual(len(recommended_ids), 3) # Recommend all 3
+        
+        # Scenario B: 5 or more available candidates.
+        # Add 3 more to make total 6 candidates (excluding base)
+        for i in range(3, 6):
+            Ingredient.objects.create(
+                name=f"Soda Ext Temp {i}",
+                category="sweet",
+                ingredient_type="ADDITIVE",
+                intensity=2,
+                sweetness=4,
+                acidity=1,
+                bitterness=1,
+                complexity=2,
+                is_ready_to_drink=True,
+                is_in_inventory=True,
+                compatible_systems="SODA"
+            )
+            
+        res2 = get_tiered_recommendation(base_ing.id, drink_type="SODA")
+        recommended_ids2 = [r['ingredient'].id for r in res2['recommended']]
+        # Total candidates is 6 (>= 5), so it should recommend at least 5
+        self.assertGreaterEqual(len(recommended_ids2), 5)
+
     @patch('requests.request')
     def test_ai_suggest_api_exclusion_and_fallback(self, mock_request: MagicMock) -> None:
         # Set up default LLM provider

@@ -181,6 +181,68 @@ class BaseEngine:
             'bitterness': round(bitter, 1)
         }
 
+    def _rank_and_select_candidates(
+        self,
+        base_ingredients: List[Ingredient],
+        system_candidates: QuerySet,
+        experimental: bool = False,
+        force_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Rank candidate ingredients based on compatibility with selected base ingredients,
+        and select recommendations based on inventory size and compatibility scores.
+        """
+        if force_type:
+            system_candidates = system_candidates.filter(ingredient_type=force_type)
+
+        recommendations = []
+        for base_ing in base_ingredients:
+            compat_cats = self.category_compatibility.get(base_ing.category, [])
+            for cand in system_candidates:
+                score_data = self._calculate_compatibility_score(
+                    base_ing, cand, experimental=experimental, avg_rating=cand.avg_rating
+                )
+                score = score_data['score']
+                reason = score_data['reason']
+                
+                if not experimental:
+                    if cand.category not in compat_cats and cand.category != base_ing.category:
+                        score -= 2
+                        
+                recommendations.append({
+                    'ingredient': cand,
+                    'score': score,
+                    'reason': reason
+                })
+
+        # Deduplicate and sort unique candidates by highest score
+        recommendations.sort(key=lambda x: x['score'], reverse=True)
+        seen = set()
+        unique_recommendations = []
+        for rec in recommendations:
+            if rec['ingredient'].id not in seen:
+                unique_recommendations.append(rec)
+                seen.add(rec['ingredient'].id)
+
+        total_available = len(unique_recommendations)
+        if total_available < 5:
+            # Rule 1: Less than 5 available candidates, recommend all of them
+            return unique_recommendations
+
+        # Rule 2: 5 or more available candidates.
+        # Resonance = score * 15.0. Low compatibility rating: < 50% => score < 3.33
+        high_compat = [r for r in unique_recommendations if r['score'] >= 3.33]
+        low_compat = [r for r in unique_recommendations if r['score'] < 3.33]
+
+        if len(high_compat) >= 10:
+            return high_compat[:10]
+        elif len(high_compat) >= 5:
+            return high_compat
+        else:
+            # Fewer than 5 are high compatibility, pad with low compatibility to reach exactly 5
+            needed = 5 - len(high_compat)
+            return high_compat + low_compat[:needed]
+
     def get_recommendation(
         self,
         ingredient_ids: List[int],
@@ -201,57 +263,21 @@ class BaseEngine:
         selected_ingredients = Ingredient.objects.filter(id__in=ingredient_ids)
         if not selected_ingredients.exists():
             return self.get_recommendation([], experimental, force_type=force_type, exclude_ids=exclude_ids)
-        
-        recommendations = []
-        
-        # Get recommended ingredients
-        for ingredient in selected_ingredients:
-            if experimental:
-                # Experimental mode: Look at shared groups/notes regardless of category
-                matching_ingredients = Ingredient.objects.filter(is_in_inventory=True).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id__in=ingredient_ids)
-            else:
-                # Standard mode: Respect category compatibility and system compatibility
-                compatible_categories = self.category_compatibility.get(ingredient.category, [])
-                matching_ingredients = Ingredient.objects.filter(
-                    category__in=compatible_categories,
-                    is_in_inventory=True,
-                    compatible_systems__icontains=self.drink_type
-                ).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id__in=ingredient_ids)
-                
-            if force_type:
-                matching_ingredients = matching_ingredients.filter(ingredient_type=force_type)
-
-            if exclude_ids:
-                filtered_ingredients = matching_ingredients.exclude(id__in=exclude_ids)
-                if filtered_ingredients.exists():
-                    matching_ingredients = filtered_ingredients
             
-            # Score matching ingredients
-            for i in matching_ingredients:
-                score_data = self._calculate_compatibility_score(ingredient, i, experimental=experimental, avg_rating=i.avg_rating)
-                score = score_data['score']
-                reason = score_data['reason']
-                
-                recommendations.append({
-                    'ingredient': i,
-                    'score': score,
-                    'reason': reason
-                })
+        system_candidates = Ingredient.objects.filter(is_in_inventory=True).annotate(
+            avg_rating=Avg('ingredient_usage__recipe__rating')
+        )
+        if not experimental:
+            system_candidates = system_candidates.filter(compatible_systems__icontains=self.drink_type)
+            
+        exclude_pool_ids = set(ingredient_ids)
+        if exclude_ids:
+            exclude_pool_ids.update(exclude_ids)
+        system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
         
-        # Sort and filter unique
-        recommendations.sort(key=lambda x: x['score'], reverse=True)
-        seen = set()
-        top_recommendations = []
-        for rec in recommendations:
-            if rec['ingredient'].id not in seen:
-                top_recommendations.append(rec)
-                seen.add(rec['ingredient'].id)
-            if len(top_recommendations) >= 10:
-                break
+        top_recommendations = self._rank_and_select_candidates(
+            list(selected_ingredients), system_candidates, experimental=experimental, force_type=force_type
+        )
         
         recipe_suggestions = self._find_similar_recipes(selected_ingredients)
         
@@ -291,75 +317,70 @@ class BaseEngine:
         if not base_ingredient:
             return {'recommended': []}
 
+        system_candidates = Ingredient.objects.filter(is_in_inventory=True).annotate(
+            avg_rating=Avg('ingredient_usage__recipe__rating')
+        )
+        if not experimental:
+            system_candidates = system_candidates.filter(compatible_systems__icontains=self.drink_type)
+            
+        exclude_pool_ids = {base_id}
+        if secondary_id:
+            exclude_pool_ids.add(secondary_id)
+        if exclude_ids:
+            exclude_pool_ids.update(exclude_ids)
+        system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
+        
+        if force_type:
+            system_candidates = system_candidates.filter(ingredient_type=force_type)
+
         recommendations = []
         
         if not secondary_id:
             # Looking for Secondary
-            if experimental:
-                candidates = Ingredient.objects.filter(is_in_inventory=True).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id=base_id)
-            else:
-                compat_cats = self.category_compatibility.get(base_ingredient.category, [])
-                candidates = Ingredient.objects.filter(
-                    category__in=compat_cats, 
-                    is_in_inventory=True,
-                    compatible_systems__icontains=self.drink_type
-                ).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id=base_id)
-                
-            if force_type:
-                candidates = candidates.filter(ingredient_type=force_type)
-                
-            if exclude_ids:
-                filtered_candidates = candidates.exclude(id__in=exclude_ids)
-                if filtered_candidates.exists():
-                    candidates = filtered_candidates
-            
-            for cand in candidates:
-                score_data = self._calculate_compatibility_score(base_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating)
+            compat_cats = self.category_compatibility.get(base_ingredient.category, [])
+            for cand in system_candidates:
+                score_data = self._calculate_compatibility_score(
+                    base_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating
+                )
                 score = score_data['score']
                 reason = score_data['reason']
                 
+                if not experimental:
+                    if cand.category not in compat_cats and cand.category != base_ingredient.category:
+                        score -= 2
+                        
                 recommendations.append({
                     'ingredient': cand,
                     'score': score,
                     'tier': 'secondary',
                     'reason': reason
                 })
+                
+            recommendations.sort(key=lambda x: x['score'], reverse=True)
+            total_available = len(recommendations)
+            if total_available < 5:
+                top_recommendations = recommendations
+            else:
+                high_compat = [r for r in recommendations if r['score'] >= 3.33]
+                low_compat = [r for r in recommendations if r['score'] < 3.33]
+                if len(high_compat) >= 10:
+                    top_recommendations = high_compat[:10]
+                elif len(high_compat) >= 5:
+                    top_recommendations = high_compat
+                else:
+                    needed = 5 - len(high_compat)
+                    top_recommendations = high_compat + low_compat[:needed]
         else:
             # Looking for Tertiary
             sec_ingredient = Ingredient.objects.filter(id=secondary_id).first()
             if not sec_ingredient:
                 return {'recommended': []}
                 
-            if experimental:
-                candidates = Ingredient.objects.filter(is_in_inventory=True).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id__in=[base_id, secondary_id])
-            else:
-                base_compat = set(self.category_compatibility.get(base_ingredient.category, []))
-                sec_compat = set(self.category_compatibility.get(sec_ingredient.category, []))
-                shared_compat = base_compat.intersection(sec_compat)
-                
-                candidates = Ingredient.objects.filter(
-                    category__in=shared_compat,
-                    is_in_inventory=True,
-                    compatible_systems__icontains=self.drink_type
-                ).annotate(
-                    avg_rating=Avg('ingredient_usage__recipe__rating')
-                ).exclude(id__in=[base_id, secondary_id])
-                
-            if force_type:
-                candidates = candidates.filter(ingredient_type=force_type)
-                
-            if exclude_ids:
-                filtered_candidates = candidates.exclude(id__in=exclude_ids)
-                if filtered_candidates.exists():
-                    candidates = filtered_candidates
+            base_compat = set(self.category_compatibility.get(base_ingredient.category, []))
+            sec_compat = set(self.category_compatibility.get(sec_ingredient.category, []))
+            shared_compat = base_compat.intersection(sec_compat)
             
-            for cand in candidates:
+            for cand in system_candidates:
                 res1 = self._calculate_compatibility_score(base_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating)
                 res2 = self._calculate_compatibility_score(sec_ingredient, cand, experimental=experimental, avg_rating=cand.avg_rating)
                 profile_score = self._calculate_profile_balance(base_ingredient, sec_ingredient, cand)
@@ -369,6 +390,10 @@ class BaseEngine:
                 if experimental and (res1.get('bridge') or res2.get('bridge')):
                     reason = f"Bridges {base_ingredient.name} and {sec_ingredient.name} via {res1.get('bridge') or res2.get('bridge')}"
                 
+                if not experimental:
+                    if cand.category not in shared_compat and cand.category != base_ingredient.category and cand.category != sec_ingredient.category:
+                        score -= 4
+                        
                 recommendations.append({
                     'ingredient': cand,
                     'score': score,
@@ -376,8 +401,22 @@ class BaseEngine:
                     'reason': reason
                 })
                 
-        recommendations.sort(key=lambda x: x['score'], reverse=True)
-        return {'recommended': recommendations[:10]}
+            recommendations.sort(key=lambda x: x['score'], reverse=True)
+            total_available = len(recommendations)
+            if total_available < 5:
+                top_recommendations = recommendations
+            else:
+                high_compat = [r for r in recommendations if r['score'] >= 6.66]
+                low_compat = [r for r in recommendations if r['score'] < 6.66]
+                if len(high_compat) >= 10:
+                    top_recommendations = high_compat[:10]
+                elif len(high_compat) >= 5:
+                    top_recommendations = high_compat
+                else:
+                    needed = 5 - len(high_compat)
+                    top_recommendations = high_compat + low_compat[:needed]
+                    
+        return {'recommended': top_recommendations}
 
     def _calculate_compatibility_score(self, i1: Ingredient, i2: Ingredient, experimental: bool = False, avg_rating: Optional[float] = 0) -> Dict[str, Any]:
         """

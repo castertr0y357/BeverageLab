@@ -114,6 +114,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
+                    'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
                     'tier': 'suggestions'
                 } for r in result.get('recommended', [])
@@ -136,6 +137,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
+                    'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
                     'tier': r.get('tier', 'secondary')
                 } for r in result.get('recommended', [])
@@ -158,6 +160,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
                     'score': r['score'],
+                    'resonance': round(min(r['score'] * 7.5, 99.8), 1),  # Tertiary is sum of two scores
                     'reason': r['reason'],
                     'tier': r.get('tier', 'tertiary')
                 } for r in result.get('recommended', [])

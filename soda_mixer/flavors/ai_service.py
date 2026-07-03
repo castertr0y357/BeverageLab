@@ -425,7 +425,7 @@ class AIAssistant:
                 if drink_type == 'COFFEE':
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Coffee Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -433,6 +433,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
@@ -462,7 +466,7 @@ Lab Mode: safe and balanced
                 elif drink_type == 'SLUSHIE':
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Cryo Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -470,6 +474,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
@@ -498,7 +506,7 @@ Lab Mode: safe and balanced
                 else:
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Soda Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -506,6 +514,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
@@ -633,7 +645,7 @@ Lab Mode: safe and balanced
             
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Coffee Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -641,6 +653,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
 4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.{force_rule}
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
@@ -670,7 +686,7 @@ Lab Mode: {tone}{exclude_context}{retry_context}
         elif drink_type == 'SLUSHIE':
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Cryo Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -678,6 +694,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
@@ -706,7 +726,7 @@ Lab Mode: {tone}{exclude_context}{retry_context}
         else:
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 10 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Soda Inventory Registry below.
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -714,6 +734,10 @@ Rules:
 3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
 4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
 5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
+6. RECOMMENDATION COUNT RULES:
+   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
+   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+
  
 JSON OUTPUT FORMAT:
 {{
