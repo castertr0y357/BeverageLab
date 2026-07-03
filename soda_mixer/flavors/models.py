@@ -83,6 +83,7 @@ class Ingredient(SoftDeleteModel):
         ('sour', 'Sour'),
         ('artificial', 'Artificial/Fun'),
         ('coffee', 'Coffee Profile'),
+        ('dairy', 'Dairy/Milk'),
     ]
 
     name = models.CharField(max_length=100)

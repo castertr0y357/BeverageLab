@@ -8,13 +8,14 @@ CATEGORY_COMPATIBILITY = {
     'citrus': ['berry', 'tropical', 'herbal', 'sweet'],
     'berry': ['citrus', 'tropical', 'herbal', 'sweet'],
     'tropical': ['citrus', 'berry', 'spice', 'herbal'],
-    'herbal': ['citrus', 'berry', 'tropical', 'sour'],
-    'spice': ['citrus', 'tropical', 'berry', 'coffee'],
-    'sweet': ['citrus', 'berry', 'sour', 'herbal', 'coffee'],
+    'herbal': ['citrus', 'berry', 'tropical', 'sour', 'dairy'],
+    'spice': ['citrus', 'tropical', 'berry', 'coffee', 'dairy'],
+    'sweet': ['citrus', 'berry', 'sour', 'herbal', 'coffee', 'dairy'],
     'sour': ['sweet', 'herbal', 'citrus'],
     'artificial': ['citrus', 'berry', 'sweet', 'tropical'],
-    'coffee': ['spice', 'sweet', 'herbal'],
-    'neutral': ['citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee'],
+    'coffee': ['spice', 'sweet', 'herbal', 'dairy'],
+    'dairy': ['coffee', 'sweet', 'spice', 'herbal'],
+    'neutral': ['citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee', 'dairy'],
 }
 
 FLAVOR_AFFINITY_GROUPS = {

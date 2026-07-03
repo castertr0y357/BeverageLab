@@ -2623,6 +2623,30 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         self.assertEqual(data_fallback['status'], 'success')
         self.assertEqual(data_fallback['suggestions'][0]['name'], 'Vanilla Twist')
 
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
+    def test_ai_suggest_api_fallback_to_algorithmic(self, mock_suggest: MagicMock) -> None:
+        # Mock suggest_autonomous to return empty list/string representing empty AI response
+        mock_suggest.return_value = '{"suggestions": []}'
+        
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': [self.ing1.name],
+                'drink_type': 'SODA',
+                'exclude': []
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = _get_sse_data(response)
+        
+        # Verify it fell back and returned algorithmic recommendations (Vanilla Twist and Cherry Blast)
+        self.assertEqual(data['status'], 'success')
+        self.assertTrue(len(data['suggestions']) >= 1)
+        suggested_names = [s['name'] for s in data['suggestions']]
+        self.assertIn("Vanilla Twist", suggested_names)
+        self.assertIn("Cherry Blast", suggested_names)
+
 
 class SodaChemistryEngineTest(TestCase):
     """Test cases for the V2.5 Soda Synthesis chemistry calculation rules."""

@@ -536,8 +536,63 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                 
                 retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
 
-            # Fallback or empty suggestions if all attempts fail
-            yield f"data: {json.dumps({'status': 'success', 'suggestions': [], 'rebalancing': {}, 'seal_recommended': False, 'seal_resonance': 0, 'reasoning': 'AI suggestions fallback.'})}\n\n"
+            # Fallback to standard/algorithmic recommendations if AI returned nothing
+            logger.warning("AISuggestion - Warning - AI returned no matches. Falling back to algorithmic recommendations.")
+            
+            # Map name strings back to database IDs
+            ing_ids = []
+            for name in ingredients:
+                if name == "NONE - Initial Synthesis" or name == "virtual_water" or name == "Carbonated Water" or name == "Ice":
+                    continue
+                ing_obj = Ingredient.objects.filter(name__iexact=name).first()
+                if ing_obj:
+                    ing_ids.append(ing_obj.id)
+            
+            # Map exclude names back to database IDs
+            excl_ids = []
+            for name in exclude:
+                ing_obj = Ingredient.objects.filter(name__iexact=name).first()
+                if ing_obj:
+                    excl_ids.append(ing_obj.id)
+            
+            from soda_mixer.flavors.recommendations import get_recommendation, get_tiered_recommendation
+            experimental = (mode == 'experimental')
+            
+            if len(ing_ids) == 0:
+                recs_data = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
+            elif len(ing_ids) == 1:
+                recs_data = get_tiered_recommendation(ing_ids[0], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
+            else:
+                recs_data = get_tiered_recommendation(ing_ids[0], ing_ids[1], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
+            
+            for item in recs_data.get('recommended', []):
+                target_obj = item['ingredient']
+                amount = None
+                if drink_type == 'COFFEE':
+                    amount = sanitize_coffee_amount(target_obj, None)
+                
+                multibrand_names = get_multibrand_names_in_inventory()
+                enriched.append({
+                    'id': target_obj.id,
+                    'name': get_display_name(target_obj, multibrand_names),
+                    'category': target_obj.category,
+                    'type': target_obj.ingredient_type,
+                    'intensity': target_obj.intensity,
+                    'sweetness': target_obj.sweetness,
+                    'acidity': target_obj.acidity,
+                    'bitterness': target_obj.bitterness,
+                    'complexity': target_obj.complexity,
+                    'base_suitability': target_obj.base_suitability,
+                    'accent_suitability': target_obj.accent_suitability,
+                    'is_ready_to_drink': target_obj.is_ready_to_drink,
+                    'is_dry': target_obj.is_dry,
+                    'resonance': round(min(item['score'] * 15.0, 99.8), 1),  # Map 1-5 score to 0-100 scale
+                    'reason': f"Algorithmic: {item['reason']}",
+                    'amount': amount,
+                    'profile': None
+                })
+            
+            yield f"data: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': {}, 'seal_recommended': False, 'seal_resonance': 0, 'reasoning': 'AI suggestions fallback.'})}\n\n"
 
         return StreamingHttpResponse(generator(), content_type='text/event-stream')
 
