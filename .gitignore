@@ -47,3 +47,6 @@ Thumbs.db
 
 # Database backups
 backups/
+
+# Gunicorn sockets
+.gunicorn/

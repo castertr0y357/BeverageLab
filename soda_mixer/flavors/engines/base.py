@@ -225,23 +225,11 @@ class BaseEngine:
                 seen.add(rec['ingredient'].id)
 
         total_available = len(unique_recommendations)
-        if total_available < 5:
-            # Rule 1: Less than 5 available candidates, recommend all of them
+        if total_available < 10:
+            # Less than 10 available candidates, recommend all of them
             return unique_recommendations
-
-        # Rule 2: 5 or more available candidates.
-        # Resonance = score * 15.0. Low compatibility rating: < 50% => score < 3.33
-        high_compat = [r for r in unique_recommendations if r['score'] >= 3.33]
-        low_compat = [r for r in unique_recommendations if r['score'] < 3.33]
-
-        if len(high_compat) >= 10:
-            return high_compat[:10]
-        elif len(high_compat) >= 5:
-            return high_compat
-        else:
-            # Fewer than 5 are high compatibility, pad with low compatibility to reach exactly 5
-            needed = 5 - len(high_compat)
-            return high_compat + low_compat[:needed]
+        # 10 or more available candidates, recommend exactly 10
+        return unique_recommendations[:10]
 
     def get_recommendation(
         self,
@@ -358,18 +346,10 @@ class BaseEngine:
                 
             recommendations.sort(key=lambda x: x['score'], reverse=True)
             total_available = len(recommendations)
-            if total_available < 5:
+            if total_available < 10:
                 top_recommendations = recommendations
             else:
-                high_compat = [r for r in recommendations if r['score'] >= 3.33]
-                low_compat = [r for r in recommendations if r['score'] < 3.33]
-                if len(high_compat) >= 10:
-                    top_recommendations = high_compat[:10]
-                elif len(high_compat) >= 5:
-                    top_recommendations = high_compat
-                else:
-                    needed = 5 - len(high_compat)
-                    top_recommendations = high_compat + low_compat[:needed]
+                top_recommendations = recommendations[:10]
         else:
             # Looking for Tertiary
             sec_ingredient = Ingredient.objects.filter(id=secondary_id).first()
@@ -403,18 +383,10 @@ class BaseEngine:
                 
             recommendations.sort(key=lambda x: x['score'], reverse=True)
             total_available = len(recommendations)
-            if total_available < 5:
+            if total_available < 10:
                 top_recommendations = recommendations
             else:
-                high_compat = [r for r in recommendations if r['score'] >= 6.66]
-                low_compat = [r for r in recommendations if r['score'] < 6.66]
-                if len(high_compat) >= 10:
-                    top_recommendations = high_compat[:10]
-                elif len(high_compat) >= 5:
-                    top_recommendations = high_compat
-                else:
-                    needed = 5 - len(high_compat)
-                    top_recommendations = high_compat + low_compat[:needed]
+                top_recommendations = recommendations[:10]
                     
         return {'recommended': top_recommendations}
 

@@ -2576,8 +2576,8 @@ class BeverageLabRecommendationExclusionTest(TestCase):
             compatible_systems="SODA"
         )
         
-        # Scenario A: Less than 5 available candidates. All of them should be recommended.
-        for i in range(3):
+        # Scenario A: Less than 10 available candidates. All of them should be recommended.
+        for i in range(6):
             Ingredient.objects.create(
                 name=f"Soda Ext Temp {i}",
                 category="sweet",
@@ -2594,11 +2594,11 @@ class BeverageLabRecommendationExclusionTest(TestCase):
             
         res = get_tiered_recommendation(base_ing.id, drink_type="SODA")
         recommended_ids = [r['ingredient'].id for r in res['recommended']]
-        self.assertEqual(len(recommended_ids), 3) # Recommend all 3
+        self.assertEqual(len(recommended_ids), 6) # Recommend all 6
         
-        # Scenario B: 5 or more available candidates.
-        # Add 3 more to make total 6 candidates (excluding base)
-        for i in range(3, 6):
+        # Scenario B: 10 or more available candidates.
+        # Add 6 more to make total 12 candidates (excluding base)
+        for i in range(6, 12):
             Ingredient.objects.create(
                 name=f"Soda Ext Temp {i}",
                 category="sweet",
@@ -2615,8 +2615,8 @@ class BeverageLabRecommendationExclusionTest(TestCase):
             
         res2 = get_tiered_recommendation(base_ing.id, drink_type="SODA")
         recommended_ids2 = [r['ingredient'].id for r in res2['recommended']]
-        # Total candidates is 6 (>= 5), so it should recommend at least 5
-        self.assertGreaterEqual(len(recommended_ids2), 5)
+        # Total candidates is 12 (>= 10), so it should recommend exactly 10
+        self.assertEqual(len(recommended_ids2), 10)
 
     @patch('requests.request')
     def test_ai_suggest_api_exclusion_and_fallback(self, mock_request: MagicMock) -> None:
