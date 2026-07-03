@@ -279,6 +279,40 @@ class BeverageLabViewsTest(TestCase):
         self.assertNotContains(response, "Soda Ingredient Only")
         self.assertNotContains(response, "Coffee Ingredient Only")
 
+    def test_ingredient_list_categories_filtered_by_system(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        # Ensure we have clean test data for this test case
+        from .models import MixHistoryIngredient, RecipeIngredient
+        MixHistoryIngredient.objects.all().delete()
+        RecipeIngredient.objects.all().delete()
+        Ingredient.objects.all().delete()
+        
+        # Create categories and ingredients with specific compatible_systems
+        Ingredient.objects.create(
+            name="Soda Ingredient", ingredient_type="OTHER", category="citrus",
+            intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1,
+            compatible_systems="SODA"
+        )
+        Ingredient.objects.create(
+            name="Coffee Ingredient", ingredient_type="OTHER", category="coffee",
+            intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1,
+            compatible_systems="COFFEE"
+        )
+
+        # Get list with system=soda, categories should only contain "citrus" (since coffee isn't compatible with SODA)
+        response = self.client.get(reverse('ingredient_list'), {'system': 'soda'})
+        self.assertEqual(response.status_code, 200)
+        categories = [cat[0] for cat in response.context['categories']]
+        self.assertIn("citrus", categories)
+        self.assertNotIn("coffee", categories)
+
+        # Get list with system=coffee, categories should only contain "coffee"
+        response = self.client.get(reverse('ingredient_list'), {'system': 'coffee'})
+        self.assertEqual(response.status_code, 200)
+        categories = [cat[0] for cat in response.context['categories']]
+        self.assertIn("coffee", categories)
+        self.assertNotIn("citrus", categories)
+
     def test_mix_history_list_view(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
         # Create a mix history entry

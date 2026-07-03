@@ -96,7 +96,13 @@ def ingredient_list(request: HttpRequest) -> HttpResponse:
     for ing in ingredients:
         ing.show_brand = ing.name.lower() in multibrand_names
 
-    used_categories = Ingredient.objects.values_list('category', flat=True).distinct().order_by('category')
+    category_qs = Ingredient.objects.all()
+    if system:
+        sys_val = system.upper()
+        if sys_val == 'CRYO':
+            sys_val = 'SLUSHIE'
+        category_qs = category_qs.filter(compatible_systems__icontains=sys_val)
+    used_categories = category_qs.values_list('category', flat=True).distinct().order_by('category')
     # Deduplicate after normalization (handles existing mixed-case DB entries)
     seen: Dict[str, str] = {}
     for c in used_categories:
