@@ -168,6 +168,33 @@ class BeverageLabRecommendationTest(TestCase):
         self.assertEqual(stats['sweetness'], 3.5)  # (2 + 5) / 2
         self.assertEqual(stats['acidity'], 3.0)  # (5 + 1) / 2
 
+    def test_get_recommendation_limit_increased_to_10(self) -> None:
+        # Create 12 more ingredients to ensure we have enough compatibility options.
+        # Make them compatible with SODA.
+        ingredients = []
+        for i in range(12):
+            ing = Ingredient.objects.create(
+                name=f"Soda Modifier {i}",
+                category="sweet",
+                ingredient_type="ADDITIVE",
+                intensity=2,
+                sweetness=3,
+                acidity=1,
+                bitterness=1,
+                complexity=2,
+                is_in_inventory=True,
+                compatible_systems="SODA"
+            )
+            ingredients.append(ing)
+
+        # get_recommendation using self.ing1 (Lemon Syrup, category="citrus", compatible with sweet category additives)
+        recs = get_recommendation([self.ing1.id], drink_type="SODA")
+        self.assertEqual(len(recs["recommended"]), 10)
+
+        # get_tiered_recommendation should also return up to 10
+        tiered_recs = get_tiered_recommendation(self.ing1.id, drink_type="SODA")
+        self.assertEqual(len(tiered_recs["recommended"]), 10)
+
 
 class BeverageLabViewsTest(TestCase):
     """Integration tests for application views and AJAX endpoints."""

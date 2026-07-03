@@ -249,7 +249,7 @@ class BaseEngine:
             if rec['ingredient'].id not in seen:
                 top_recommendations.append(rec)
                 seen.add(rec['ingredient'].id)
-            if len(top_recommendations) >= 5:
+            if len(top_recommendations) >= 10:
                 break
         
         recipe_suggestions = self._find_similar_recipes(selected_ingredients)
@@ -376,7 +376,7 @@ class BaseEngine:
                 })
                 
         recommendations.sort(key=lambda x: x['score'], reverse=True)
-        return {'recommended': recommendations[:5]}
+        return {'recommended': recommendations[:10]}
 
     def _calculate_compatibility_score(self, i1: Ingredient, i2: Ingredient, experimental: bool = False, avg_rating: Optional[float] = 0) -> Dict[str, Any]:
         """

@@ -382,7 +382,7 @@ class AIAssistant:
                 if drink_type == 'COFFEE':
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -416,7 +416,7 @@ Lab Mode: safe and balanced
                 elif drink_type == 'SLUSHIE':
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -449,7 +449,7 @@ Lab Mode: safe and balanced
                 else:
                     prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -581,7 +581,7 @@ Lab Mode: safe and balanced
             
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Coffee Inventory Registry below that pair well with the current coffee mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -615,7 +615,7 @@ Lab Mode: {tone}{exclude_context}{retry_context}
         elif drink_type == 'SLUSHIE':
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Cryo Inventory Registry below that pair well with the current mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
@@ -648,7 +648,7 @@ Lab Mode: {tone}{exclude_context}{retry_context}
         else:
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
-Task: Identify 3 to 5 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
+Task: Identify 3 to 10 ingredients from the Soda Inventory Registry below that pair well with the current carbonated mix AND determine if it should be "sealed".
  
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
