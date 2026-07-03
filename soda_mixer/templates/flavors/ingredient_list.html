@@ -53,18 +53,52 @@
     </div>
 </div>
 
-<div class="mb-4">
-    <div class="d-flex flex-wrap gap-2">
-        <a href="{% url 'ingredient_list' %}"
-            class="fizz-pill {% if not request.GET.category %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %} text-decoration-none">
-            All Compounds
-        </a>
-        {% for cat_name, cat_label in categories %}
-        <a href="?category={{ cat_name }}"
-            class="fizz-pill text-decoration-none {% if request.GET.category == cat_name %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}">
-            {{ cat_label }}
-        </a>
-        {% endfor %}
+<!-- Reagent Filters Dashboard -->
+<div class="glass-card p-3 mb-4 border-white border-opacity-10">
+    <!-- Lab System Filters -->
+    <div class="mb-3">
+        <div class="small text-dim mb-2" style="font-size: 0.6rem; letter-spacing: 1.5px; font-weight: 700; text-transform: uppercase;">Lab System Filter</div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="?{% if current_category %}category={{ current_category }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if not current_system %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}" 
+                style="font-size: 0.75rem; padding: 0.4rem 1rem;">
+                All Systems
+            </a>
+            <a href="?system=soda{% if current_category %}&category={{ current_category }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if current_system == 'soda' %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}" 
+                style="font-size: 0.75rem; padding: 0.4rem 1rem; {% if current_system == 'soda' %}background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important; color: var(--bg-deep) !important; box-shadow: 0 0 15px rgba(164, 230, 76, 0.4) !important; font-weight: 700; border-color: transparent !important;{% endif %}">
+                <i class="bi bi-water me-1"></i> Soda Lab
+            </a>
+            <a href="?system=coffee{% if current_category %}&category={{ current_category }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if current_system == 'coffee' %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}"
+                style="font-size: 0.75rem; padding: 0.4rem 1rem; {% if current_system == 'coffee' %}background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important; color: var(--bg-deep) !important; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4) !important; font-weight: 700; border-color: transparent !important;{% endif %}">
+                <i class="bi bi-cup-hot me-1"></i> Coffee Lab
+            </a>
+            <a href="?system=cryo{% if current_category %}&category={{ current_category }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if current_system == 'cryo' %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}"
+                style="font-size: 0.75rem; padding: 0.4rem 1rem; {% if current_system == 'cryo' %}background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; color: var(--bg-deep) !important; box-shadow: 0 0 15px rgba(14, 165, 233, 0.4) !important; font-weight: 700; border-color: transparent !important;{% endif %}">
+                <i class="bi bi-snow me-1"></i> Cryo Lab
+            </a>
+        </div>
+    </div>
+
+    <!-- Flavor Category Filters -->
+    <div>
+        <div class="small text-dim mb-2" style="font-size: 0.6rem; letter-spacing: 1.5px; font-weight: 700; text-transform: uppercase;">Flavor Category Filter</div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="?{% if current_system %}system={{ current_system }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if not current_category %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}" 
+                style="font-size: 0.75rem; padding: 0.4rem 1rem;">
+                All Categories
+            </a>
+            {% for cat_name, cat_label in categories %}
+            <a href="?category={{ cat_name }}{% if current_system %}&system={{ current_system }}{% endif %}"
+                class="fizz-pill text-decoration-none {% if current_category == cat_name %}active{% else %}bg-dark bg-opacity-50 text-white border-white border-opacity-10{% endif %}" 
+                style="font-size: 0.75rem; padding: 0.4rem 1rem;">
+                {{ cat_label }}
+            </a>
+            {% endfor %}
+        </div>
     </div>
 </div>
 

@@ -239,6 +239,46 @@ class BeverageLabViewsTest(TestCase):
         names = [ing.name for ing in response.context['ingredients']]
         self.assertEqual(names, sorted(names))
 
+    def test_ingredient_list_system_filtering(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        # Create ingredients with specific compatible_systems
+        ing_soda = Ingredient.objects.create(
+            name="Soda Ingredient Only", ingredient_type="OTHER", category="sweet",
+            intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1,
+            compatible_systems="SODA"
+        )
+        ing_coffee = Ingredient.objects.create(
+            name="Coffee Ingredient Only", ingredient_type="OTHER", category="coffee",
+            intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1,
+            compatible_systems="COFFEE"
+        )
+        ing_slushie = Ingredient.objects.create(
+            name="Cryo Ingredient Only", ingredient_type="OTHER", category="tropical",
+            intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1,
+            compatible_systems="SLUSHIE"
+        )
+
+        # Filter by soda system
+        response = self.client.get(reverse('ingredient_list'), {'system': 'soda'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Soda Ingredient Only")
+        self.assertNotContains(response, "Coffee Ingredient Only")
+        self.assertNotContains(response, "Cryo Ingredient Only")
+
+        # Filter by coffee system
+        response = self.client.get(reverse('ingredient_list'), {'system': 'coffee'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Coffee Ingredient Only")
+        self.assertNotContains(response, "Soda Ingredient Only")
+        self.assertNotContains(response, "Cryo Ingredient Only")
+
+        # Filter by cryo system
+        response = self.client.get(reverse('ingredient_list'), {'system': 'cryo'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cryo Ingredient Only")
+        self.assertNotContains(response, "Soda Ingredient Only")
+        self.assertNotContains(response, "Coffee Ingredient Only")
+
     def test_mix_history_list_view(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
         # Create a mix history entry

@@ -73,10 +73,17 @@ def home(request: HttpRequest) -> HttpResponse:
 def ingredient_list(request: HttpRequest) -> HttpResponse:
     """List all available ingredients."""
     category = request.GET.get('category')
+    system = request.GET.get('system')
     ingredients = Ingredient.objects.all().order_by('name')
     
     if category:
         ingredients = ingredients.filter(category=category)
+        
+    if system:
+        sys_val = system.upper()
+        if sys_val == 'CRYO':
+            sys_val = 'SLUSHIE'
+        ingredients = ingredients.filter(compatible_systems__icontains=sys_val)
         
     # Calculate multibrand names in the registry
     from django.db.models import Count
@@ -108,7 +115,9 @@ def ingredient_list(request: HttpRequest) -> HttpResponse:
     return render(request, 'flavors/ingredient_list.html', {
         'ingredients': ingredients,
         'categories': categories,
-        'all_categories': RecipeCategory.objects.all().order_by('name')
+        'all_categories': RecipeCategory.objects.all().order_by('name'),
+        'current_category': category,
+        'current_system': system,
     })
 
 
