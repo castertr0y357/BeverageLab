@@ -260,8 +260,15 @@ class BaseEngine:
             
         exclude_pool_ids = set(ingredient_ids)
         if exclude_ids:
-            exclude_pool_ids.update(exclude_ids)
-        system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
+            candidate_check = system_candidates.exclude(id__in=exclude_pool_ids)
+            filtered_candidates = candidate_check.exclude(id__in=exclude_ids)
+            if filtered_candidates.exists():
+                exclude_pool_ids.update(exclude_ids)
+                system_candidates = filtered_candidates
+            else:
+                system_candidates = candidate_check
+        else:
+            system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
         
         top_recommendations = self._rank_and_select_candidates(
             list(selected_ingredients), system_candidates, experimental=experimental, force_type=force_type
@@ -315,8 +322,15 @@ class BaseEngine:
         if secondary_id:
             exclude_pool_ids.add(secondary_id)
         if exclude_ids:
-            exclude_pool_ids.update(exclude_ids)
-        system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
+            candidate_check = system_candidates.exclude(id__in=exclude_pool_ids)
+            filtered_candidates = candidate_check.exclude(id__in=exclude_ids)
+            if filtered_candidates.exists():
+                exclude_pool_ids.update(exclude_ids)
+                system_candidates = filtered_candidates
+            else:
+                system_candidates = candidate_check
+        else:
+            system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
         
         if force_type:
             system_candidates = system_candidates.filter(ingredient_type=force_type)

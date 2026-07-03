@@ -459,18 +459,26 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                 
                 if suggested_data:
                     yield send_progress("Sanitizing extraction volumes & balancing ratios...")
+                    if isinstance(suggested_data, str):
+                        try:
+                            suggested_data = json.loads(suggested_data)
+                        except Exception:
+                            pass
+
+                    suggestions_list = []
+                    rebalancing = {}
+                    seal_recommended = False
+                    seal_resonance = 0
+                    reasoning = ''
+
                     if isinstance(suggested_data, dict):
                         suggestions_list = suggested_data.get('suggestions', [])
                         rebalancing = suggested_data.get('rebalancing', {})
                         seal_recommended = suggested_data.get('seal_recommended', False)
                         seal_resonance = suggested_data.get('seal_resonance', 0)
                         reasoning = suggested_data.get('reasoning', '')
-                    else:
+                    elif isinstance(suggested_data, list):
                         suggestions_list = suggested_data
-                        rebalancing = {}
-                        seal_recommended = False
-                        seal_resonance = 0
-                        reasoning = ''
 
                     enriched: List[Dict[str, Any]] = []
                     inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
