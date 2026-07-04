@@ -41,17 +41,23 @@ def run_task_in_thread(task_uuid: Any, func: Callable[..., None], *args: Any, **
         update_progress(100, status='FAILURE', error_msg=str(e))
     finally:
         # Close connection in thread to prevent postgres connection leaks
-        connection.close()
+        import sys
+        if 'test' not in sys.argv:
+            connection.close()
 
 
 def submit_task(task_name: str, func: Callable[..., None], *args: Any, **kwargs: Any) -> BackgroundExecutionTask:
-    """Submits a background task executed via a daemon thread."""
+    """Submits a background task executed via a daemon thread (or synchronously in tests)."""
     task = BackgroundExecutionTask.objects.create(task_name=task_name)
-    thread = threading.Thread(
-        target=run_task_in_thread,
-        args=(task.uuid, func) + args,
-        kwargs=kwargs,
-        daemon=True
-    )
-    thread.start()
+    import sys
+    if 'test' in sys.argv:
+        run_task_in_thread(task.uuid, func, *args, **kwargs)
+    else:
+        thread = threading.Thread(
+            target=run_task_in_thread,
+            args=(task.uuid, func) + args,
+            kwargs=kwargs,
+            daemon=True
+        )
+        thread.start()
     return task

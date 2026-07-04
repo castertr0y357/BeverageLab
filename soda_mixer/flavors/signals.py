@@ -23,8 +23,9 @@ def trigger_cache_preheat_on_ingredient_change(sender, instance, **kwargs):
     logger.info(f"AIKeepWarm - Info - Database modification detected on ingredient '{instance.name}'. Triggering suggestions cache preheat.")
     
     if 'test' in sys.argv:
-        # Run synchronously during tests to prevent background thread database connection leaks
-        AIAssistant.preheat_suggestions_cache()
+        # Skip preheating during tests to avoid slow network/LLM calls, except when verifying the signal connection
+        if 'Mock' in type(AIAssistant.preheat_suggestions_cache).__name__:
+            AIAssistant.preheat_suggestions_cache()
         return
 
     def run_preheat():

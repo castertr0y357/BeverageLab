@@ -16,31 +16,55 @@ logger = logging.getLogger(__name__)
 class AIAssistant:
     """Service for interacting with various LLM providers."""
 
-    SYSTEM_PROMPT = """
-    You are the Lead Creative Mixologist at the "Beverage Laboratory," a high-end, 
-    scientific-themed soda and coffee mixing facility. Your goal is to assist users 
-    in synthesizing perfect liquid compounds.
+    SYSTEM_PROMPT = """You are the Lead Creative Mixologist at the "Beverage Laboratory," a high-end, scientific-themed soda, coffee, and slushie mixing facility. Your goal is to assist users in synthesizing perfect liquid compounds.
 
-    Personality:
-    - You are enthusiastic about flavor science.
-    - You use laboratory terminology (synthesis, compound, reagent, base, stabilizer).
-    - You are a "Creative Mixologist"—you value bold, experimental pairings over 
-      safe bets, but you always anchor them in flavor balance.
-    - You understand Sweetness, Acidity, Bitterness, Intensity, and Complexity as the core axes 
-      of a drink.
-    - Complexity measures the depth and "layers" of a flavor (1: simple/one-note, 5: deep/multi-layered).
+Personality:
+- Enthusiastic about flavor science.
+- Use laboratory terminology (synthesis, compound, reagent, base, stabilizer).
+- Value bold, experimental pairings over safe bets, but always anchor them in flavor balance.
+- Understand Sweetness, Acidity, Bitterness, Intensity, and Complexity as the core axes of a drink.
 
-    Context:
-    - You have access to a user's current inventory and their high-rated recipes.
-    - Users will send you their "Current Compound" (selected ingredients).
-    - You should suggest additional reagents to "Bridge" or "Stabilize" the mix (usually 1-3 more items).
-    - Suggest specific ml/g or "parts" ratios. Some mixes benefit from a 1:1 parity, while others need small "flavor notes" to add complexity without overpowering.
-    - Explain the flavor science: why does the acidity of Lemon balance the bitterness of Espresso?
+Core Synthesis Mode Rules:
 
-    Guidelines:
-    - Keep responses concise (2-3 short paragraphs).
-    - Be supportive of "Experimental Mode" requests.
-    """
+1. SODA LAB MODE:
+   - Total syrup for a 1.0L batch must not exceed 160ml (proportional for other sizes: 80ml for 0.5L, crisp=105ml, craft=120ml, fountain=140ml).
+   - Recommend base flavor anchors (e.g. fruit syrups) and complementary accents.
+
+2. COFFEE LAB MODE (Espresso & Brew Extraction):
+   - The dry base coffee beans MUST be 18.0g (weight) representing a double-shot espresso.
+   - Liquid dairy and plant milks (type DAIRY) must be 50.0ml (volume).
+   - Minor additives, sweet syrups, and creamers (type ADDITIVE) must be 15.0ml (volume).
+   - Accents and others must be 15.0ml.
+   - Do NOT suggest grams for liquids, and do NOT use ml for coffee beans.
+   - Limit suggested counts strictly based on compatibility rules: recommend between 5 and 10 options.
+
+3. CRYO LAB (SLUSHIE) MODE:
+   - Total syrup for a 1.0L batch must not exceed 160ml.
+   - Recommend amounts based on Ninja Creami displacement limits (e.g., 80.0ml for base, 40.0ml for payloads, 20.0ml for accents).
+
+Output Specifications:
+- For general conversation, respond with concise, creative lab reports or conversational guidance (2-3 paragraphs).
+- For structured data requests, return ONLY a raw JSON object conforming to the specified JSON schema. Do not include markdown wraps (like ```json) or any conversational preamble.
+
+Structured Output JSON Schema:
+{
+    "suggestions": [
+        {
+            "name": "Ingredient Name",
+            "reason": "Acidity balances sweetness",
+            "resonance": 95,
+            "amount": 15.0,
+            "profile": { "intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2 }
+        }
+    ],
+    "rebalancing": {
+        "Active Ingredient 1": 18.0,
+        "Active Ingredient 2": 50.0
+    },
+    "seal_recommended": false,
+    "seal_resonance": 90,
+    "reasoning": "Standard laboratory balance analysis."
+}"""
     
     SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "amount": 25.0, "reason": "Acidity balances sweetness", "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}}]'
     
@@ -96,10 +120,40 @@ class AIAssistant:
         return LLMProvider.objects.filter(is_enabled=True).first()
 
     @classmethod
+    def get_static_ingredients_context(cls) -> str:
+        """Serialize all active inventory ingredients into a stable, sorted, rich text format."""
+        from .models import Ingredient
+        # Order by name and brand to guarantee identical output sequence for prefix caching
+        ingredients = Ingredient.objects.filter(is_in_inventory=True).order_by('name', 'brand')
+        registry = []
+        for ing in ingredients:
+            brand_str = f" [{ing.brand}]" if ing.brand else ""
+            notes_str = f" | Notes: {ing.flavor_notes}" if ing.flavor_notes else ""
+            ai_notes_str = f" | Sensory: {ing.ai_notes}" if ing.ai_notes else ""
+            
+            if ing.ingredient_type == 'COFFEE_BEAN':
+                registry.append(
+                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category} | "
+                    f"Roast: {ing.roast_level} | Decaf: {ing.is_decaf} | Origin: {ing.origin or 'Unknown'} | "
+                    f"Body: {ing.body_intensity}/5 | Acidity: {ing.acidity_score}/5 | Bitterness: {ing.bitterness_score}/5"
+                    f"{notes_str}{ai_notes_str})"
+                )
+            else:
+                registry.append(
+                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category} | "
+                    f"Intensity: {ing.intensity}/5 | Sweetness: {ing.sweetness}/5 | Acidity: {ing.acidity}/5 | "
+                    f"Bitterness: {ing.bitterness}/5 | Complexity: {ing.complexity}/5 | "
+                    f"Base Suitability: {ing.base_suitability}/5 | Accent Suitability: {ing.accent_suitability}/5 | "
+                    f"RTD: {ing.is_ready_to_drink} | Dry: {ing.is_dry} | Systems: {ing.compatible_systems}"
+                    f"{notes_str}{ai_notes_str})"
+                )
+        return "\n".join(registry)
+
+    @classmethod
     def _mock_chat(cls, user_prompt: str, context: Optional[str] = None) -> str:
         """Return realistic JSON/text payloads in MOCK_MODE."""
         if "[STRUCTURED DATA REQUEST]" in user_prompt:
-            if "Lab Type: COFFEE" in user_prompt:
+            if "COFFEE" in user_prompt:
                 return json.dumps({
                     "suggestions": [
                         {
@@ -406,142 +460,22 @@ class AIAssistant:
         if not provider:
             return
 
-        from .models import Ingredient
+        # Fetch the static ingredients context (same as used in actual suggestions)
+        inventory_context = cls.get_static_ingredients_context()
+
         # Loop through all three active system modes to ensure each prefix is pre-cached
         for drink_type in ['SODA', 'COFFEE', 'SLUSHIE']:
             try:
-                all_ingredients = Ingredient.objects.filter(is_in_inventory=True, compatible_systems__icontains=drink_type)
-                
-                registry = []
-                for ing in all_ingredients:
-                    ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                    if ing.ingredient_type == 'COFFEE_BEAN':
-                        registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
-                    else:
-                        registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
-                inventory_context = "\n".join(registry)
+                # Construct standard dummy query matching the active mode parameters
+                prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
 
-                # Construct dummy queries matching the optimized format of each mode
-                if drink_type == 'COFFEE':
-                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Coffee Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
-4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
-
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 15.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 15.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 15.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Espresso": 18.0,
-        "Whole Milk": 50.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the coffee balance strategy"
-}}
- 
-Inventory Registry for Selection: See context.
+Task: Recommending between 5 to 10 compatible ingredients from the Inventory Registry to create/stabilize a drink compound.
 
 [DYNAMIC REQUEST PARAMETERS]:
-Current Compound: NONE - Initial Synthesis
-Lab Type: COFFEE (Espresso Extraction)
-Lab Mode: safe and balanced
-"""
-                elif drink_type == 'SLUSHIE':
-                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Cryo Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
-4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
-
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 20.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 20.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 20.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Lemon Syrup": 80.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the cryo freezing and displacement strategy"
-}}
- 
-Inventory Registry for Selection: See context.
-
-[DYNAMIC REQUEST PARAMETERS]:
-Current Compound: NONE - Initial Synthesis
-Lab Type: SLUSHIE (Cryo Lab)
-Lab Mode: safe and balanced
-"""
-                else:
-                    prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Soda Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
-4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
-
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 25.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 25.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 25.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Lemon Syrup": 100.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the carbonation and dilution strategy"
-}}
-
-Inventory Registry for Selection: See context.
-
-[DYNAMIC REQUEST PARAMETERS]:
-Current Compound: NONE - Initial Synthesis
-Lab Type: SODA (Soda Lab)
-Lab Mode: safe and balanced
+Current Mode: {drink_type} | Mode: safe and balanced
+Active Mixture: NONE - Initial Synthesis
+Force Type Constraint: None
+Exclusion List: None
 """
                 cls.chat(prompt, context=inventory_context, provider=provider)
                 logger.info(f"AIKeepWarm - Info - Preheat KV Cache succeeded for mode '{drink_type}' on provider '{provider.name}'")
@@ -606,13 +540,15 @@ Lab Mode: safe and balanced
     def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """
         Generate multiple proactive suggestions as a structured JSON array.
-        Returns 3 specific ingredient recommendations from the inventory.
+        Returns 5 to 10 specific ingredient recommendations from the inventory.
         """
         drink_type = drink_type.upper()
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
-        exclude_context = f" Exclude these previously suggested items: {', '.join(exclude)}." if exclude else ""
-        retry_context = f"\n\n[RETRY COMMAND]: {retry_note}\n" if retry_note else ""
         
+        # Fallback if inventory is not passed explicitly
+        if not inventory:
+            inventory = cls.get_static_ingredients_context()
+
         # Look up detailed metadata for ingredients currently in the mix
         current_compound_details = []
         from .models import Ingredient
@@ -628,141 +564,35 @@ Lab Mode: safe and balanced
             if db_ing:
                 ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
                 if db_ing.ingredient_type == 'COFFEE_BEAN':
-                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Roast: {db_ing.roast_level}, Decaf: {db_ing.is_decaf}, Body: {db_ing.body_intensity}/5, Acidity: {db_ing.acidity_score}/5, Bitterness: {db_ing.bitterness_score}/5, Flavor Notes: {db_ing.flavor_notes}"
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Roast: {db_ing.roast_level}, Decaf: {db_ing.is_decaf}, Body: {db_ing.body_intensity}/5, Acidity: {db_ing.acidity_score}/5, Bitterness: {db_ing.bitterness_score}/5"
                 else:
-                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Sweetness: {db_ing.sweetness}/5, Acidity: {db_ing.acidity}/5, Bitterness: {db_ing.bitterness}/5, Complexity: {db_ing.complexity}/5"
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Sweetness: {db_ing.sweetness}/5, Acidity: {db_ing.acidity}/5, Bitterness: {db_ing.bitterness}/5"
                 current_compound_details.append(f"{ing_display} ({details})")
             else:
                 current_compound_details.append(ing_name)
                 
-        current_compound_str = ", ".join(current_compound_details)
+        current_compound_str = ", ".join(current_compound_details) if current_compound_details else "NONE - Initial Synthesis"
         
-        if drink_type == 'COFFEE':
-            force_rule = ""
-            if force_type:
-                force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
-                force_rule = f"\n6. MANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+        force_rule = ""
+        if force_type:
+            force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
+            force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
             
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Coffee Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' based on coffee brewing ratios. The dry base coffee beans MUST be 18.0g (grams) representing a double-shot espresso. Dairy and plant milks (type DAIRY) must be 50.0ml (milliliters), minor additives and syrups (type ADDITIVE) must be 15.0ml (milliliters), and accents/others must be 15.0ml (milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
-4. For new suggestions, provide a specific 'amount' (18.0g for coffee beans, 50.0ml for dairy/plant milks, 15.0ml for minor additives/syrups/accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for coffee extraction balance: The coffee bean base should be 18.0g (weight), while liquid dairy/plant milks (50.0ml) and other minor additives/syrups/accents (15.0ml) should be in volume.{force_rule}
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+        exclude_str = f"Exclude these previously suggested items: {', '.join(exclude)}." if exclude else "None"
 
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 15.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 15.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 15.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 15.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Espresso": 18.0,
-        "Whole Milk": 50.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the coffee balance strategy"
-}}
- 
-Inventory Registry for Selection: See context.
+        prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+
+Task: Recommending between 5 to 10 compatible ingredients from the Inventory Registry to create/stabilize a drink compound.
 
 [DYNAMIC REQUEST PARAMETERS]:
-Current Compound: {current_compound_str}
-Lab Type: COFFEE (Espresso Extraction)
-Lab Mode: {tone}{exclude_context}{retry_context}
+Current Mode: {drink_type} | Mode: {tone}
+Active Mixture: {current_compound_str}
+Force Type Constraint: {force_type or 'None'}{force_rule}
+Exclusion List: {exclude_str}
 """
-        elif drink_type == 'SLUSHIE':
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Cryo Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on Ninja Creami displacement limits (max 160ml syrup total).
-4. For new suggestions, provide a specific 'amount' in ml (e.g. 80.0ml for base, 40.0ml for payloads, 20.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for cryo displacement balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
+        if retry_note:
+            prompt += f"\n[RETRY COMMAND]: {retry_note}\n"
 
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 20.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 20.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 20.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 20.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Lemon Syrup": 80.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the cryo freezing and displacement strategy"
-}}
- 
-Inventory Registry for Selection: See context.
-
-[DYNAMIC REQUEST PARAMETERS]:
-Current Compound: {current_compound_str}
-Lab Type: SLUSHIE (Cryo Lab)
-Lab Mode: {tone}{exclude_context}{retry_context}
-"""
-        else:
-            prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
- 
-Task: Recommending between 5 to 10 options depending on compatibility ratings. Review the Soda Inventory Registry below.
- 
-Rules:
-1. USE THE EXACT NOMENCLATURE from the Inventory Registry for suggestions.
-2. Provide a 'seal_recommended' boolean and a 'seal_resonance' (0-100). Set seal_recommended to TRUE if the compound is complete.
-3. REBALANCING: For every ingredient already in the 'Current Compound', prescribe an optimal 'amount' in milliliters (ml) based on soda dilution.
-4. For new suggestions, provide a specific 'amount' in ml (e.g. 100.0ml for base, 50.0ml for payloads, 25.0ml for accents) and a "Chemical Profile Overload" (intensity, sweetness, acidity, bitterness, complexity) on a scale of 1-5.
-5. Aim for molecular balance: Total syrup for a 1.0L batch MUST NOT exceed 160ml. Scale proportions accordingly (e.g. 80ml Base + 40ml Payload + 20ml Accent + 20ml Deep Accent = 160ml).
-6. RECOMMENDATION COUNT RULES:
-   * If there are less than 5 available ingredients in the Registry, you MUST recommend ALL of them in the JSON array, no matter their compatibility rating.
-   * If there are 5 or more available ingredients in the Registry, recommend a minimum of 5 and a maximum of 10. Aim to recommend closer to 10 ingredients. You should only recommend fewer (minimum of 5) if the remaining candidates have very low compatibility ratings (Less than 50% Resonance).
-
- 
-JSON OUTPUT FORMAT:
-{{
-    "suggestions": [
-        {{ "name": "Ingredient Name 1", "reason": "Reason for recommendation 1", "resonance": 95, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3 }} }},
-        {{ "name": "Ingredient Name 2", "reason": "Reason for recommendation 2", "resonance": 90, "amount": 25.0, "profile": {{ "intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 3", "reason": "Reason for recommendation 3", "resonance": 88, "amount": 25.0, "profile": {{ "intensity": 4, "sweetness": 2, "acidity": 3, "bitterness": 2, "complexity": 4 }} }},
-        {{ "name": "Ingredient Name 4", "reason": "Reason for recommendation 4", "resonance": 85, "amount": 25.0, "profile": {{ "intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 2 }} }},
-        {{ "name": "Ingredient Name 5", "reason": "Reason for recommendation 5", "resonance": 80, "amount": 25.0, "profile": {{ "intensity": 5, "sweetness": 1, "acidity": 2, "bitterness": 3, "complexity": 3 }} }}
-    ],
-    "rebalancing": {{
-        "Lemon Syrup": 100.0
-    }},
-    "seal_recommended": true/false,
-    "seal_resonance": 95,
-    "reasoning": "Brief overview of the carbonation and dilution strategy"
-}}
- 
-Inventory Registry for Selection: See context.
-
-[DYNAMIC REQUEST PARAMETERS]:
-Current Compound: {current_compound_str}
-Lab Type: SODA (Soda Lab)
-Lab Mode: {tone}{exclude_context}{retry_context}
-"""
         response = cls.chat(prompt, context=inventory)
         return cls._extract_json(response)
 

@@ -233,16 +233,7 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         if not drink_type:
             drink_type = 'SODA'
 
-        all_ingredients = Ingredient.objects.filter(is_in_inventory=True, compatible_systems__icontains=drink_type)
-        registry: List[str] = []
-        for ing in all_ingredients:
-            ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-            if ing.ingredient_type == 'COFFEE_BEAN':
-                registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
-            else:
-                registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5)")
-        inventory_context = "\n".join(registry)
-
+        inventory_context = AIAssistant.get_static_ingredients_context()
         prompt = user_message + lab_context
         
         # Bridge to the streaming generator
@@ -388,16 +379,18 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
 
             yield send_progress("Scanning current compound registry...")
             
-            # Get full inventory registry for AI context
-            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-            
+            # Get full static inventory context
+            inventory_context = AIAssistant.get_static_ingredients_context()
+
             # Filter the candidate pool for this step
+            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
             candidate_pool = all_ingredients
             if force_type:
                 candidate_pool = candidate_pool.filter(ingredient_type=force_type)
             if mode != 'experimental':
                 candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
-            
+
+            # Determine actual exclusion based on candidate pool availability
             exclude_names = [name.strip().lower() for name in exclude]
             remaining = []
             for ing in candidate_pool:
@@ -407,33 +400,9 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                 remaining.append(ing)
                 
             if remaining:
-                oracle_ingredients = remaining
                 actual_exclude = exclude
             else:
-                oracle_ingredients = list(candidate_pool)
                 actual_exclude = []
-                
-            # Build the registry context with details of active candidates + current ingredients
-            current_names = [n.strip().lower() for n in ingredients]
-            registry_ingredients = []
-            seen_ids = set()
-            for ing in all_ingredients:
-                display_name = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                is_current = (ing.name.strip().lower() in current_names or display_name.strip().lower() in current_names)
-                is_oracle = any(o.id == ing.id for o in oracle_ingredients)
-                if (is_current or is_oracle) and ing.id not in seen_ids:
-                    registry_ingredients.append(ing)
-                    seen_ids.add(ing.id)
-                    
-            registry = []
-            for ing in registry_ingredients:
-                ing_display = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                if ing.ingredient_type == 'COFFEE_BEAN':
-                    registry.append(f"{ing_display} (COFFEE_BEAN, Roast: {ing.roast_level}, Decaf: {ing.is_decaf}, Body: {ing.body_intensity}/5, Acid: {ing.acidity_score}/5, Bitter: {ing.bitterness_score}/5, Notes: {ing.flavor_notes})")
-                else:
-                    registry.append(f"{ing_display} ({ing.ingredient_type}, {ing.category}, Int: {ing.intensity}/5, RTD: {ing.is_ready_to_drink})")
-            inventory_context = "\n".join(registry)
-
             yield send_progress("Locating matching flavor affinity groups...")
             yield send_progress("Querying Mixology Oracle...")
 
