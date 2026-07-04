@@ -933,7 +933,6 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "think": think_val,
             "options": {
                 "num_predict": 2048,
-                "num_ctx": 8192,
                 "temperature": 0.2
             }
         }
@@ -1089,7 +1088,6 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "think": think_val,
             "options": {
                 "num_predict": 2048,
-                "num_ctx": 8192,
                 "temperature": 0.2
             }
         }
