@@ -932,7 +932,9 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "stream": False,
             "think": think_val,
             "options": {
-                "num_predict": 2048
+                "num_predict": 2048,
+                "num_ctx": 8192,
+                "temperature": 0.2
             }
         }
         user_prompt = messages[-1]['content'] if messages else ""
@@ -1086,7 +1088,9 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "stream": True,
             "think": think_val,
             "options": {
-                "num_predict": 2048
+                "num_predict": 2048,
+                "num_ctx": 8192,
+                "temperature": 0.2
             }
         }
         user_prompt = messages[-1]['content'] if messages else ""
