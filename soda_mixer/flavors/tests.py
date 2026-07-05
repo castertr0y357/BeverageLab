@@ -189,11 +189,57 @@ class BeverageLabRecommendationTest(TestCase):
 
         # get_recommendation using self.ing1 (Lemon Syrup, category="citrus", compatible with sweet category additives)
         recs = get_recommendation([self.ing1.id], drink_type="SODA")
-        self.assertEqual(len(recs["recommended"]), 10)
+        self.assertEqual(len(recs["recommended"]), 15)
 
-        # get_tiered_recommendation should also return up to 10
+        # get_tiered_recommendation should also return up to 15
         tiered_recs = get_tiered_recommendation(self.ing1.id, drink_type="SODA")
-        self.assertEqual(len(tiered_recs["recommended"]), 10)
+        self.assertEqual(len(tiered_recs["recommended"]), 15)
+
+    def test_favorite_ingredient_score_boost_and_prioritization(self) -> None:
+        """Verify that marking an ingredient as favorite boosts its score and ranks it at the top."""
+        # Create a non-favorite ingredient
+        normal_ing = Ingredient.objects.create(
+            name="Normal Syrup",
+            category="sweet",
+            ingredient_type="ADDITIVE",
+            intensity=3,
+            sweetness=3,
+            acidity=2,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True,
+            compatible_systems="SODA"
+        )
+        # Create a favorite ingredient with the exact same profile
+        favorite_ing = Ingredient.objects.create(
+            name="Favorite Syrup",
+            category="sweet",
+            ingredient_type="ADDITIVE",
+            intensity=3,
+            sweetness=3,
+            acidity=2,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True,
+            favorite=True,
+            compatible_systems="SODA"
+        )
+        
+        # Get standard recommendations starting with Lemon Syrup (self.ing1)
+        recs = get_recommendation([self.ing1.id], drink_type="SODA")
+        recommended_list = recs["recommended"]
+        
+        # Find normal and favorite syrup in recommendations
+        normal_rec = next(r for r in recommended_list if r["ingredient"].id == normal_ing.id)
+        fav_rec = next(r for r in recommended_list if r["ingredient"].id == favorite_ing.id)
+        
+        # The favorite ingredient should have a score boost (+8) compared to the normal one
+        self.assertEqual(fav_rec["score"] - normal_rec["score"], 8)
+        
+        # Favorite should rank higher/earlier in the list than normal ingredient
+        fav_idx = recommended_list.index(fav_rec)
+        normal_idx = recommended_list.index(normal_rec)
+        self.assertLess(fav_idx, normal_idx)
 
 
 class BeverageLabViewsTest(TestCase):
@@ -2615,8 +2661,29 @@ class BeverageLabRecommendationExclusionTest(TestCase):
             
         res2 = get_tiered_recommendation(base_ing.id, drink_type="SODA")
         recommended_ids2 = [r['ingredient'].id for r in res2['recommended']]
-        # Total candidates is 12 (>= 10), so it should recommend exactly 10
-        self.assertEqual(len(recommended_ids2), 10)
+        # Total candidates is 12 (>= 10 and <= 15), so it should recommend exactly 12
+        self.assertEqual(len(recommended_ids2), 12)
+
+        # Scenario C: More than 15 candidates.
+        # Add 6 more to make total 18 candidates (excluding base)
+        for i in range(12, 18):
+            Ingredient.objects.create(
+                name=f"Soda Ext Temp {i}",
+                category="sweet",
+                ingredient_type="ADDITIVE",
+                intensity=2,
+                sweetness=4,
+                acidity=1,
+                bitterness=1,
+                complexity=2,
+                is_ready_to_drink=True,
+                is_in_inventory=True,
+                compatible_systems="SODA"
+            )
+        res3 = get_tiered_recommendation(base_ing.id, drink_type="SODA")
+        recommended_ids3 = [r['ingredient'].id for r in res3['recommended']]
+        # Total candidates is 18 (> 15), so it should cap at exactly 15
+        self.assertEqual(len(recommended_ids3), 15)
 
     @patch('requests.request')
     def test_ai_suggest_api_exclusion_and_fallback(self, mock_request: MagicMock) -> None:
@@ -2658,7 +2725,7 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         # Verify call to AI service has the excluded ingredient in the request context/instructions
         args, kwargs = mock_request.call_args
         user_msg = kwargs['json']['messages'][1]['content']
-        self.assertIn("Exclude these previously suggested items: Vanilla Twist.", user_msg)
+        self.assertIn("Exclude these previously suggested items: Vanilla Twist", user_msg)
 
         # 2. Exclude all candidates: Cherry Blast and Vanilla Twist
         # It should fall back, meaning Vanilla Twist and Cherry Blast are still in the context.

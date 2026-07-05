@@ -34,6 +34,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     accent_suitability = request.POST.get('accent_suitability', 3.0)
     is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     is_dry = request.POST.get('is_dry') == 'on'
+    favorite = request.POST.get('favorite') == 'on'
     
     # Coffee fields
     roast_level = request.POST.get('roast_level', 'MEDIUM')
@@ -73,6 +74,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 compatible_systems=compatible_systems,
                 is_ready_to_drink=is_ready_to_drink,
                 is_dry=is_dry,
+                favorite=favorite,
                 is_in_inventory=True,
                 roast_level=roast_level,
                 is_decaf=is_decaf,
@@ -111,6 +113,7 @@ def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
     ingredient.ai_notes = request.POST.get('ai_notes', ingredient.ai_notes)
     ingredient.is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
     ingredient.is_dry = request.POST.get('is_dry') == 'on'
+    ingredient.favorite = request.POST.get('favorite') == 'on'
     
     # Coffee fields
     ingredient.roast_level = request.POST.get('roast_level', ingredient.roast_level)

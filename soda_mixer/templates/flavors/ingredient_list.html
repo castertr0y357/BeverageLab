@@ -17,6 +17,18 @@
     .lab-rating i:not(.active) {
         opacity: 0.2;
     }
+
+    .border-favorite {
+        border: 1px solid rgba(255, 193, 7, 0.45) !important;
+    }
+    .glow-favorite {
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.25);
+        animation: favorite-pulse 3s infinite ease-in-out;
+    }
+    @keyframes favorite-pulse {
+        0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.2); }
+        50% { box-shadow: 0 0 18px rgba(255, 193, 7, 0.4); }
+    }
 </style>
 {% endblock %}
 
@@ -105,9 +117,12 @@
 <div class="row g-4">
     {% for ingredient in ingredients %}
     <div class="col-md-6 col-lg-4">
-        <div class="glass-card h-100 p-4 d-flex flex-column border-white border-opacity-10">
+        <div class="glass-card h-100 p-4 d-flex flex-column {% if ingredient.favorite %}border-favorite glow-favorite{% else %}border-white border-opacity-10{% endif %}">
             <div class="d-flex justify-content-between align-items-start mb-3">
                 <h4 class="mb-0 d-flex align-items-center flex-wrap gap-2">
+                    {% if ingredient.favorite %}
+                    <i class="bi bi-star-fill text-warning" title="Favorite Material" style="filter: drop-shadow(0 0 5px var(--fizz-amber));"></i>
+                    {% endif %}
                     <a href="{% url 'ingredient_detail' ingredient.uuid %}"
                         class="text-decoration-none text-white hover-lime fw-bold">{{ ingredient.name }}</a>
                     {% if ingredient.show_brand and ingredient.brand %}
@@ -181,6 +196,7 @@
                         class="btn btn-sm btn-outline-warning border-white border-opacity-10 btn-edit-material"
                         title="Edit Material" data-id="{{ ingredient.uuid }}" data-name="{{ ingredient.name }}"
                         data-brand="{{ ingredient.brand }}"
+                        data-favorite="{{ ingredient.favorite|yesno:'true,false' }}"
                         data-type="{{ ingredient.ingredient_type }}" data-category="{{ ingredient.category }}"
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
                         data-acidity="{{ ingredient.acidity }}" data-bitterness="{{ ingredient.bitterness }}"
@@ -409,6 +425,13 @@
                     <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
                 </div>
                 <div class="mb-3">
+                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                        <input class="neon-check" type="checkbox" name="favorite" id="addFavorite">
+                        <label class="form-label text-white fw-bold small mb-0" for="addFavorite"><i class="bi bi-star-fill text-warning me-1"></i>Mark as Favorite?</label>
+                    </div>
+                    <span class="text-dim d-block" style="font-size: 0.6rem;">Prioritize this ingredient in recommendations with a glowing highlight.</span>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
                     <textarea name="ai_notes" id="addAINotes" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -604,6 +627,13 @@
                     <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
                 </div>
                 <div class="mb-3">
+                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
+                        <input class="neon-check" type="checkbox" name="favorite" id="editFavorite">
+                        <label class="form-label text-white fw-bold small mb-0" for="editFavorite"><i class="bi bi-star-fill text-warning me-1"></i>Mark as Favorite?</label>
+                    </div>
+                    <span class="text-dim d-block" style="font-size: 0.6rem;">Prioritize this ingredient in recommendations with a glowing highlight.</span>
+                </div>
+                <div class="mb-3">
                     <label class="form-label text-white fw-bold small">AI Mixology Notes (Optional)</label>
                     <textarea name="ai_notes" id="editAINotes" rows="2"
                         class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10"></textarea>
@@ -736,6 +766,7 @@
                 document.getElementById('editAINotes').value = d.aiNotes || '';
                 document.getElementById('editReadyToDrink').checked = d.isReadyToDrink === 'true';
                 document.getElementById('editIsDry').checked = d.isDry === 'true';
+                document.getElementById('editFavorite').checked = d.favorite === 'true';
                 
                 // Coffee fields populator
                 document.getElementById('editOrigin').value = d.origin || '';

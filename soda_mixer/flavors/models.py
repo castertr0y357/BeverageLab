@@ -171,6 +171,10 @@ class Ingredient(SoftDeleteModel):
         default=False,
         help_text="Whether this ingredient is measured in weight (g) rather than volume (ml/oz)."
     )
+    favorite = models.BooleanField(
+        default=False,
+        help_text="Whether this ingredient is a favorite/preferred reagent."
+    )
     description = models.TextField(blank=True, null=True)
     ai_notes = models.TextField(
         blank=True,

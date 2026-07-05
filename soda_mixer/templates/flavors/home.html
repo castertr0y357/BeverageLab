@@ -219,8 +219,9 @@
                         <div class="col-md-4 col-sm-6 ingredient-card" 
                              data-type="{{ ingredient.ingredient_type }}"
                              data-systems="{{ ingredient.compatible_systems }}">
-                            <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn"
+                            <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn {% if ingredient.favorite %}border-favorite glow-favorite{% endif %}"
                                  data-id="{{ ingredient.id }}"
+                                 data-favorite="{{ ingredient.favorite|yesno:'true,false' }}"
                                  data-type="{{ ingredient.ingredient_type }}"
                                  data-name="{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}"
                                  data-intensity="{{ ingredient.intensity }}"
@@ -237,7 +238,7 @@
                                  data-flavor-notes="{{ ingredient.flavor_notes|default:'' }}"
                                  data-is-decaf="{% if 'decaf' in ingredient.name|lower %}true{% else %}false{% endif %}"
                                  data-profile=''>
-                                <span class="fw-bold fs-5 mb-2">{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}</span>
+                                <span class="fw-bold fs-5 mb-2">{% if ingredient.favorite %}★ {% endif %}{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}</span>
                                 <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
                                 <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
                                     <span class="text-gradient-lab font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
@@ -299,6 +300,18 @@
 <style>
     .resonance-glow { box-shadow: 0 0 10px rgba(var(--lab-accent-rgb), 0.3); }
     .dot-accent { background-color: var(--lab-accent); border-radius: 50%; display: inline-block; }
+    
+    .border-favorite {
+        border: 1px solid rgba(255, 193, 7, 0.45) !important;
+    }
+    .glow-favorite {
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.25);
+        animation: favorite-pulse 3s infinite ease-in-out;
+    }
+    @keyframes favorite-pulse {
+        0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.2); }
+        50% { box-shadow: 0 0 18px rgba(255, 193, 7, 0.4); }
+    }
 </style>
 
 {% endblock %}
@@ -2826,7 +2839,11 @@
                         let textClass = 'text-gradient-lab';
                         let iconHtml = '';
                         
-                        if (isExperimentalMode) {
+                        if (rec.favorite) {
+                            cardClass = 'border-favorite glow-favorite';
+                            textClass = 'text-warning';
+                            iconHtml = '<i class="bi bi-star-fill text-warning me-1" style="filter: drop-shadow(0 0 5px var(--fizz-amber));"></i>';
+                        } else if (isExperimentalMode) {
                             cardClass = 'border-experimental glow-experimental';
                             textClass = 'text-experimental';
                             iconHtml = '<i class="bi bi-flask me-1"></i>';
@@ -2845,8 +2862,9 @@
                                  data-bitterness="${rec.bitterness || 0}" data-complexity="${rec.complexity || 0}"
                                  data-base-suitability="${rec.base_suitability || 3.0}" data-accent-suitability="${rec.accent_suitability || 3.0}"
                                  data-is-ready-to-drink="${rec.is_ready_to_drink === true || rec.is_ready_to_drink === 'true'}"
-                                 data-profile='${profileJson}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}">
-                                    <span class="fw-bold fs-5 mb-1">${rec.name}</span>
+                                 data-profile='${profileJson}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}"
+                                 data-favorite="${rec.favorite === true || rec.favorite === 'true'}">
+                                    <span class="fw-bold fs-5 mb-1">${rec.favorite ? '★ ' : ''}${rec.name}</span>
                                     <div class="d-flex gap-2 align-items-center mb-2">
                                         <span class="badge-fizz ${badgeClass}">${rec.category}</span>
                                         ${rec.resonance ? `<span class="text-info fw-black small" style="text-shadow: 0 0 8px var(--fizz-cyan);">🧪 ${rec.resonance}%</span>` : ''}

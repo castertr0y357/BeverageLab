@@ -36,7 +36,7 @@ Core Synthesis Mode Rules:
    - Minor additives, sweet syrups, and creamers (type ADDITIVE) must be 15.0ml (volume).
    - Accents and others must be 15.0ml.
    - Do NOT suggest grams for liquids, and do NOT use ml for coffee beans.
-   - Limit suggested counts strictly based on compatibility rules: recommend between 5 and 10 options.
+   - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 
 3. CRYO LAB (SLUSHIE) MODE:
    - Total syrup for a 1.0L batch must not exceed 160ml.
@@ -130,13 +130,14 @@ Structured Output JSON Schema:
             brand_str = f" [{ing.brand}]" if ing.brand else ""
             notes_str = f" | Notes: {ing.flavor_notes}" if ing.flavor_notes else ""
             ai_notes_str = f" | Sensory: {ing.ai_notes}" if ing.ai_notes else ""
+            fav_str = " | *FAVORITE*" if ing.favorite else ""
             
             if ing.ingredient_type == 'COFFEE_BEAN':
                 registry.append(
                     f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category} | "
                     f"Roast: {ing.roast_level} | Decaf: {ing.is_decaf} | Origin: {ing.origin or 'Unknown'} | "
                     f"Body: {ing.body_intensity}/5 | Acidity: {ing.acidity_score}/5 | Bitterness: {ing.bitterness_score}/5"
-                    f"{notes_str}{ai_notes_str})"
+                    f"{notes_str}{ai_notes_str}{fav_str})"
                 )
             else:
                 registry.append(
@@ -145,7 +146,7 @@ Structured Output JSON Schema:
                     f"Bitterness: {ing.bitterness}/5 | Complexity: {ing.complexity}/5 | "
                     f"Base Suitability: {ing.base_suitability}/5 | Accent Suitability: {ing.accent_suitability}/5 | "
                     f"RTD: {ing.is_ready_to_drink} | Dry: {ing.is_dry} | Systems: {ing.compatible_systems}"
-                    f"{notes_str}{ai_notes_str})"
+                    f"{notes_str}{ai_notes_str}{fav_str})"
                 )
         return "\n".join(registry)
 
@@ -190,6 +191,55 @@ Structured Output JSON Schema:
                             "resonance": 80,
                             "amount": 18.0,
                             "profile": {"intensity": 5, "sweetness": 2, "acidity": 2, "bitterness": 4, "complexity": 3}
+                        },
+                        {
+                            "name": "Hazelnut",
+                            "reason": "Offers sweet nutty complexity",
+                            "resonance": 78,
+                            "amount": 15.0,
+                            "profile": {"intensity": 2, "sweetness": 4, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        },
+                        {
+                            "name": "Cinnamon",
+                            "reason": "Warm baking spice warmth",
+                            "resonance": 76,
+                            "amount": 15.0,
+                            "profile": {"intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 2, "complexity": 3}
+                        },
+                        {
+                            "name": "Chocolate Syrup",
+                            "reason": "Deep rich cocoa notes",
+                            "resonance": 74,
+                            "amount": 15.0,
+                            "profile": {"intensity": 4, "sweetness": 4, "acidity": 1, "bitterness": 3, "complexity": 4}
+                        },
+                        {
+                            "name": "Whole Milk",
+                            "reason": "Provides rich dairy suspension",
+                            "resonance": 72,
+                            "amount": 50.0,
+                            "profile": {"intensity": 1, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        },
+                        {
+                            "name": "Heavy Cream",
+                            "reason": "Elevates lipid mouthfeel thickness",
+                            "resonance": 70,
+                            "amount": 15.0,
+                            "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        },
+                        {
+                            "name": "Oat Milk",
+                            "reason": "Silky grain-based body profile",
+                            "resonance": 68,
+                            "amount": 50.0,
+                            "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
+                        },
+                        {
+                            "name": "Honey",
+                            "reason": "Nectarous viscosity stabilizer",
+                            "resonance": 65,
+                            "amount": 15.0,
+                            "profile": {"intensity": 2, "sweetness": 5, "acidity": 2, "bitterness": 1, "complexity": 3}
                         }
                     ],
                     "rebalancing": {
@@ -236,6 +286,55 @@ Structured Output JSON Schema:
                         "resonance": 82,
                         "amount": 20.0,
                         "profile": {"intensity": 2, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2}
+                    },
+                    {
+                        "name": "Ginger Syrup",
+                        "reason": "Zesty heat spice bridge",
+                        "resonance": 80,
+                        "amount": 15.0,
+                        "profile": {"intensity": 4, "sweetness": 3, "acidity": 2, "bitterness": 2, "complexity": 3}
+                    },
+                    {
+                        "name": "Peach Syrup",
+                        "reason": "Fleshy stone fruit sweetness",
+                        "resonance": 78,
+                        "amount": 20.0,
+                        "profile": {"intensity": 2, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2}
+                    },
+                    {
+                        "name": "Mango Syrup",
+                        "reason": "Rich tropical ester profile",
+                        "resonance": 75,
+                        "amount": 25.0,
+                        "profile": {"intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3}
+                    },
+                    {
+                        "name": "Raspberry Syrup",
+                        "reason": "Tart red berry acidity",
+                        "resonance": 72,
+                        "amount": 15.0,
+                        "profile": {"intensity": 3, "sweetness": 3, "acidity": 4, "bitterness": 1, "complexity": 2}
+                    },
+                    {
+                        "name": "Lavender Syrup",
+                        "reason": "Soft floral herbal aroma",
+                        "resonance": 70,
+                        "amount": 10.0,
+                        "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 2, "complexity": 3}
+                    },
+                    {
+                        "name": "Hibiscus Syrup",
+                        "reason": "Cranberry-like botanical tartness",
+                        "resonance": 68,
+                        "amount": 15.0,
+                        "profile": {"intensity": 3, "sweetness": 2, "acidity": 4, "bitterness": 2, "complexity": 3}
+                    },
+                    {
+                        "name": "Grapefruit Syrup",
+                        "reason": "Bitter citrus clean edge",
+                        "resonance": 65,
+                        "amount": 20.0,
+                        "profile": {"intensity": 4, "sweetness": 2, "acidity": 4, "bitterness": 3, "complexity": 3}
                     }
                 ],
                 "rebalancing": {},
@@ -468,8 +567,8 @@ Structured Output JSON Schema:
             try:
                 # Construct standard dummy query matching the active mode parameters
                 prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
-
-Task: Recommending between 5 to 10 compatible ingredients from the Inventory Registry to create/stabilize a drink compound.
+ 
+Task: Recommending between 10 to 15 compatible ingredients from the Inventory Registry to create/stabilize a drink compound. Prioritize ingredients marked with '*FAVORITE*'.
 
 [DYNAMIC REQUEST PARAMETERS]:
 Current Mode: {drink_type} | Mode: safe and balanced
@@ -540,7 +639,7 @@ Exclusion List: None
     def suggest_autonomous(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
         """
         Generate multiple proactive suggestions as a structured JSON array.
-        Returns 5 to 10 specific ingredient recommendations from the inventory.
+        Returns 10 to 15 specific ingredient recommendations from the inventory.
         """
         drink_type = drink_type.upper()
         tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
@@ -582,7 +681,7 @@ Exclusion List: None
 
         prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
 
-Task: Recommending between 5 to 10 compatible ingredients from the Inventory Registry to create/stabilize a drink compound.
+Task: Recommending between 10 to 15 compatible ingredients from the Inventory Registry to create/stabilize a drink compound. Prioritize ingredients marked with '*FAVORITE*'.
 
 [DYNAMIC REQUEST PARAMETERS]:
 Current Mode: {drink_type} | Mode: {tone}

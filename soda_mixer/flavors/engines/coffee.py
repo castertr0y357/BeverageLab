@@ -25,7 +25,9 @@ class CoffeeEngine(BaseEngine):
             if filtered_query.exists():
                 query = filtered_query
             
-        diverse_bases = query.order_by('?')[:10]
+        # Get a diverse, dynamic set of up to 15 ingredients to serve as bases, prioritizing favorites
+        limit = min(max(10, query.count()), 15)
+        diverse_bases = query.order_by('-favorite', '?')[:limit]
         
         for ingredient in diverse_bases:
             recommendations.append({

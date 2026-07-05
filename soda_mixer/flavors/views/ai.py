@@ -93,6 +93,11 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
         exclude_ids = data.get('exclude_ids', [])
         exclude_ids = [int(i) for i in exclude_ids if str(i).isdigit()]
 
+        # Merge all selected ingredients into the exclude pool to prevent duplicate recommendations!
+        for ing_id in ingredient_ids:
+            if ing_id > 0 and ing_id not in exclude_ids:
+                exclude_ids.append(ing_id)
+
         serialized_recs: List[Dict[str, Any]] = []
         multibrand_names = get_multibrand_names_in_inventory()
 
@@ -113,6 +118,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
+                    'favorite': r['ingredient'].favorite,
                     'score': r['score'],
                     'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
@@ -136,6 +142,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
+                    'favorite': r['ingredient'].favorite,
                     'score': r['score'],
                     'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
@@ -159,6 +166,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'accent_suitability': r['ingredient'].accent_suitability,
                     'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
                     'is_dry': r['ingredient'].is_dry,
+                    'favorite': r['ingredient'].favorite,
                     'score': r['score'],
                     'resonance': round(min(r['score'] * 7.5, 99.8), 1),  # Tertiary is sum of two scores
                     'reason': r['reason'],
@@ -390,17 +398,26 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             if mode != 'experimental':
                 candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
 
-            # Determine actual exclusion based on candidate pool availability
+            # Merge active ingredients into exclusions to prevent duplicate suggestions
+            active_names = [name.strip().lower() for name in ingredients if name and name != "NONE - Initial Synthesis"]
             exclude_names = [name.strip().lower() for name in exclude]
+            
+            # Determine actual exclusion based on candidate pool availability
             remaining = []
             for ing in candidate_pool:
                 display_name = f"{ing.brand} {ing.name}" if ing.brand else ing.name
-                if ing.name.strip().lower() in exclude_names or display_name.strip().lower() in exclude_names:
+                if ing.name.strip().lower() in exclude_names or display_name.strip().lower() in exclude_names or ing.name.strip().lower() in active_names or display_name.strip().lower() in active_names:
                     continue
                 remaining.append(ing)
                 
+            # Create a combined exclude list for context prompts
+            combined_exclude = list(exclude)
+            for act_n in ingredients:
+                if act_n and act_n != "NONE - Initial Synthesis" and act_n not in combined_exclude:
+                    combined_exclude.append(act_n)
+                    
             if remaining:
-                actual_exclude = exclude
+                actual_exclude = combined_exclude
             else:
                 actual_exclude = []
             yield send_progress("Locating matching flavor affinity groups...")
@@ -491,6 +508,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 'accent_suitability': target_obj.accent_suitability,
                                 'is_ready_to_drink': target_obj.is_ready_to_drink,
                                 'is_dry': target_obj.is_dry,
+                                'favorite': target_obj.favorite,
                                 'resonance': round(min(resonance, 99.8), 1),
                                 'reason': item.get('reason', 'Molecular Affinity Match'),
                                 'amount': amount,

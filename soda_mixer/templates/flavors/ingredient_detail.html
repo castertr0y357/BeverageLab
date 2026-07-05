@@ -15,7 +15,12 @@
         <div class="glass-surface p-4 mb-4 border-lab h-100">
             <div class="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h2 class="display-5 fw-bold mb-0 text-white">{% if ingredient.brand %}{{ ingredient.brand }} {% endif %}{{ ingredient.name }}</h2>
+                    <h2 class="display-5 fw-bold mb-0 text-white">
+                        {% if ingredient.favorite %}
+                        <i class="bi bi-star-fill text-warning me-2" title="Favorite Material" style="filter: drop-shadow(0 0 8px var(--fizz-amber));"></i>
+                        {% endif %}
+                        {% if ingredient.brand %}{{ ingredient.brand }} {% endif %}{{ ingredient.name }}
+                    </h2>
                     {% if ingredient.brand %}
                     <span class="text-dim small">Brand: {{ ingredient.brand }}</span>
                     {% endif %}

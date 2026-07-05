@@ -225,11 +225,8 @@ class BaseEngine:
                 seen.add(rec['ingredient'].id)
 
         total_available = len(unique_recommendations)
-        if total_available < 10:
-            # Less than 10 available candidates, recommend all of them
-            return unique_recommendations
-        # 10 or more available candidates, recommend exactly 10
-        return unique_recommendations[:10]
+        limit = min(max(10, total_available), 15)
+        return unique_recommendations[:limit]
 
     def get_recommendation(
         self,
@@ -360,10 +357,8 @@ class BaseEngine:
                 
             recommendations.sort(key=lambda x: x['score'], reverse=True)
             total_available = len(recommendations)
-            if total_available < 10:
-                top_recommendations = recommendations
-            else:
-                top_recommendations = recommendations[:10]
+            limit = min(max(10, total_available), 15)
+            top_recommendations = recommendations[:limit]
         else:
             # Looking for Tertiary
             sec_ingredient = Ingredient.objects.filter(id=secondary_id).first()
@@ -397,10 +392,8 @@ class BaseEngine:
                 
             recommendations.sort(key=lambda x: x['score'], reverse=True)
             total_available = len(recommendations)
-            if total_available < 10:
-                top_recommendations = recommendations
-            else:
-                top_recommendations = recommendations[:10]
+            limit = min(max(10, total_available), 15)
+            top_recommendations = recommendations[:limit]
                     
         return {'recommended': top_recommendations}
 
@@ -471,6 +464,11 @@ class BaseEngine:
                 else:
                     score += 1 # Base experimental score for novel pairings
 
+        # Favorite Boost: Prioritize preferred reagents
+        if i2.favorite:
+            score += 8
+            reason = f"★ Favorite reagent: {reason}"
+
         return {'score': score, 'reason': reason, 'bridge': bridge}
 
     def _calculate_profile_balance(self, i1: Ingredient, i2: Ingredient, cand: Ingredient) -> int:
@@ -500,8 +498,9 @@ class BaseEngine:
             if filtered_query.exists():
                 query = filtered_query
             
-        # Get a diverse, dynamic set of 10 ingredients to serve as bases
-        diverse_bases = query.order_by('?')[:10]
+        # Get a diverse, dynamic set of up to 15 ingredients to serve as bases, prioritizing favorites
+        limit = min(max(10, query.count()), 15)
+        diverse_bases = query.order_by('-favorite', '?')[:limit]
         
         for ingredient in diverse_bases:
             recommendations.append({
