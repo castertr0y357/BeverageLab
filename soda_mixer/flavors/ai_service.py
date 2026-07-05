@@ -941,7 +941,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         if is_json_request:
             data["format"] = "json"
 
-        logger.info(f"Ollama Chat - Request payload: {json.dumps(data)}")
+        logger.warning(f"Ollama Chat - Request payload: {json.dumps(data)}")
         response = cls._safe_request('POST', url, json=data, timeout=120)
         result = response.json()
         
@@ -1097,7 +1097,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
         if is_json_request:
             data["format"] = "json"
 
-        logger.info(f"Ollama Stream Chat - Request payload: {json.dumps(data)}")
+        logger.warning(f"Ollama Stream Chat - Request payload: {json.dumps(data)}")
         response = requests.post(url, json=data, stream=True, timeout=120)
         response.raise_for_status()
         for line in response.iter_lines():
