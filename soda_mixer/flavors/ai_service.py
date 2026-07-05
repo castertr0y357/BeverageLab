@@ -45,16 +45,16 @@ Core Synthesis Mode Rules:
 Output Specifications:
 - For general conversation, respond with concise, creative lab reports or conversational guidance (2-3 paragraphs).
 - For structured data requests, return ONLY a raw JSON object conforming to the specified JSON schema. Do not include markdown wraps (like ```json) or any conversational preamble.
+- Each suggestion "reason" must be a concise, scientific, mixology-focused explanation of MAX 12 words (e.g., "neutralizes bitter espresso phenols").
+- The overall "reasoning" must be a concise mixology synthesis analysis of MAX 2 sentences.
 
 Structured Output JSON Schema:
 {
     "suggestions": [
         {
             "name": "Ingredient Name",
-            "reason": "Acidity balances sweetness",
-            "resonance": 95,
-            "amount": 15.0,
-            "profile": { "intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2 }
+            "reason": "Scientific flavor/chemistry explanation (max 12 words)",
+            "amount": 15.0
         }
     ],
     "rebalancing": {
@@ -63,10 +63,10 @@ Structured Output JSON Schema:
     },
     "seal_recommended": false,
     "seal_resonance": 90,
-    "reasoning": "Standard laboratory balance analysis."
+    "reasoning": "Scientific mixology analysis (max 2 sentences)."
 }"""
     
-    SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "amount": 25.0, "reason": "Acidity balances sweetness", "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}}]'
+    SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "amount": 25.0, "reason": "Acidity balances sweetness"}]'
     
     SURPRISE_MIX_FORMAT = """{
     "design_intent": "Brief overall reasoning...",
