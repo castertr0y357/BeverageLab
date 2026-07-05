@@ -933,7 +933,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "think": think_val,
             "options": {
                 "num_predict": 2048,
-                "temperature": 0.2
+                "temperature": 0.5
             }
         }
         user_prompt = messages[-1]['content'] if messages else ""
@@ -1089,7 +1089,7 @@ Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdo
             "think": think_val,
             "options": {
                 "num_predict": 2048,
-                "temperature": 0.2
+                "temperature": 0.5
             }
         }
         user_prompt = messages[-1]['content'] if messages else ""
