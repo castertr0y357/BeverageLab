@@ -44,6 +44,12 @@ The Assistant is compatible with a wide range of LLM providers, configurable via
 - **Local Inferencing**: Native Ollama support (Mistral, Llama 3, etc.) and AnythingLLM integrations.
 - **VRAM Pre-Warming**: Automates a "Status Pulse" heartbeat that proactively loads local models into the GPU/VRAM on system load, ensuring zero-latency response times during active synthesis.
 
+### 💡 Recommended Models (Quality & Speed)
+When running **Ollama** locally, selecting the correct model is vital for maintaining responsive suggestion latency (ideally under 5 seconds) without sacrificing schema parsing reliability:
+- **Small-Scale Models (Recommended)**: Use smaller, instruction-tuned models like `gemma4:e4b`, `gemma2:9b`, or `llama3:8b`. These have small footprints, load rapidly in consumer VRAM (such as an RTX 3080/4080 series), and generate tokens quickly.
+- **Mixture of Experts (MoE)**: MoE models (like Mixtral) offer high intelligence with active parameter optimization, allowing complex mixology routing with fast token output.
+- **Why Smaller is Better**: Because suggestion prompts rely on exact matching against the static Laboratory Registry, smaller models excel at structured tasks when kept at a low-to-medium temperature (`0.2` - `0.5`). Larger reasoning models can add unnecessary latency without improving keyword-matching success.
+
 ### 🧪 Synthesis Protocols
 - **Molecular Affinity Matches**: The Assistant analyzes your current compound and proactively discovers matches based on chemical resonance and flavor science.
 - **"Surprise Me" (Random Pairing)**: Initiates an autonomous pairing protocol that constructs a viable 3-component formula based on the current laboratory mode.
