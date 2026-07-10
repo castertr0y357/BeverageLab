@@ -241,6 +241,42 @@ class BeverageLabRecommendationTest(TestCase):
         normal_idx = recommended_list.index(normal_rec)
         self.assertLess(fav_idx, normal_idx)
 
+    def test_multi_ingredient_compatibility(self) -> None:
+        """Verify that recommendations evaluate compatibility against all active ingredients."""
+        Ingredient.objects.all().update(is_in_inventory=False)
+        comp_both = Ingredient.objects.create(
+            name="Vanilla Extract",
+            category="sweet",
+            ingredient_type="ADDITIVE",
+            intensity=2,
+            sweetness=4,
+            acidity=1,
+            bitterness=1,
+            complexity=2,
+            is_in_inventory=True,
+            compatible_systems="SODA,COFFEE"
+        )
+        comp_one = Ingredient.objects.create(
+            name="Dark Cocoa",
+            category="coffee",
+            ingredient_type="ADDITIVE",
+            intensity=4,
+            sweetness=1,
+            acidity=2,
+            bitterness=4,
+            complexity=3,
+            is_in_inventory=True,
+            compatible_systems="SODA,COFFEE"
+        )
+        
+        recs = get_recommendation([self.ing1.id, self.ing2.id], drink_type="SODA")
+        recommended_list = recs["recommended"]
+        
+        vanilla_rec = next(r for r in recommended_list if r["ingredient"].id == comp_both.id)
+        cocoa_rec = next(r for r in recommended_list if r["ingredient"].id == comp_one.id)
+        
+        self.assertGreater(vanilla_rec["score"], cocoa_rec["score"])
+
 
 class BeverageLabViewsTest(TestCase):
     """Integration tests for application views and AJAX endpoints."""
@@ -1371,6 +1407,51 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.assertEqual(len(suggestions), 1)
         self.assertEqual(suggestions[0]['name'], 'Whole Milk')
 
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
+    def test_ai_suggest_api_coffee_bean_split_rebalancing(self, mock_suggest: MagicMock) -> None:
+        """Verify that when multiple coffee beans are returned in rebalancing, they scale to sum to 18.0g."""
+        another_bean = Ingredient.objects.create(
+            name="Ethiopian Beans",
+            brand="Monin",
+            ingredient_type="COFFEE_BEAN",
+            category="coffee",
+            is_in_inventory=True
+        )
+        
+        mock_suggest.return_value = {
+            "suggestions": [
+                {
+                    "name": "Whole Milk (Local Dairy)",
+                    "reason": "Creams it up",
+                    "resonance": 95,
+                    "amount": 100.0,
+                    "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
+                }
+            ],
+            "rebalancing": {
+                "Espresso Beans (Monin)": 10.0,
+                "Ethiopian Beans (Monin)": 10.0
+            },
+            "seal_recommended": False,
+            "seal_resonance": 80,
+            "reasoning": "Test split bean rebalancing."
+        }
+
+        response = self.client.post(
+            reverse('ai_suggest_api'),
+            data=json.dumps({
+                'ingredients': ['Espresso Beans (Monin)', 'Ethiopian Beans (Monin)'],
+                'drink_type': 'COFFEE',
+                'mode': 'standard'
+            }),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = _get_sse_data(response)
+        
+        # Verify the two coffee beans sum to 18.0g (9.0g each)
+        self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 9.0)
+        self.assertEqual(data['rebalancing']['Ethiopian Beans (Monin)'], 9.0)
 
 
 class BeverageLabIcedCoffeeTest(TestCase):

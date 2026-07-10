@@ -195,38 +195,66 @@ class BaseEngine:
         if force_type:
             system_candidates = system_candidates.filter(ingredient_type=force_type)
 
-        recommendations = []
-        for base_ing in base_ingredients:
-            compat_cats = self.category_compatibility.get(base_ing.category, [])
+        if not base_ingredients:
+            recommendations = []
             for cand in system_candidates:
+                recommendations.append({
+                    'ingredient': cand,
+                    'score': 5,
+                    'reason': "Excellent Component"
+                })
+            recommendations.sort(key=lambda x: x['score'], reverse=True)
+            total_available = len(recommendations)
+            limit = min(max(10, total_available), 15)
+            return recommendations[:limit]
+
+        recommendations = []
+        for cand in system_candidates:
+            total_score = 0
+            best_score = -999
+            best_reason = "Pairs with active mixture"
+            
+            for base_ing in base_ingredients:
                 score_data = self._calculate_compatibility_score(
                     base_ing, cand, experimental=experimental, avg_rating=cand.avg_rating
                 )
-                score = score_data['score']
-                reason = score_data['reason']
+                item_score = score_data['score']
                 
+                # Category compatibility penalty in standard mode
                 if not experimental:
+                    compat_cats = self.category_compatibility.get(base_ing.category, [])
                     if cand.category not in compat_cats and cand.category != base_ing.category:
-                        score -= 2
-                        
-                recommendations.append({
-                    'ingredient': cand,
-                    'score': score,
-                    'reason': reason
-                })
+                        item_score -= 2
+                
+                total_score += item_score
+                if item_score > best_score:
+                    best_score = item_score
+                    best_reason = score_data['reason']
+            
+            # Profile balance score if there are multiple active ingredients
+            if len(base_ingredients) >= 2:
+                avg_sweet = sum(b.sweetness for b in base_ingredients) / len(base_ingredients)
+                avg_acid = sum(b.acidity for b in base_ingredients) / len(base_ingredients)
+                
+                profile_score = 0
+                if avg_sweet > 3.5 and (cand.acidity >= 3 or cand.bitterness >= 3):
+                    profile_score += 3
+                if avg_acid > 3.5 and cand.sweetness >= 3:
+                    profile_score += 3
+                total_score += profile_score
+                
+            recommendations.append({
+                'ingredient': cand,
+                'score': total_score,
+                'reason': best_reason
+            })
 
-        # Deduplicate and sort unique candidates by highest score
+        # Sort candidates by highest score
         recommendations.sort(key=lambda x: x['score'], reverse=True)
-        seen = set()
-        unique_recommendations = []
-        for rec in recommendations:
-            if rec['ingredient'].id not in seen:
-                unique_recommendations.append(rec)
-                seen.add(rec['ingredient'].id)
 
-        total_available = len(unique_recommendations)
+        total_available = len(recommendations)
         limit = min(max(10, total_available), 15)
-        return unique_recommendations[:limit]
+        return recommendations[:limit]
 
     def get_recommendation(
         self,

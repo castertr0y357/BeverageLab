@@ -126,7 +126,7 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                 } for r in result.get('recommended', [])
             ]
         elif len(ingredient_ids) == 1:
-            result = get_tiered_recommendation(ingredient_ids[0], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
+            result = get_recommendation(ingredient_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
@@ -146,11 +146,12 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'score': r['score'],
                     'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
-                    'tier': r.get('tier', 'secondary')
+                    'tier': 'secondary'
                 } for r in result.get('recommended', [])
             ]
         else:
-            result = get_tiered_recommendation(ingredient_ids[0], ingredient_ids[1], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
+            result = get_recommendation(ingredient_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
+            scale_factor = 15.0 / len(ingredient_ids)
             serialized_recs = [
                 {
                     'id': r['ingredient'].id,
@@ -168,9 +169,9 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_dry': r['ingredient'].is_dry,
                     'favorite': r['ingredient'].favorite,
                     'score': r['score'],
-                    'resonance': round(min(r['score'] * 7.5, 99.8), 1),  # Tertiary is sum of two scores
+                    'resonance': round(min(r['score'] * scale_factor, 99.8), 1),
                     'reason': r['reason'],
-                    'tier': r.get('tier', 'tertiary')
+                    'tier': 'tertiary'
                 } for r in result.get('recommended', [])
             ]
 
@@ -478,14 +479,21 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' (type: {target_obj.ingredient_type}) which does not match force_type '{force_type}'")
                                 continue
                             intensity_delta = 0
-                            if ingredients and ingredients[0] != "NONE - Initial Synthesis":
-                                baseline_name = ingredients[0].strip().lower()
-                                first_ing = next((inv for inv in inventory_items if inv.name.lower() == baseline_name), None)
-                                if not first_ing:
-                                    first_ing = Ingredient.objects.filter(name__iexact=ingredients[0]).first()
-                                
-                                base_intensity = first_ing.intensity if first_ing else 3
-                                intensity_delta = abs(target_obj.intensity - base_intensity)
+                            active_ingredients = []
+                            for ing_name in ingredients:
+                                if ing_name and ing_name != "NONE - Initial Synthesis":
+                                    ing_clean = ing_name.strip().lower()
+                                    ing_obj = next((inv for inv in inventory_items if inv.name.lower() == ing_clean), None)
+                                    if not ing_obj:
+                                        ing_obj = Ingredient.objects.filter(Q(name__iexact=ing_clean) | Q(brand__iexact=ing_clean)).first()
+                                    if ing_obj:
+                                        active_ingredients.append(ing_obj)
+                            
+                            if active_ingredients:
+                                avg_intensity = sum(ing.intensity for ing in active_ingredients) / len(active_ingredients)
+                                intensity_delta = abs(target_obj.intensity - avg_intensity)
+                            else:
+                                intensity_delta = 3
                             
                             resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
                             
@@ -518,12 +526,50 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     if drink_type == 'COFFEE' and rebalancing:
                         logger.warning(f"AISuggestion - Info - Raw AI rebalancing before sanitization: {rebalancing}")
                         sanitized_rebalancing = {}
+                        
+                        beans_in_rebal = {}
+                        dairy_in_rebal = {}
+                        other_in_rebal = {}
+                        
                         for key, val in rebalancing.items():
                             target_obj = find_ingredient_by_name(key, inventory_items)
                             if target_obj:
-                                sanitized_rebalancing[key] = sanitize_coffee_amount(target_obj, val)
+                                val_float = float(val) if val is not None else 0.0
+                                if target_obj.ingredient_type == 'COFFEE_BEAN':
+                                    beans_in_rebal[key] = val_float
+                                elif target_obj.ingredient_type == 'DAIRY':
+                                    dairy_in_rebal[key] = val_float
+                                else:
+                                    other_in_rebal[key] = val_float
                             else:
                                 logger.warning(f"AISuggestion - Warning - Rebalancing key '{key}' not found in inventory, skipping raw value {val}")
+                                
+                        # Sanitize coffee beans (sum to 18.0g)
+                        if beans_in_rebal:
+                            total_bean_val = sum(beans_in_rebal.values())
+                            if total_bean_val > 0:
+                                for key, val in beans_in_rebal.items():
+                                    sanitized_rebalancing[key] = round((val / total_bean_val) * 18.0, 1)
+                            else:
+                                num_beans = len(beans_in_rebal)
+                                for key in beans_in_rebal:
+                                    sanitized_rebalancing[key] = round(18.0 / num_beans, 1)
+                                    
+                        # Sanitize dairy (sum to 50.0ml)
+                        if dairy_in_rebal:
+                            total_dairy_val = sum(dairy_in_rebal.values())
+                            if total_dairy_val > 0:
+                                for key, val in dairy_in_rebal.items():
+                                    sanitized_rebalancing[key] = round((val / total_dairy_val) * 50.0, 1)
+                            else:
+                                num_dairy = len(dairy_in_rebal)
+                                for key in dairy_in_rebal:
+                                    sanitized_rebalancing[key] = round(50.0 / num_dairy, 1)
+                                    
+                        # Sanitize additives/others (15.0ml each)
+                        for key in other_in_rebal:
+                            sanitized_rebalancing[key] = 15.0
+                            
                         rebalancing = sanitized_rebalancing
                         logger.warning(f"AISuggestion - Info - Sanitized rebalancing: {rebalancing}")
 
@@ -553,15 +599,13 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                 if ing_obj:
                     excl_ids.append(ing_obj.id)
             
-            from soda_mixer.flavors.recommendations import get_recommendation, get_tiered_recommendation
+            from soda_mixer.flavors.recommendations import get_recommendation
             experimental = (mode == 'experimental')
             
-            if len(ing_ids) == 0:
-                recs_data = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
-            elif len(ing_ids) == 1:
-                recs_data = get_tiered_recommendation(ing_ids[0], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
-            else:
-                recs_data = get_tiered_recommendation(ing_ids[0], ing_ids[1], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
+            recs_data = get_recommendation(ing_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
+            scale_factor = 15.0
+            if len(ing_ids) >= 2:
+                scale_factor = 15.0 / len(ing_ids)
             
             for item in recs_data.get('recommended', []):
                 target_obj = item['ingredient']
@@ -584,7 +628,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     'accent_suitability': target_obj.accent_suitability,
                     'is_ready_to_drink': target_obj.is_ready_to_drink,
                     'is_dry': target_obj.is_dry,
-                    'resonance': round(min(item['score'] * 15.0, 99.8), 1),  # Map 1-5 score to 0-100 scale
+                    'resonance': round(min(item['score'] * scale_factor, 99.8), 1),  # Map score to 0-100 scale dynamically
                     'reason': f"Algorithmic: {item['reason']}",
                     'amount': amount,
                     'profile': None
