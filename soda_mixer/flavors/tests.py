@@ -1500,8 +1500,10 @@ class BeverageLabIcedCoffeeTest(TestCase):
         self.assertContains(detail_response, 'Ice')
         self.assertContains(detail_response, 'iceDetailVolume')
 
-    def test_random_pairing_api_coffee_secondary_dairy(self) -> None:
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.check_status')
+    def test_random_pairing_api_coffee_secondary_dairy(self, mock_status: MagicMock) -> None:
         """Verify that Coffee Lab random pairing selects DAIRY as the secondary ingredient (index 1)."""
+        mock_status.return_value = 'unconfigured'
         Ingredient.objects.create(
             name="Vanilla Syrup",
             brand="Monin",
