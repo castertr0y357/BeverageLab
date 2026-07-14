@@ -242,11 +242,11 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         if not drink_type:
             drink_type = 'SODA'
 
-        inventory_context = AIAssistant.get_static_ingredients_context()
+        inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
         prompt = user_message + lab_context
         
         # Bridge to the streaming generator
-        response_generator = AIAssistant.chat_stream(prompt, history=history, context=inventory_context)
+        response_generator = AIAssistant.chat_stream(prompt, history=history, context=inventory_context, drink_type=drink_type)
         return StreamingHttpResponse(response_generator, content_type='text/event-stream')
         
     except Exception as e:
@@ -389,7 +389,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             yield send_progress("Scanning current compound registry...")
             
             # Get full static inventory context
-            inventory_context = AIAssistant.get_static_ingredients_context()
+            inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
 
             # Filter the candidate pool for this step
             all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
@@ -824,10 +824,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
         
         status = AIAssistant.check_status()
         if status == 'synchronized':
-            inventory_context = [
-                f"{i.name} (Type: {i.ingredient_type}, Category: {i.category})"
-                for i in all_compatible
-            ]
+            inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
             
             ai_result = AIAssistant.synthesize_surprise_mix(
                 inventory=inventory_context,

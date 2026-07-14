@@ -110,6 +110,89 @@ Structured Output JSON Schema:
         return base_url
 
     @classmethod
+    def get_system_prompt(cls, drink_type: Optional[str] = None) -> str:
+        """Construct a dynamic, mode-specific system prompt to prevent cross-engine rule confusion."""
+        base_prompt = """You are the Lead Creative Mixologist at the "Beverage Laboratory," a high-end, scientific-themed soda, coffee, and slushie mixing facility. Your goal is to assist users in synthesizing perfect liquid compounds.
+
+Personality:
+- Enthusiastic about flavor science.
+- Use laboratory terminology (synthesis, compound, reagent, base, stabilizer).
+- Value bold, experimental pairings over safe bets, but always anchor them in flavor balance.
+- Understand Sweetness, Acidity, Bitterness, Intensity, and Complexity as the core axes of a drink.
+"""
+
+        drink_type = (drink_type or '').upper()
+        mode_rules = ""
+        
+        if drink_type == 'SODA':
+            mode_rules = """
+Core Synthesis Mode Rules:
+SODA LAB MODE:
+- Total syrup for a 1.0L batch must not exceed 160ml (proportional for other sizes: 80ml for 0.5L, crisp=105ml, craft=120ml, fountain=140ml).
+- Recommend base flavor anchors (e.g. fruit syrups) and complementary accents.
+"""
+        elif drink_type == 'COFFEE':
+            mode_rules = """
+Core Synthesis Mode Rules:
+COFFEE LAB MODE (Espresso & Brew Extraction):
+- The dry base coffee beans MUST be 18.0g (weight) representing a double-shot espresso.
+- Liquid dairy and plant milks (type DAIRY) must be 50.0ml (volume).
+- Minor additives, sweet syrups, and creamers (type ADDITIVE) must be 15.0ml (volume).
+- Accents and others must be 15.0ml.
+- Do NOT suggest grams for liquids, and do NOT use ml for coffee beans.
+- Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
+"""
+        elif drink_type == 'SLUSHIE':
+            mode_rules = """
+Core Synthesis Mode Rules:
+CRYO LAB (SLUSHIE) MODE:
+- Total syrup for a 1.0L batch must not exceed 160ml.
+- Recommend amounts based on Ninja Creami displacement limits (e.g., 80.0ml for base, 40.0ml for payloads, 20.0ml for accents).
+"""
+        else:
+            mode_rules = """
+Core Synthesis Mode Rules:
+1. SODA LAB MODE: Total syrup for a 1.0L batch must not exceed 160ml.
+2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans must be 18.0g, dairy/plant milk must be 50.0ml, and additives/syrups must be 15.0ml.
+3. CRYO LAB (SLUSHIE) MODE: Total syrup for a 1.0L batch must not exceed 160ml.
+"""
+
+        quality_rules = """
+Flavor Clashing & Balance Rules:
+- Reason about flavor aesthetics and avoid clashing combinations (e.g., do not pair delicate herbs or florals like lavender with extremely bitter dark roast coffee, and avoid combining highly acidic ingredients with dairy to prevent curdling/clashing taste).
+
+Composition-Wide Harmony:
+- Evaluate the entire active mixture as a single cohesive unit. Do not just recommend based on the base flavor; ensure the new recommendation complements, balances, or enhances all selected ingredients in the compound.
+"""
+
+        output_specs = """
+Output Specifications:
+- For general conversation, respond with concise, creative lab reports or conversational guidance (2-3 paragraphs).
+- For structured data requests, return ONLY a raw JSON object conforming to the specified JSON schema. Do not include markdown wraps (like ```json) or any conversational preamble.
+- Each suggestion "reason" must be a concise, scientific, mixology-focused explanation of MAX 12 words (e.g., "neutralizes bitter espresso phenols").
+- The overall "reasoning" must be a concise mixology synthesis analysis of MAX 2 sentences.
+
+Structured Output JSON Schema:
+{
+    "suggestions": [
+        {
+            "name": "Ingredient Name",
+            "reason": "Scientific flavor/chemistry explanation (max 12 words)",
+            "amount": 15.0
+        }
+    ],
+    "rebalancing": {
+        "Active Ingredient 1": 18.0,
+        "Active Ingredient 2": 50.0
+    },
+    "seal_recommended": false,
+    "seal_resonance": 90,
+    "reasoning": "Scientific mixology analysis (max 2 sentences)."
+}"""
+
+        return base_prompt + mode_rules + quality_rules + output_specs
+
+    @classmethod
     def get_default_provider(cls) -> Optional[LLMProvider]:
         """Get the default LLM provider configured in the system."""
         config = SystemConfiguration.get_config()
@@ -120,32 +203,30 @@ Structured Output JSON Schema:
         return LLMProvider.objects.filter(is_enabled=True).first()
 
     @classmethod
-    def get_static_ingredients_context(cls) -> str:
-        """Serialize all active inventory ingredients into a stable, sorted, rich text format."""
+    def get_static_ingredients_context(cls, drink_type: Optional[str] = None) -> str:
+        """Serialize active inventory ingredients into a stable, sorted, rich text format, filtered by mode."""
         from .models import Ingredient
-        # Order by name and brand to guarantee identical output sequence for prefix caching
-        ingredients = Ingredient.objects.filter(is_in_inventory=True).order_by('name', 'brand')
+        ingredients = Ingredient.objects.filter(is_in_inventory=True)
+        if drink_type:
+            ingredients = ingredients.filter(compatible_systems__icontains=drink_type.upper())
+        ingredients = ingredients.order_by('name', 'brand')
+        
         registry = []
         for ing in ingredients:
             brand_str = f" [{ing.brand}]" if ing.brand else ""
-            notes_str = f" | Notes: {ing.flavor_notes}" if ing.flavor_notes else ""
+            notes_str = f" | Profile: {ing.flavor_notes}" if ing.flavor_notes else ""
             ai_notes_str = f" | Sensory: {ing.ai_notes}" if ing.ai_notes else ""
             fav_str = " | *FAVORITE*" if ing.favorite else ""
             
             if ing.ingredient_type == 'COFFEE_BEAN':
+                decaf_str = "Decaf" if ing.is_decaf else "Regular"
                 registry.append(
-                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category} | "
-                    f"Roast: {ing.roast_level} | Decaf: {ing.is_decaf} | Origin: {ing.origin or 'Unknown'} | "
-                    f"Body: {ing.body_intensity}/5 | Acidity: {ing.acidity_score}/5 | Bitterness: {ing.bitterness_score}/5"
+                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Roast: {ing.roast_level} | {decaf_str} | Origin: {ing.origin or 'Unknown'}"
                     f"{notes_str}{ai_notes_str}{fav_str})"
                 )
             else:
                 registry.append(
-                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category} | "
-                    f"Intensity: {ing.intensity}/5 | Sweetness: {ing.sweetness}/5 | Acidity: {ing.acidity}/5 | "
-                    f"Bitterness: {ing.bitterness}/5 | Complexity: {ing.complexity}/5 | "
-                    f"Base Suitability: {ing.base_suitability}/5 | Accent Suitability: {ing.accent_suitability}/5 | "
-                    f"RTD: {ing.is_ready_to_drink} | Dry: {ing.is_dry} | Systems: {ing.compatible_systems}"
+                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category}"
                     f"{notes_str}{ai_notes_str}{fav_str})"
                 )
         return "\n".join(registry)
@@ -441,7 +522,7 @@ Structured Output JSON Schema:
             return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
 
     @classmethod
-    def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> str:
+    def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None) -> str:
         """
         Send a prompt to the configured LLM provider.
         history: List of previous messages for context.
@@ -457,9 +538,13 @@ Structured Output JSON Schema:
         if not provider:
             return "Error: No AI Laboratory Assistant is configured or enabled. Please check settings."
 
-        system_content = cls.SYSTEM_PROMPT
+        system_content = cls.get_system_prompt(drink_type=drink_type)
         if context:
-            system_content += f"\n\nUSER'S LABORATORY INVENTORY REGISTRY:\n{context}"
+            if isinstance(context, list):
+                context_str = "\n".join(context)
+            else:
+                context_str = str(context)
+            system_content += f"\n\nUSER'S LABORATORY INVENTORY REGISTRY:\n{context_str}"
 
         messages = [{"role": "system", "content": system_content}]
         if history:
@@ -489,10 +574,10 @@ Structured Output JSON Schema:
             return f"Laboratory Error: Failed to reach the assistant ({str(e)})."
 
     @classmethod
-    def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[str] = None) -> Generator[str, None, None]:
+    def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None) -> Generator[str, None, None]:
         """Stream a prompt response from the configured LLM provider."""
         if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
-            text = cls.chat(user_prompt, history, provider, context)
+            text = cls.chat(user_prompt, history, provider, context, drink_type=drink_type)
             yield f"data: {json.dumps({'chunk': text})}\n\n"
             return
 
@@ -504,9 +589,13 @@ Structured Output JSON Schema:
             yield f"data: {error_chunk}\n\n"
             return
 
-        system_content = cls.SYSTEM_PROMPT
+        system_content = cls.get_system_prompt(drink_type=drink_type)
         if context:
-            system_content += f"\n\nUSER'S LABORATORY INVENTORY REGISTRY:\n{context}"
+            if isinstance(context, list):
+                context_str = "\n".join(context)
+            else:
+                context_str = str(context)
+            system_content += f"\n\nUSER'S LABORATORY INVENTORY REGISTRY:\n{context_str}"
 
         messages = [{"role": "system", "content": system_content}]
         if history:
@@ -559,12 +648,12 @@ Structured Output JSON Schema:
         if not provider:
             return
 
-        # Fetch the static ingredients context (same as used in actual suggestions)
-        inventory_context = cls.get_static_ingredients_context()
-
         # Loop through all three active system modes to ensure each prefix is pre-cached
         for drink_type in ['SODA', 'COFFEE', 'SLUSHIE']:
             try:
+                # Fetch the static ingredients context filtered by mode
+                inventory_context = cls.get_static_ingredients_context(drink_type=drink_type)
+                
                 # Construct standard dummy query matching the active mode parameters
                 prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
  
@@ -576,7 +665,7 @@ Active Mixture: NONE - Initial Synthesis
 Force Type Constraint: None
 Exclusion List: None
 """
-                cls.chat(prompt, context=inventory_context, provider=provider)
+                cls.chat(prompt, context=inventory_context, provider=provider, drink_type=drink_type)
                 logger.info(f"AIKeepWarm - Info - Preheat KV Cache succeeded for mode '{drink_type}' on provider '{provider.name}'")
             except Exception as e:
                 logger.error(f"AIKeepWarm - Error - Preheat KV Cache failed for mode '{drink_type}': {e}")
@@ -646,7 +735,7 @@ Exclusion List: None
         
         # Fallback if inventory is not passed explicitly
         if not inventory:
-            inventory = cls.get_static_ingredients_context()
+            inventory = cls.get_static_ingredients_context(drink_type=drink_type)
 
         # Look up detailed metadata for ingredients currently in the mix
         current_compound_details = []
@@ -662,10 +751,13 @@ Exclusion List: None
             
             if db_ing:
                 ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
+                profile_part = f", Profile: {db_ing.flavor_notes}" if db_ing.flavor_notes else ""
+                sensory_part = f", Sensory: {db_ing.ai_notes}" if db_ing.ai_notes else ""
                 if db_ing.ingredient_type == 'COFFEE_BEAN':
-                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Roast: {db_ing.roast_level}, Decaf: {db_ing.is_decaf}, Body: {db_ing.body_intensity}/5, Acidity: {db_ing.acidity_score}/5, Bitterness: {db_ing.bitterness_score}/5"
+                    decaf_str = "Decaf" if db_ing.is_decaf else "Regular"
+                    details = f"Type: {db_ing.ingredient_type}, Roast: {db_ing.roast_level}, {decaf_str}{profile_part}{sensory_part}"
                 else:
-                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}, Intensity: {db_ing.intensity}/5, Sweetness: {db_ing.sweetness}/5, Acidity: {db_ing.acidity}/5, Bitterness: {db_ing.bitterness}/5"
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}{profile_part}{sensory_part}"
                 current_compound_details.append(f"{ing_display} ({details})")
             else:
                 current_compound_details.append(ing_name)
@@ -688,11 +780,13 @@ Current Mode: {drink_type} | Mode: {tone}
 Active Mixture: {current_compound_str}
 Force Type Constraint: {force_type or 'None'}{force_rule}
 Exclusion List: {exclude_str}
+
+Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture, not just the base ingredient. Avoid recommending items that clash with any part of the active mixture.
 """
         if retry_note:
             prompt += f"\n[RETRY COMMAND]: {retry_note}\n"
 
-        response = cls.chat(prompt, context=inventory)
+        response = cls.chat(prompt, context=inventory, drink_type=drink_type)
         return cls._extract_json(response)
 
     @classmethod
@@ -751,6 +845,9 @@ Exclusion List: {exclude_str}
     ]
 }"""
 
+        if not inventory:
+            inventory = cls.get_static_ingredients_context(drink_type=drink_type)
+
         prompt = f"""[AUTONOMOUS SYNTHESIS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
         
 Task: Select {count_limit} ingredients from the Inventory Registry below to create a cohesive {drink_label} compound.
@@ -765,7 +862,7 @@ Inventory Registry for Selection: See context.
 [DYNAMIC REQUEST PARAMETERS]:
 Lab Mode: {tone}
 """
-        response = cls.chat(prompt, context=inventory)
+        response = cls.chat(prompt, context=inventory, drink_type=drink_type)
         return cls._extract_json(response)
 
     @classmethod
@@ -784,23 +881,20 @@ Lab Mode: {tone}
             amt = i.get('amount')
             amt_str = f" ({amt}g)" if itype == 'COFFEE_BEAN' else (f" ({amt}ml)" if amt else "")
             
+            notes = i.get('flavor_notes', '')
+            if isinstance(notes, list):
+                notes = ", ".join(notes)
+            ai_notes = i.get('ai_notes', '')
+            
+            profile_part = f", Profile: {notes}" if notes else ""
+            sensory_part = f", Sensory: {ai_notes}" if ai_notes else ""
+            
             if itype == 'COFFEE_BEAN':
                 roast = i.get('roast_level', 'MEDIUM')
                 decaf = "Decaf" if i.get('is_decaf') or i.get('is_decaf') == 'true' or i.get('is_decaf') is True else "Regular"
-                body = i.get('body_intensity', 3)
-                acid = i.get('acidity_score', 3)
-                bitter = i.get('bitterness_score', 3)
-                notes = i.get('flavor_notes', '')
-                if isinstance(notes, list):
-                    notes = ", ".join(notes)
-                desc = f"{name}{amt_str} [Type: {itype}, Roast: {roast}, {decaf}, Body: {body}/5, Acidity: {acid}/5, Bitterness: {bitter}/5, Notes: {notes}]"
+                desc = f"{name}{amt_str} [Type: {itype}, Roast: {roast}, {decaf}{profile_part}{sensory_part}]"
             else:
-                intensity = i.get('intensity', 3)
-                sweetness = i.get('sweetness', 3)
-                acidity = i.get('acidity', 3)
-                bitterness = i.get('bitterness', 1)
-                complexity = i.get('complexity', 3)
-                desc = f"{name}{amt_str} [Type: {itype}, Intensity: {intensity}/5, Sweetness: {sweetness}/5, Acidity: {acidity}/5, Bitterness: {bitterness}/5, Complexity: {complexity}/5]"
+                desc = f"{name}{amt_str} [Type: {itype}, Category: {i.get('category', 'sweet')}{profile_part}{sensory_part}]"
             enriched_list.append(desc)
         
         ingredient_list = '\n'.join(f"- {item}" for item in enriched_list)
@@ -815,7 +909,7 @@ Paragraph 1 — FLAVOR SYNERGY: Why do these ingredients work together? Referenc
 Paragraph 2 — EXPECTED TASTE: What will this drink taste like? Describe the opening, body, and finish. Keep it vivid and specific.
 
 Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
-        return cls.chat(prompt)
+        return cls.chat(prompt, drink_type=drink_type)
 
     @classmethod
     def analyze_flavor_profile(cls, name: str, description: str) -> Optional[Dict[str, float]]:
