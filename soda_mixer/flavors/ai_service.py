@@ -130,6 +130,7 @@ Core Synthesis Mode Rules:
 SODA LAB MODE:
 - Total syrup for a 1.0L batch must not exceed 160ml (proportional for other sizes: 80ml for 0.5L, crisp=105ml, craft=120ml, fountain=140ml).
 - Recommend base flavor anchors (e.g. fruit syrups) and complementary accents.
+- Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 """
         elif drink_type == 'COFFEE':
             mode_rules = """
@@ -148,6 +149,7 @@ Core Synthesis Mode Rules:
 CRYO LAB (SLUSHIE) MODE:
 - Total syrup for a 1.0L batch must not exceed 160ml.
 - Recommend amounts based on Ninja Creami displacement limits (e.g., 80.0ml for base, 40.0ml for payloads, 20.0ml for accents).
+- Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 """
         else:
             mode_rules = """
@@ -155,6 +157,7 @@ Core Synthesis Mode Rules:
 1. SODA LAB MODE: Total syrup for a 1.0L batch must not exceed 160ml.
 2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans must be 18.0g, dairy/plant milk must be 50.0ml, and additives/syrups must be 15.0ml.
 3. CRYO LAB (SLUSHIE) MODE: Total syrup for a 1.0L batch must not exceed 160ml.
+- Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 """
 
         quality_rules = """
