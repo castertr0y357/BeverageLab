@@ -438,7 +438,8 @@ def export_to_mealie_task(update_progress: Callable[..., None], recipe_uuid: uui
     
     mealie_ingredients = []
     for ring in recipe.recipe_ingredients.all():
-        unit = "oz" if recipe.drink_type == "SLUSHIE" else ("g" if recipe.drink_type == "COFFEE" and ring.ingredient and ring.ingredient.ingredient_type == "COFFEE_BEAN" else "ml")
+        is_coffee_bean = (ring.ingredient.physical_state == 'SOLID_EXTRACTABLE') if (ring.ingredient and ring.ingredient.physical_state) else (ring.ingredient and ring.ingredient.ingredient_type == 'COFFEE_BEAN')
+        unit = "oz" if recipe.drink_type == "SLUSHIE" else ("g" if recipe.drink_type == "COFFEE" and is_coffee_bean else "ml")
         ing_full_name = ring.ingredient.name
         amount = float(ring.amount)
         

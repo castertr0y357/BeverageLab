@@ -21,6 +21,8 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     name = request.POST.get('name', '').strip()
     brand = request.POST.get('brand', '').strip()
     ingredient_type = request.POST.get('ingredient_type', 'SODA_SYRUP')
+    physical_state = request.POST.get('physical_state', 'SYRUP')
+    mixology_function = request.POST.get('mixology_function', 'FLAVORING')
     category = request.POST.get('category', 'citrus').strip().lower()
     description = request.POST.get('description', '')
     ai_notes = request.POST.get('ai_notes', '').strip()
@@ -61,6 +63,8 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 name=name,
                 brand=brand,
                 ingredient_type=ingredient_type,
+                physical_state=physical_state,
+                mixology_function=mixology_function,
                 category=category,
                 description=description,
                 ai_notes=ai_notes,
@@ -104,6 +108,8 @@ def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
     ingredient.name = request.POST.get('name', ingredient.name).strip()
     ingredient.brand = request.POST.get('brand', ingredient.brand).strip()
     ingredient.ingredient_type = request.POST.get('ingredient_type', ingredient.ingredient_type)
+    ingredient.physical_state = request.POST.get('physical_state', ingredient.physical_state)
+    ingredient.mixology_function = request.POST.get('mixology_function', ingredient.mixology_function)
     
     category = request.POST.get('category', '').strip().lower()
     if category:

@@ -55,8 +55,18 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
     if not sweetness_style or sweetness_style == 'AUTO':
         baseline_sum = 0.0
         for ing in ingredients_input:
+            pstate = str(ing.get('physical_state', '')).upper()
+            mfunc = str(ing.get('mixology_function', '')).upper()
             itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
-            if itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not ing.get('is_dry', False):
+            is_dry = ing.get('is_dry', False)
+            
+            is_flavor_modifier = False
+            if pstate:
+                is_flavor_modifier = (pstate in ['SYRUP', 'SAUCE', 'LIQUID'] and mfunc in ['FLAVORING', 'SWEETENER', 'TEXTURIZER'])
+            else:
+                is_flavor_modifier = (itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not is_dry)
+                
+            if is_flavor_modifier:
                 baseline_sum += float(ing.get('amount', 0.0))
         
         unscaled_sum = baseline_sum / bottle_scale
@@ -88,8 +98,18 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
     # Partition ingredients using the Primary Flavor Anchor Protocol
     flavor_modifiers = []
     for ing in ingredients_input:
+        pstate = str(ing.get('physical_state', '')).upper()
+        mfunc = str(ing.get('mixology_function', '')).upper()
         itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
-        if itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not ing.get('is_dry', False):
+        is_dry = ing.get('is_dry', False)
+        
+        is_flavor_modifier = False
+        if pstate:
+            is_flavor_modifier = (pstate in ['SYRUP', 'SAUCE', 'LIQUID'] and mfunc in ['FLAVORING', 'SWEETENER', 'TEXTURIZER'])
+        else:
+            is_flavor_modifier = (itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not is_dry)
+            
+        if is_flavor_modifier:
             flavor_modifiers.append(ing)
 
     total_ingredients_count = len(flavor_modifiers)

@@ -40,9 +40,11 @@ def get_multibrand_names_in_inventory() -> Set[str]:
 
 def sanitize_coffee_amount(ingredient: Ingredient, amount: Optional[Union[float, int]] = None) -> float:
     """Ensure coffee ingredients have proper gram/volume amounts based on their role/type."""
-    if ingredient.ingredient_type == 'COFFEE_BEAN':
+    is_coffee = (ingredient.physical_state == 'SOLID_EXTRACTABLE') if ingredient.physical_state else (ingredient.ingredient_type == 'COFFEE_BEAN')
+    is_dairy = (ingredient.mixology_function == 'VOLUME_BASE' and ingredient.physical_state == 'LIQUID') if ingredient.mixology_function else (ingredient.ingredient_type == 'DAIRY')
+    if is_coffee:
         return 18.0
-    elif ingredient.ingredient_type == 'DAIRY':
+    elif is_dairy:
         return 50.0
     else:
         return 15.0
@@ -109,6 +111,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'type': r['ingredient'].ingredient_type,
+                    'physical_state': r['ingredient'].physical_state,
+                    'mixology_function': r['ingredient'].mixology_function,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -133,6 +137,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'type': r['ingredient'].ingredient_type,
+                    'physical_state': r['ingredient'].physical_state,
+                    'mixology_function': r['ingredient'].mixology_function,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -158,6 +164,8 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'name': get_display_name(r['ingredient'], multibrand_names),
                     'category': r['ingredient'].category,
                     'type': r['ingredient'].ingredient_type,
+                    'physical_state': r['ingredient'].physical_state,
+                    'mixology_function': r['ingredient'].mixology_function,
                     'intensity': r['ingredient'].intensity,
                     'sweetness': r['ingredient'].sweetness,
                     'acidity': r['ingredient'].acidity,
@@ -395,7 +403,17 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
             candidate_pool = all_ingredients
             if force_type:
-                candidate_pool = candidate_pool.filter(ingredient_type=force_type)
+                ft = force_type.upper()
+                if ft == 'COFFEE_BEAN':
+                    candidate_pool = candidate_pool.filter(physical_state='SOLID_EXTRACTABLE')
+                elif ft == 'DAIRY':
+                    candidate_pool = candidate_pool.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+                elif ft == 'SODA_SYRUP':
+                    candidate_pool = candidate_pool.filter(physical_state='SYRUP', mixology_function='FLAVORING')
+                elif ft == 'ADDITIVE':
+                    candidate_pool = candidate_pool.filter(mixology_function__in=['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
+                else:
+                    candidate_pool = candidate_pool.filter(ingredient_type=force_type)
             if mode != 'experimental':
                 candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
 
@@ -475,8 +493,21 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                         target_obj = find_ingredient_by_name(ing_name, inventory_items)
                                     
                         if target_obj:
-                            if force_type and target_obj.ingredient_type != force_type:
-                                logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' (type: {target_obj.ingredient_type}) which does not match force_type '{force_type}'")
+                            is_match = True
+                            if force_type:
+                                ft = force_type.upper()
+                                if ft == 'COFFEE_BEAN':
+                                    is_match = (target_obj.physical_state == 'SOLID_EXTRACTABLE')
+                                elif ft == 'DAIRY':
+                                    is_match = (target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID')
+                                elif ft == 'SODA_SYRUP':
+                                    is_match = (target_obj.physical_state == 'SYRUP' and target_obj.mixology_function == 'FLAVORING')
+                                elif ft == 'ADDITIVE':
+                                    is_match = (target_obj.mixology_function in ['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
+                                else:
+                                    is_match = (target_obj.ingredient_type == force_type)
+                            if not is_match:
+                                logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' which does not match force_type '{force_type}'")
                                 continue
                             intensity_delta = 0
                             active_ingredients = []
@@ -514,6 +545,8 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 'complexity': target_obj.complexity,
                                 'base_suitability': target_obj.base_suitability,
                                 'accent_suitability': target_obj.accent_suitability,
+                                'physical_state': target_obj.physical_state,
+                                'mixology_function': target_obj.mixology_function,
                                 'is_ready_to_drink': target_obj.is_ready_to_drink,
                                 'is_dry': target_obj.is_dry,
                                 'favorite': target_obj.favorite,
@@ -535,9 +568,9 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                             target_obj = find_ingredient_by_name(key, inventory_items)
                             if target_obj:
                                 val_float = float(val) if val is not None else 0.0
-                                if target_obj.ingredient_type == 'COFFEE_BEAN':
+                                if target_obj.physical_state == 'SOLID_EXTRACTABLE':
                                     beans_in_rebal[key] = val_float
-                                elif target_obj.ingredient_type == 'DAIRY':
+                                elif target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID':
                                     dairy_in_rebal[key] = val_float
                                 else:
                                     other_in_rebal[key] = val_float
@@ -733,6 +766,14 @@ def ai_bulk_analyze_task(update_progress: Callable[..., None]) -> None:
                         if category_res in ['citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee']:
                             match.category = category_res
                             
+                        physical_state_res = res.get('physical_state', '').strip().upper()
+                        if physical_state_res in ['LIQUID', 'SYRUP', 'SAUCE', 'POWDER', 'SOLID_EXTRACTABLE']:
+                            match.physical_state = physical_state_res
+                            
+                        mixology_function_res = res.get('mixology_function', '').strip().upper()
+                        if mixology_function_res in ['VOLUME_BASE', 'FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH']:
+                            match.mixology_function = mixology_function_res
+                            
                         type_res = res.get('ingredient_type', '').strip().upper()
                         if type_res in ['SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER']:
                             match.ingredient_type = type_res
@@ -855,19 +896,18 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
             design_intent = "" 
             
             if drink_type == 'COFFEE':
-                base_types = ['COFFEE_BEAN']
+                potential_bases = all_compatible.filter(physical_state='SOLID_EXTRACTABLE')
             else:
-                base_types = ['SODA_SYRUP']
-            potential_bases = all_compatible.filter(ingredient_type__in=base_types)
+                potential_bases = all_compatible.filter(physical_state='SYRUP', mixology_function='FLAVORING')
             
             if potential_bases.exists():
                 selection.append({'obj': random.choice(list(potential_bases)), 'amount': None})
             
             if drink_type == 'COFFEE' and target_count >= 3:
-                # Prioritize DAIRY as secondary ingredient, fallback to ADDITIVE
-                additives = all_compatible.filter(ingredient_type='DAIRY').exclude(id__in=[i['obj'].id for i in selection])
+                # Prioritize VOLUME_BASE / LIQUID (milks) as secondary ingredient, fallback to others
+                additives = all_compatible.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID').exclude(id__in=[i['obj'].id for i in selection])
                 if not additives.exists():
-                    additives = all_compatible.filter(ingredient_type='ADDITIVE').exclude(id__in=[i['obj'].id for i in selection])
+                    additives = all_compatible.exclude(physical_state='SOLID_EXTRACTABLE').exclude(id__in=[i['obj'].id for i in selection])
                 
                 if additives.exists():
                     target_additive = random.choice(list(additives))
@@ -915,6 +955,8 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                 'name': get_display_name(ing, multibrand_names),
                 'category': ing.category,
                 'type': ing.ingredient_type,
+                'physical_state': ing.physical_state,
+                'mixology_function': ing.mixology_function,
                 'intensity': ing.intensity,
                 'sweetness': ing.sweetness,
                 'acidity': ing.acidity,

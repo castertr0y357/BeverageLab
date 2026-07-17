@@ -198,6 +198,7 @@
                         data-brand="{{ ingredient.brand }}"
                         data-favorite="{{ ingredient.favorite|yesno:'true,false' }}"
                         data-type="{{ ingredient.ingredient_type }}" data-category="{{ ingredient.category }}"
+                        data-physical-state="{{ ingredient.physical_state }}" data-mixology-function="{{ ingredient.mixology_function }}"
                         data-intensity="{{ ingredient.intensity }}" data-sweetness="{{ ingredient.sweetness }}"
                         data-acidity="{{ ingredient.acidity }}" data-bitterness="{{ ingredient.bitterness }}"
                         data-complexity="{{ ingredient.complexity }}"
@@ -275,18 +276,29 @@
                     <input type="text" name="brand" id="addBrand" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Monin, Torani, Homemade">
                 </div>
                 <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label text-white fw-bold small">Type</label>
-                        <select name="ingredient_type" id="addType"
-                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
-                            <option value="SODA_SYRUP">Soda Syrup</option>
-                            <option value="COFFEE_BEAN">Coffee Bean</option>
-                            <option value="DAIRY">Dairy & Plant Milk</option>
-                            <option value="ADDITIVE">Additive (Syrup, Sugar, Honey, etc.)</option>
-                            <option value="OTHER">Other</option>
+                    <div class="col-4">
+                        <label class="form-label text-white fw-bold small">Physical State</label>
+                        <select name="physical_state" id="addPhysicalState"
+                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10" style="font-size: 0.75rem;">
+                            <option value="LIQUID">Liquid</option>
+                            <option value="SYRUP" selected>Syrup</option>
+                            <option value="SAUCE">Sauce</option>
+                            <option value="POWDER">Powder</option>
+                            <option value="SOLID_EXTRACTABLE">Solid Extractable</option>
                         </select>
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
+                        <label class="form-label text-white fw-bold small">Mixology Function</label>
+                        <select name="mixology_function" id="addMixologyFunction"
+                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10" style="font-size: 0.75rem;">
+                            <option value="VOLUME_BASE">Volume Base</option>
+                            <option value="FLAVORING" selected>Flavoring</option>
+                            <option value="SWEETENER">Sweetener</option>
+                            <option value="TEXTURIZER">Texturizer</option>
+                            <option value="GARNISH">Garnish</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
                         <label class="form-label text-white fw-bold small">Base Profile</label>
                         <input type="text" name="category" id="addCategory" list="category-list" autocomplete="off" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" required placeholder="Select or type new...">
                         <datalist id="category-list">
@@ -474,18 +486,29 @@
                     <input type="text" name="brand" id="editBrand" class="form-control bg-dark bg-opacity-50 text-white border-white border-opacity-10" placeholder="e.g. Monin, Torani, Homemade">
                 </div>
                 <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label text-white fw-bold small">Type</label>
-                        <select name="ingredient_type" id="editType"
-                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10">
-                            <option value="SODA_SYRUP">Soda Syrup</option>
-                            <option value="COFFEE_BEAN">Coffee Bean</option>
-                            <option value="DAIRY">Dairy & Plant Milk</option>
-                            <option value="ADDITIVE">Additive (Syrup, Sugar, Honey, etc.)</option>
-                            <option value="OTHER">Other</option>
+                    <div class="col-4">
+                        <label class="form-label text-white fw-bold small">Physical State</label>
+                        <select name="physical_state" id="editPhysicalState"
+                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10" style="font-size: 0.75rem;">
+                            <option value="LIQUID">Liquid</option>
+                            <option value="SYRUP">Syrup</option>
+                            <option value="SAUCE">Sauce</option>
+                            <option value="POWDER">Powder</option>
+                            <option value="SOLID_EXTRACTABLE">Solid Extractable</option>
                         </select>
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
+                        <label class="form-label text-white fw-bold small">Mixology Function</label>
+                        <select name="mixology_function" id="editMixologyFunction"
+                            class="form-select bg-dark bg-opacity-50 text-white border-white border-opacity-10" style="font-size: 0.75rem;">
+                            <option value="VOLUME_BASE">Volume Base</option>
+                            <option value="FLAVORING">Flavoring</option>
+                            <option value="SWEETENER">Sweetener</option>
+                            <option value="TEXTURIZER">Texturizer</option>
+                            <option value="GARNISH">Garnish</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
                         <label class="form-label text-white fw-bold small">Base Profile</label>
                         <input type="text" name="category" id="editCategory" list="edit-category-list"
                             autocomplete="off"
@@ -725,10 +748,10 @@
 <script>
     // Toggle Coffee-Specific Fields Function
     function toggleCoffeeFields(prefix) {
-        const typeSelect = document.getElementById(prefix + 'Type');
+        const stateSelect = document.getElementById(prefix + 'PhysicalState');
         const coffeeFields = document.getElementById(prefix + 'CoffeeFields');
-        if (typeSelect && coffeeFields) {
-            if (typeSelect.value === 'COFFEE_BEAN') {
+        if (stateSelect && coffeeFields) {
+            if (stateSelect.value === 'SOLID_EXTRACTABLE') {
                 coffeeFields.style.display = 'block';
             } else {
                 coffeeFields.style.display = 'none';
@@ -737,13 +760,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        const addTypeSelect = document.getElementById('addType');
-        if (addTypeSelect) {
-            addTypeSelect.addEventListener('change', () => toggleCoffeeFields('add'));
+        const addStateSelect = document.getElementById('addPhysicalState');
+        if (addStateSelect) {
+            addStateSelect.addEventListener('change', () => toggleCoffeeFields('add'));
         }
-        const editTypeSelect = document.getElementById('editType');
-        if (editTypeSelect) {
-            editTypeSelect.addEventListener('change', () => toggleCoffeeFields('edit'));
+        const editStateSelect = document.getElementById('editPhysicalState');
+        if (editStateSelect) {
+            editStateSelect.addEventListener('change', () => toggleCoffeeFields('edit'));
         }
 
         // 1. Edit Material Modal Logic
@@ -753,7 +776,8 @@
                 document.getElementById('editIngredientForm').action = `/ingredients/${d.id}/edit/`;
                 document.getElementById('editName').value = d.name;
                 document.getElementById('editBrand').value = d.brand || '';
-                document.getElementById('editType').value = d.type;
+                document.getElementById('editPhysicalState').value = d.physicalState || 'SYRUP';
+                document.getElementById('editMixologyFunction').value = d.mixologyFunction || 'FLAVORING';
                 document.getElementById('editCategory').value = d.category;
                 document.getElementById('editInt').value = d.intensity;
                 document.getElementById('editSwt').value = d.sweetness;
@@ -961,11 +985,18 @@
                     setTimeout(() => categoryEl.classList.remove('is-valid'), 2000);
                 }
 
-                const typeEl = document.getElementById(prefix + 'Type');
-                if (typeEl && profile.ingredient_type) {
-                    typeEl.value = profile.ingredient_type;
-                    typeEl.classList.add('is-valid');
-                    setTimeout(() => typeEl.classList.remove('is-valid'), 2000);
+                const physicalStateEl = document.getElementById(prefix + 'PhysicalState');
+                if (physicalStateEl && profile.physical_state) {
+                    physicalStateEl.value = profile.physical_state;
+                    physicalStateEl.classList.add('is-valid');
+                    setTimeout(() => physicalStateEl.classList.remove('is-valid'), 2000);
+                }
+
+                const mixologyFunctionEl = document.getElementById(prefix + 'MixologyFunction');
+                if (mixologyFunctionEl && profile.mixology_function) {
+                    mixologyFunctionEl.value = profile.mixology_function;
+                    mixologyFunctionEl.classList.add('is-valid');
+                    setTimeout(() => mixologyFunctionEl.classList.remove('is-valid'), 2000);
                     toggleCoffeeFields(prefix);
                 }
 

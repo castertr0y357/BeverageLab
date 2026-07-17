@@ -73,6 +73,22 @@ class Ingredient(SoftDeleteModel):
         ('OTHER', 'Other'),
     ]
     
+    PHYSICAL_STATE_CHOICES = [
+        ('LIQUID', 'Liquid'),
+        ('SYRUP', 'Syrup'),
+        ('SAUCE', 'Sauce'),
+        ('POWDER', 'Powder'),
+        ('SOLID_EXTRACTABLE', 'Solid Extractable'),
+    ]
+    
+    MIXOLOGY_FUNCTION_CHOICES = [
+        ('VOLUME_BASE', 'Volume Base'),
+        ('FLAVORING', 'Flavoring'),
+        ('SWEETENER', 'Sweetener'),
+        ('TEXTURIZER', 'Texturizer'),
+        ('GARNISH', 'Garnish'),
+    ]
+    
     CATEGORY_CHOICES = [
         ('citrus', 'Citrus'),
         ('berry', 'Berry'),
@@ -93,7 +109,18 @@ class Ingredient(SoftDeleteModel):
         blank=True,
         help_text="The manufacturer or brand of the syrup/reagent (e.g. Monin, Torani, Homemade)"
     )
-    ingredient_type = models.CharField(max_length=20, choices=INGREDIENT_TYPE_CHOICES, default='SODA_SYRUP')
+    physical_state = models.CharField(
+        max_length=20, 
+        choices=PHYSICAL_STATE_CHOICES, 
+        default='SYRUP',
+        db_index=True
+    )
+    mixology_function = models.CharField(
+        max_length=20, 
+        choices=MIXOLOGY_FUNCTION_CHOICES, 
+        default='FLAVORING',
+        db_index=True
+    )
     category = models.CharField(max_length=50, default='citrus')
     
     # Common stats
@@ -163,14 +190,6 @@ class Ingredient(SoftDeleteModel):
         default=True,
         help_text="Whether this ingredient is currently in your bar/lab"
     )
-    is_ready_to_drink = models.BooleanField(
-        default=False,
-        help_text="Whether this ingredient is a ready-to-drink liquid (e.g. juices, milk, tea) that can serve as a primary volume filler."
-    )
-    is_dry = models.BooleanField(
-        default=False,
-        help_text="Whether this ingredient is measured in weight (g) rather than volume (ml/oz)."
-    )
     favorite = models.BooleanField(
         default=False,
         help_text="Whether this ingredient is a favorite/preferred reagent."
@@ -194,6 +213,176 @@ class Ingredient(SoftDeleteModel):
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __init__(self, *args, **kwargs):
+        # Extract deprecated fields from kwargs before initializing the Model
+        ing_type = kwargs.pop('ingredient_type', None)
+        rtd = kwargs.pop('is_ready_to_drink', None)
+        dry = kwargs.pop('is_dry', None)
+        
+        super().__init__(*args, **kwargs)
+        
+        # If we got any of these, and new fields are at defaults, we can infer them
+        if ing_type or rtd is not None or dry is not None:
+            name_lower = self.name.lower() if self.name else ""
+            
+            temp_type = ing_type or 'SODA_SYRUP'
+            temp_rtd = rtd if rtd is not None else False
+            temp_dry = dry if dry is not None else False
+            
+            if self.physical_state == 'SYRUP' and self.mixology_function == 'FLAVORING':
+                if temp_type == 'COFFEE_BEAN':
+                    self.physical_state = 'SOLID_EXTRACTABLE'
+                    self.mixology_function = 'FLAVORING'
+                elif temp_type == 'DAIRY':
+                    if 'cream' in name_lower or 'half' in name_lower or 'whipped' in name_lower:
+                        self.physical_state = 'SAUCE'
+                        self.mixology_function = 'TEXTURIZER'
+                    else:
+                        self.physical_state = 'LIQUID'
+                        self.mixology_function = 'VOLUME_BASE'
+                elif temp_rtd:
+                    self.physical_state = 'LIQUID'
+                    self.mixology_function = 'VOLUME_BASE'
+                elif temp_dry:
+                    self.physical_state = 'POWDER'
+                    if any(x in name_lower for x in ['sugar', 'sweetener', 'stevia', 'splenda', 'honey powder', 'erythritol']):
+                        self.mixology_function = 'SWEETENER'
+                    elif any(x in name_lower for x in ['cinnamon', 'nutmeg', 'dust', 'powder', 'cocoa', 'matcha']):
+                        self.mixology_function = 'GARNISH'
+                    else:
+                        self.mixology_function = 'FLAVORING'
+                else:
+                    if any(x in name_lower for x in ['honey', 'agave', 'maple', 'caramel', 'chocolate', 'fudge', 'sauce', 'puree']):
+                        self.physical_state = 'SAUCE'
+                        if any(x in name_lower for x in ['honey', 'agave', 'maple']):
+                            self.mixology_function = 'SWEETENER'
+                        else:
+                            self.mixology_function = 'FLAVORING'
+                    elif any(x in name_lower for x in ['sugar', 'simple syrup', 'syrup sugar']):
+                        self.physical_state = 'SYRUP'
+                        self.mixology_function = 'SWEETENER'
+                    elif any(x in name_lower for x in ['syrup', 'monin', 'torani', 'extract', 'bitters']):
+                        self.physical_state = 'SYRUP'
+                        self.mixology_function = 'FLAVORING'
+                    elif any(x in name_lower for x in ['water', 'juice', 'club soda', 'soda water', 'tonic']):
+                        self.physical_state = 'LIQUID'
+                        self.mixology_function = 'VOLUME_BASE'
+
+    @property
+    def ingredient_type(self) -> str:
+        """Backward compatibility mapping for ingredient_type."""
+        if self.physical_state == 'SOLID_EXTRACTABLE':
+            return 'COFFEE_BEAN'
+        elif self.mixology_function == 'VOLUME_BASE' and self.physical_state == 'LIQUID':
+            return 'DAIRY'
+        elif self.physical_state == 'SYRUP' and self.mixology_function == 'FLAVORING':
+            return 'SODA_SYRUP'
+        else:
+            return 'ADDITIVE'
+
+    @ingredient_type.setter
+    def ingredient_type(self, value):
+        if value == 'COFFEE_BEAN':
+            self.physical_state = 'SOLID_EXTRACTABLE'
+            self.mixology_function = 'FLAVORING'
+        elif value == 'DAIRY':
+            self.physical_state = 'LIQUID'
+            self.mixology_function = 'VOLUME_BASE'
+        elif value == 'SODA_SYRUP':
+            self.physical_state = 'SYRUP'
+            self.mixology_function = 'FLAVORING'
+        elif value == 'ADDITIVE':
+            self.physical_state = 'SYRUP'
+            self.mixology_function = 'FLAVORING'
+
+    @property
+    def is_ready_to_drink(self) -> bool:
+        """Backward compatibility mapping for is_ready_to_drink."""
+        return self.mixology_function == 'VOLUME_BASE' and self.physical_state == 'LIQUID'
+
+    @is_ready_to_drink.setter
+    def is_ready_to_drink(self, value):
+        if value:
+            self.physical_state = 'LIQUID'
+            self.mixology_function = 'VOLUME_BASE'
+        else:
+            if self.physical_state == 'LIQUID' and self.mixology_function == 'VOLUME_BASE':
+                self.physical_state = 'SYRUP'
+                self.mixology_function = 'FLAVORING'
+
+    @property
+    def is_dry(self) -> bool:
+        """Backward compatibility mapping for is_dry."""
+        return self.physical_state in ['SOLID_EXTRACTABLE', 'POWDER']
+
+    @is_dry.setter
+    def is_dry(self, value):
+        if value:
+            if self.physical_state not in ['SOLID_EXTRACTABLE', 'POWDER']:
+                self.physical_state = 'POWDER'
+        else:
+            if self.physical_state in ['SOLID_EXTRACTABLE', 'POWDER']:
+                self.physical_state = 'SYRUP'
+
+    def get_ingredient_type_display(self) -> str:
+        """Backward compatibility mapping for get_ingredient_type_display."""
+        t = self.ingredient_type
+        if t == 'COFFEE_BEAN':
+            return 'Coffee Bean'
+        elif t == 'DAIRY':
+            return 'Dairy & Plant Milk'
+        elif t == 'SODA_SYRUP':
+            return 'Soda Syrup'
+        elif t == 'ADDITIVE':
+            return 'Additive (Syrup, Sugar, Honey, etc.)'
+        return 'Other'
+
+    def save(self, *args, **kwargs):
+        # Auto-populate physical_state and mixology_function based on old fields
+        # if they are left at defaults (SYRUP and FLAVORING)
+        if self.physical_state == 'SYRUP' and self.mixology_function == 'FLAVORING':
+            name_lower = self.name.lower()
+            if self.ingredient_type == 'COFFEE_BEAN':
+                self.physical_state = 'SOLID_EXTRACTABLE'
+                self.mixology_function = 'FLAVORING'
+            elif self.ingredient_type == 'DAIRY':
+                if 'cream' in name_lower or 'half' in name_lower or 'whipped' in name_lower:
+                    self.physical_state = 'SAUCE'
+                    self.mixology_function = 'TEXTURIZER'
+                else:
+                    self.physical_state = 'LIQUID'
+                    self.mixology_function = 'VOLUME_BASE'
+            elif self.is_ready_to_drink:
+                self.physical_state = 'LIQUID'
+                self.mixology_function = 'VOLUME_BASE'
+            elif self.is_dry:
+                self.physical_state = 'POWDER'
+                if any(x in name_lower for x in ['sugar', 'sweetener', 'stevia', 'splenda', 'honey powder', 'erythritol']):
+                    self.mixology_function = 'SWEETENER'
+                elif any(x in name_lower for x in ['cinnamon', 'nutmeg', 'dust', 'powder', 'cocoa', 'matcha']):
+                    self.mixology_function = 'GARNISH'
+                else:
+                    self.mixology_function = 'FLAVORING'
+            else:
+                # Additive or other
+                if any(x in name_lower for x in ['honey', 'agave', 'maple', 'caramel', 'chocolate', 'fudge', 'sauce', 'puree']):
+                    self.physical_state = 'SAUCE'
+                    if any(x in name_lower for x in ['honey', 'agave', 'maple']):
+                        self.mixology_function = 'SWEETENER'
+                    else:
+                        self.mixology_function = 'FLAVORING'
+                elif any(x in name_lower for x in ['sugar', 'simple syrup', 'syrup sugar']):
+                    self.physical_state = 'SYRUP'
+                    self.mixology_function = 'SWEETENER'
+                elif any(x in name_lower for x in ['syrup', 'monin', 'torani', 'extract', 'bitters']):
+                    self.physical_state = 'SYRUP'
+                    self.mixology_function = 'FLAVORING'
+                elif any(x in name_lower for x in ['water', 'juice', 'club soda', 'soda water', 'tonic']):
+                    self.physical_state = 'LIQUID'
+                    self.mixology_function = 'VOLUME_BASE'
+                    
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -284,7 +473,7 @@ class Recipe(SoftDeleteModel):
     @property
     def has_ready_to_drink(self) -> bool:
         """Returns True if the recipe contains at least one ready-to-drink ingredient."""
-        return self.recipe_ingredients.filter(ingredient__is_ready_to_drink=True).exists()
+        return self.recipe_ingredients.filter(ingredient__physical_state='LIQUID', ingredient__mixology_function='VOLUME_BASE').exists()
 
     @property
     def water_temp_f(self):

@@ -9,10 +9,12 @@ from django.views.decorators.http import require_http_methods
 
 logger = logging.getLogger(__name__)
 
-def get_cryo_sugar_fraction(name: str, type_str: str) -> float:
+def get_cryo_sugar_fraction(name: str, type_str: str, physical_state: str = "", mixology_function: str = "") -> float:
     """Evaluate sugar mass contribution fraction by volume."""
     name_lower = name.lower()
     type_upper = type_str.upper()
+    pstate = physical_state.upper()
+    mfunc = mixology_function.upper()
     
     # 1. Raw Honey (80%)
     if 'honey' in name_lower:
@@ -30,10 +32,10 @@ def get_cryo_sugar_fraction(name: str, type_str: str) -> float:
         
     # 4. Monin Syrups (65%)
     # Ginger Beer explicitly treated as dense flavor syrup reagent
-    if 'ginger beer' in name_lower or 'syrup' in name_lower or 'sauce' in name_lower or type_upper == 'SODA_SYRUP':
+    if 'ginger beer' in name_lower or 'syrup' in name_lower or 'sauce' in name_lower or type_upper == 'SODA_SYRUP' or pstate in ['SYRUP', 'SAUCE']:
         return 0.65
         
-    if type_upper == 'ADDITIVE':
+    if type_upper == 'ADDITIVE' or mfunc in ['FLAVORING', 'SWEETENER', 'TEXTURIZER']:
         return 0.65
     return 0.0
 
@@ -108,7 +110,11 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
     for ing in ingredients_input:
         name = ing.get('name', 'Ingredient')
         name_lower = name.lower()
-        is_rtd = ing.get('is_ready_to_drink', False) or ing.get('isReadyToDrink', False)
+        is_rtd = (
+            ing.get('mixology_function', '').upper() == 'VOLUME_BASE'
+            or ing.get('is_ready_to_drink', False)
+            or ing.get('isReadyToDrink', False)
+        )
         is_virtual_water = ing.get('id') == 'virtual_water'
         
         if is_rtd or is_virtual_water or 'water' in name_lower or 'juice' in name_lower:
@@ -141,9 +147,19 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
         if is_solitary and not is_user_overridden:
             filler_name = filler_ing.get('name', 'Water')
             filler_type = filler_ing.get('ingredient_type', filler_ing.get('type', 'OTHER'))
-            filler_sugar_frac = get_cryo_sugar_fraction(filler_name, filler_type)
+            filler_sugar_frac = get_cryo_sugar_fraction(
+                filler_name, 
+                filler_type, 
+                filler_ing.get('physical_state', ''), 
+                filler_ing.get('mixology_function', '')
+            )
             
-            sugar_frac = get_cryo_sugar_fraction(name, itype)
+            sugar_frac = get_cryo_sugar_fraction(
+                name, 
+                itype, 
+                ing.get('physical_state', ''), 
+                ing.get('mixology_function', '')
+            )
             sugar_diff = sugar_frac - filler_sugar_frac
             if abs(sugar_diff) > 0.001:
                 required_vol = (0.13 - filler_sugar_frac) * target_volume_ml / sugar_diff
@@ -166,7 +182,12 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
         if sweetness >= 4:
             scaled_amt *= 1.05
 
-        sugar_frac = get_cryo_sugar_fraction(name, itype)
+        sugar_frac = get_cryo_sugar_fraction(
+            name, 
+            itype, 
+            ing.get('physical_state', ''), 
+            ing.get('mixology_function', '')
+        )
 
         modifier_volumes.append({
             'ing': ing,
@@ -180,7 +201,12 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
     fixed_mods = []
     filler_name = filler_ing.get('name', 'Water')
     filler_type = filler_ing.get('ingredient_type', filler_ing.get('type', 'OTHER'))
-    filler_sugar_frac = get_cryo_sugar_fraction(filler_name, filler_type)
+    filler_sugar_frac = get_cryo_sugar_fraction(
+        filler_name, 
+        filler_type, 
+        filler_ing.get('physical_state', ''), 
+        filler_ing.get('mixology_function', '')
+    )
     k = 1.0
 
     for _ in range(3):

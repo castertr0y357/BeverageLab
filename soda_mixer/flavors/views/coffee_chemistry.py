@@ -34,8 +34,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         is_espresso_base = False
     
     for ing in ingredients_input:
+        pstate = str(ing.get('physical_state', '')).upper()
         itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
-        if itype == 'COFFEE_BEAN':
+        is_coffee = (pstate == 'SOLID_EXTRACTABLE') if pstate else (itype == 'COFFEE_BEAN')
+        if is_coffee:
             base_type = str(ing.get('coffee_base_type', '')).lower()
             if 'standard' in base_type or 'brew' in base_type:
                 is_espresso_base = False
@@ -61,16 +63,23 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     has_seen_dairy = False
 
     for idx, ing in enumerate(ingredients_input):
+        pstate = str(ing.get('physical_state', '')).upper()
+        mfunc = str(ing.get('mixology_function', '')).upper()
         itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
-        if itype == 'COFFEE_BEAN':
+        
+        is_coffee = (pstate == 'SOLID_EXTRACTABLE') if pstate else (itype == 'COFFEE_BEAN')
+        is_dairy = (mfunc == 'VOLUME_BASE' and pstate == 'LIQUID') if mfunc else (itype == 'DAIRY')
+        is_modifier = (mfunc in ['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH']) if mfunc else (itype in ['ADDITIVE', 'OTHER', 'SODA_SYRUP'])
+        
+        if is_coffee:
             coffee_inputs.append(ing)
-        elif itype == 'DAIRY':
+        elif is_dairy:
             if has_seen_dairy:
                 modifier_inputs.append(ing)
             else:
                 dairy_inputs.append(ing)
                 has_seen_dairy = True
-        elif itype in ['ADDITIVE', 'OTHER', 'SODA_SYRUP']:
+        elif is_modifier:
             modifier_inputs.append(ing)
         else:
             # Fallback based on name keywords

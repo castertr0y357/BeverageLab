@@ -85,9 +85,8 @@ Structured Output JSON Schema:
     "base_suitability": float,
     "accent_suitability": float,
     "category": string (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee'),
-    "ingredient_type": string (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER'),
-    "is_ready_to_drink": boolean (true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false if it is a concentrated syrup, bean, or powder that needs to be diluted/brewed),
-    "is_dry": boolean (true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false if it is a liquid like syrup, juice, milk, water),
+    "physical_state": string (must be one of: 'LIQUID', 'SYRUP', 'SAUCE', 'POWDER', 'SOLID_EXTRACTABLE'),
+    "mixology_function": string (must be one of: 'VOLUME_BASE', 'FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'),
     "compatible_systems": string (comma-separated list of systems, e.g., 'SODA,SLUSHIE' or 'COFFEE'),
     "ai_notes": string,
     "roast_level": string (must be one of: 'LIGHT', 'MEDIUM', 'DARK', or null if not a coffee bean),
@@ -136,11 +135,11 @@ SODA LAB MODE:
             mode_rules = """
 Core Synthesis Mode Rules:
 COFFEE LAB MODE (Espresso & Brew Extraction):
-- The dry base coffee beans MUST be 18.0g (weight) representing a double-shot espresso.
-- Liquid dairy and plant milks (type DAIRY) must be 50.0ml (volume).
-- Minor additives, sweet syrups, and creamers (type ADDITIVE) must be 15.0ml (volume).
-- Accents and others must be 15.0ml.
-- Do NOT suggest grams for liquids, and do NOT use ml for coffee beans.
+- The dry base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0g (weight) representing a double-shot espresso.
+- Liquid dairy and plant milks (Function: VOLUME_BASE, State: LIQUID) must be 50.0ml (volume).
+- Texturizers, creamers, and sauces (Function: TEXTURIZER, State: SAUCE or LIQUID) must be 15.0ml (volume).
+- Accents, flavorings, sweeteners, and garnishes must be 15.0ml.
+- Do NOT suggest grams for liquids/syrups/sauces, and do NOT use ml for coffee beans.
 - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 """
         elif drink_type == 'SLUSHIE':
@@ -155,7 +154,7 @@ CRYO LAB (SLUSHIE) MODE:
             mode_rules = """
 Core Synthesis Mode Rules:
 1. SODA LAB MODE: Total syrup for a 1.0L batch must not exceed 160ml.
-2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans must be 18.0g, dairy/plant milk must be 50.0ml, and additives/syrups must be 15.0ml.
+2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans (SOLID_EXTRACTABLE) must be 18.0g, volume bases like dairy/plant milk (VOLUME_BASE, LIQUID) must be 50.0ml, and other flavorings/sweeteners/texturizers must be 15.0ml.
 3. CRYO LAB (SLUSHIE) MODE: Total syrup for a 1.0L batch must not exceed 160ml.
 - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
 """
@@ -220,16 +219,17 @@ Structured Output JSON Schema:
             notes_str = f" | Profile: {ing.flavor_notes}" if ing.flavor_notes else ""
             ai_notes_str = f" | Sensory: {ing.ai_notes}" if ing.ai_notes else ""
             fav_str = " | *FAVORITE*" if ing.favorite else ""
+            state_str = f"State: {ing.physical_state} | Function: {ing.mixology_function}"
             
-            if ing.ingredient_type == 'COFFEE_BEAN':
+            if ing.physical_state == 'SOLID_EXTRACTABLE':
                 decaf_str = "Decaf" if ing.is_decaf else "Regular"
                 registry.append(
-                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Roast: {ing.roast_level} | {decaf_str} | Origin: {ing.origin or 'Unknown'}"
+                    f"- {ing.name}{brand_str} ({state_str} | Roast: {ing.roast_level} | {decaf_str} | Origin: {ing.origin or 'Unknown'}"
                     f"{notes_str}{ai_notes_str}{fav_str})"
                 )
             else:
                 registry.append(
-                    f"- {ing.name}{brand_str} (Type: {ing.ingredient_type} | Category: {ing.category}"
+                    f"- {ing.name}{brand_str} ({state_str} | Category: {ing.category}"
                     f"{notes_str}{ai_notes_str}{fav_str})"
                 )
         return "\n".join(registry)
