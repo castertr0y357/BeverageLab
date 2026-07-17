@@ -422,20 +422,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
-                        <input class="neon-check" type="checkbox" name="is_ready_to_drink" id="addReadyToDrink">
-                        <label class="form-label text-white fw-bold small mb-0" for="addReadyToDrink">Is Ready to Drink base?</label>
-                    </div>
-                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for juices, milk, teas, etc., to use them as volume-filling bases.</span>
-                </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
-                        <input class="neon-check" type="checkbox" name="is_dry" id="addIsDry">
-                        <label class="form-label text-white fw-bold small mb-0" for="addIsDry">Is Dry Ingredient?</label>
-                    </div>
-                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
-                </div>
+
                 <div class="mb-3">
                     <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
                         <input class="neon-check" type="checkbox" name="favorite" id="addFavorite">
@@ -635,20 +622,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
-                        <input class="neon-check" type="checkbox" name="is_ready_to_drink" id="editReadyToDrink">
-                        <label class="form-label text-white fw-bold small mb-0" for="editReadyToDrink">Is Ready to Drink base?</label>
-                    </div>
-                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for juices, milk, teas, etc., to use them as volume-filling bases.</span>
-                </div>
-                <div class="mb-3">
-                    <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
-                        <input class="neon-check" type="checkbox" name="is_dry" id="editIsDry">
-                        <label class="form-label text-white fw-bold small mb-0" for="editIsDry">Is Dry Ingredient?</label>
-                    </div>
-                    <span class="text-dim d-block" style="font-size: 0.6rem;">Check this for dry/powdered ingredients (e.g. sugar, powders, coffee beans) to measure in weight (g).</span>
-                </div>
+
                 <div class="mb-3">
                     <div class="form-check form-switch px-0 d-flex align-items-center gap-2">
                         <input class="neon-check" type="checkbox" name="favorite" id="editFavorite">
@@ -788,8 +762,6 @@
                 document.getElementById('editAccentSuit').value = d.accentSuitability;
                 document.getElementById('editDesc').value = d.description;
                 document.getElementById('editAINotes').value = d.aiNotes || '';
-                document.getElementById('editReadyToDrink').checked = d.isReadyToDrink === 'true';
-                document.getElementById('editIsDry').checked = d.isDry === 'true';
                 document.getElementById('editFavorite').checked = d.favorite === 'true';
                 
                 // Coffee fields populator
@@ -1061,19 +1033,7 @@
                     setTimeout(() => aiNotesEl.classList.remove('is-valid'), 2000);
                 }
 
-                const rtdEl = document.getElementById(prefix + 'ReadyToDrink');
-                if (rtdEl && profile.is_ready_to_drink !== undefined) {
-                    rtdEl.checked = profile.is_ready_to_drink === true || profile.is_ready_to_drink === 'true';
-                    rtdEl.classList.add('is-valid');
-                    setTimeout(() => rtdEl.classList.remove('is-valid'), 2000);
-                }
 
-                const dryEl = document.getElementById(prefix + 'IsDry');
-                if (dryEl && profile.is_dry !== undefined) {
-                    dryEl.checked = profile.is_dry === true || profile.is_dry === 'true';
-                    dryEl.classList.add('is-valid');
-                    setTimeout(() => dryEl.classList.remove('is-valid'), 2000);
-                }
 
                 btn.innerHTML = '<i class="bi bi-check-lg"></i> Synced';
                 btn.classList.replace('btn-outline-experimental', 'btn-success');

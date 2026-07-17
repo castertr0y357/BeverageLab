@@ -34,8 +34,6 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     complexity = request.POST.get('complexity', 3)
     base_suitability = request.POST.get('base_suitability', 3.0)
     accent_suitability = request.POST.get('accent_suitability', 3.0)
-    is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
-    is_dry = request.POST.get('is_dry') == 'on'
     favorite = request.POST.get('favorite') == 'on'
     
     # Coffee fields
@@ -59,37 +57,43 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
 
     if name:
         try:
-            Ingredient.objects.create(
-                name=name,
-                brand=brand,
-                ingredient_type=ingredient_type,
-                physical_state=physical_state,
-                mixology_function=mixology_function,
-                category=category,
-                description=description,
-                ai_notes=ai_notes,
-                intensity=intensity,
-                sweetness=sweetness,
-                acidity=acidity,
-                bitterness=bitterness,
-                complexity=complexity,
-                base_suitability=base_suitability,
-                accent_suitability=accent_suitability,
-                compatible_systems=compatible_systems,
-                is_ready_to_drink=is_ready_to_drink,
-                is_dry=is_dry,
-                favorite=favorite,
-                is_in_inventory=True,
-                roast_level=roast_level,
-                is_decaf=is_decaf,
-                body_intensity=body_intensity,
-                acidity_score=acidity_score,
-                bitterness_score=bitterness_score,
-                flavor_notes=flavor_notes,
-                origin=origin,
-                roaster=roaster,
-                process=process
-            )
+            kwargs = {
+                'name': name,
+                'brand': brand,
+                'category': category,
+                'description': description,
+                'ai_notes': ai_notes,
+                'intensity': intensity,
+                'sweetness': sweetness,
+                'acidity': acidity,
+                'bitterness': bitterness,
+                'complexity': complexity,
+                'base_suitability': base_suitability,
+                'accent_suitability': accent_suitability,
+                'compatible_systems': compatible_systems,
+                'favorite': favorite,
+                'is_in_inventory': True,
+                'roast_level': roast_level,
+                'is_decaf': is_decaf,
+                'body_intensity': body_intensity,
+                'acidity_score': acidity_score,
+                'bitterness_score': bitterness_score,
+                'flavor_notes': flavor_notes,
+                'origin': origin,
+                'roaster': roaster,
+                'process': process
+            }
+            
+            has_new_fields = ('physical_state' in request.POST or 'mixology_function' in request.POST)
+            if has_new_fields:
+                kwargs['physical_state'] = physical_state
+                kwargs['mixology_function'] = mixology_function
+            else:
+                kwargs['ingredient_type'] = ingredient_type
+                kwargs['is_ready_to_drink'] = request.POST.get('is_ready_to_drink') == 'on'
+                kwargs['is_dry'] = request.POST.get('is_dry') == 'on'
+                
+            Ingredient.objects.create(**kwargs)
             logger.info(f"IngredientRegistry - Info - Successfully registered ingredient: {name} ({brand})")
         except IntegrityError:
             logger.warning(f"IngredientRegistry - Warning - Registry Conflict: Reagent '{name}' with brand '{brand}' is already indexed.")
@@ -107,9 +111,14 @@ def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
     ingredient = get_object_or_404(Ingredient, uuid=uuid)
     ingredient.name = request.POST.get('name', ingredient.name).strip()
     ingredient.brand = request.POST.get('brand', ingredient.brand).strip()
-    ingredient.ingredient_type = request.POST.get('ingredient_type', ingredient.ingredient_type)
-    ingredient.physical_state = request.POST.get('physical_state', ingredient.physical_state)
-    ingredient.mixology_function = request.POST.get('mixology_function', ingredient.mixology_function)
+    has_new_fields = ('physical_state' in request.POST or 'mixology_function' in request.POST)
+    if has_new_fields:
+        ingredient.physical_state = request.POST.get('physical_state', ingredient.physical_state)
+        ingredient.mixology_function = request.POST.get('mixology_function', ingredient.mixology_function)
+    else:
+        ingredient.ingredient_type = request.POST.get('ingredient_type', ingredient.ingredient_type)
+        ingredient.is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
+        ingredient.is_dry = request.POST.get('is_dry') == 'on'
     
     category = request.POST.get('category', '').strip().lower()
     if category:
@@ -117,8 +126,6 @@ def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
         
     ingredient.description = request.POST.get('description', ingredient.description)
     ingredient.ai_notes = request.POST.get('ai_notes', ingredient.ai_notes)
-    ingredient.is_ready_to_drink = request.POST.get('is_ready_to_drink') == 'on'
-    ingredient.is_dry = request.POST.get('is_dry') == 'on'
     ingredient.favorite = request.POST.get('favorite') == 'on'
     
     # Coffee fields
