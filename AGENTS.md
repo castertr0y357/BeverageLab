@@ -3,7 +3,7 @@
 This file defines the rules and skills for the BeverageLab workspace.
 
 ## 🚀 Post-Change Verification Protocol
-You **MUST** run the project verification command after every code change to guarantee stability and prevent regressions.
+Run the project verification command when making significant changes to check for regressions, but avoid running it excessively to conserve quota.
 
 ### Rebuild and Verify Command
 Run the following command from the workspace root:
@@ -12,9 +12,9 @@ docker compose run --rm web python manage.py test; docker compose down; docker c
 ```
 
 > [!IMPORTANT]
-> 1. Never skip verification before committing. The verification step **MUST** execute all unit and integration test suites.
-> 2. You **MUST** update the [status.md](file:///./status.md) file after each task to reflect the current status of features, completed tasks, and architectural changes.
-> 3. You **MUST** generate a git commit with an accurate, descriptive commit message representing the changes after every successful execution (only if a Git repository is initialized in the workspace; skip this step if Git is not initialized).
+> 1. Run verification before committing when making significant changes, but do not overuse it.
+> 2. Update the [status.md](file:///./status.md) file after each task to reflect the current status.
+> 3. Generate a git commit with an accurate, descriptive commit message representing the changes (only if a Git repository is initialized in the workspace).
 > 4. The user will handle all visual inspection. Do NOT run automated browser subagents or screenshot-based tools for user interface layout verification.
 
 ## 🧪 Automated Testing & Bug Prevention

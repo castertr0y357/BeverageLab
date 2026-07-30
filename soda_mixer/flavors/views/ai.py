@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Set, Union, Optional, Callable
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.template.loader import render_to_string
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.db.models import Q
 
@@ -124,7 +125,6 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_dry': r['ingredient'].is_dry,
                     'favorite': r['ingredient'].favorite,
                     'score': r['score'],
-                    'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
                     'tier': 'suggestions'
                 } for r in result.get('recommended', [])
@@ -150,7 +150,6 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_dry': r['ingredient'].is_dry,
                     'favorite': r['ingredient'].favorite,
                     'score': r['score'],
-                    'resonance': round(min(r['score'] * 15.0, 99.8), 1),
                     'reason': r['reason'],
                     'tier': 'secondary'
                 } for r in result.get('recommended', [])
@@ -177,7 +176,6 @@ def get_recommendations_api(request: HttpRequest) -> JsonResponse:
                     'is_dry': r['ingredient'].is_dry,
                     'favorite': r['ingredient'].favorite,
                     'score': r['score'],
-                    'resonance': round(min(r['score'] * scale_factor, 99.8), 1),
                     'reason': r['reason'],
                     'tier': 'tertiary'
                 } for r in result.get('recommended', [])
@@ -392,7 +390,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             
         def generator():
             def send_progress(msg: str):
-                return f"data: {json.dumps({'status': 'progress', 'message': msg})}\n\n"
+                return f"event: progress\ndata: {json.dumps({'status': 'progress', 'message': msg})}\n\n"
 
             yield send_progress("Scanning current compound registry...")
             
@@ -445,173 +443,183 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             raw_suggestion = ""
             retry_note = None
             
+            import time
+            from django.template.loader import render_to_string
+            inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
+            multibrand_names = get_multibrand_names_in_inventory()
+            enriched = []
+            final_data = None
+            sanitized_rebalancing = {}
+            
             for attempt in range(3):
-                # On the final attempt, strip persona for brute-force compliance
-                if attempt == 2 and not retry_note:
+                retry_note = None
+                if attempt == 2:
                      retry_note = "CRITICAL DATA MISMATCH: STOP all prose. Provide ONLY the JSON array of ingredients from the registry. [RAW JSON ONLY]"
                 
-                raw_suggestion = AIAssistant.suggest_autonomous(
-                    ingredients, mode, 
-                    drink_type=drink_type,
-                    inventory=inventory_context, 
-                    exclude=actual_exclude,
-                    retry_note=retry_note,
-                    force_type=force_type
-                )
-                logger.warning(f"AISuggestion - Info - Raw suggestion from LLM: {raw_suggestion}")
-                
-                suggested_data = raw_suggestion
-                
-                if suggested_data:
-                    yield send_progress("Sanitizing extraction volumes & balancing ratios...")
-                    if isinstance(suggested_data, str):
-                        try:
-                            suggested_data = json.loads(suggested_data)
-                        except Exception:
-                            pass
-
-                    suggestions_list = []
-                    rebalancing = {}
-                    seal_recommended = False
-                    seal_resonance = 0
-                    reasoning = ''
-
-                    if isinstance(suggested_data, dict):
-                        suggestions_list = suggested_data.get('suggestions', [])
-                        rebalancing = suggested_data.get('rebalancing', {})
-                        seal_recommended = suggested_data.get('seal_recommended', False)
-                        seal_resonance = suggested_data.get('seal_resonance', 0)
-                        reasoning = suggested_data.get('reasoning', '')
-                    elif isinstance(suggested_data, list):
-                        suggestions_list = suggested_data
-
-                    enriched: List[Dict[str, Any]] = []
-                    inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
+                try:
+                    stream = AIAssistant.suggest_autonomous_stream(
+                        ingredients, mode, 
+                        drink_type=drink_type,
+                        inventory=inventory_context, 
+                        exclude=actual_exclude,
+                        retry_note=retry_note,
+                        force_type=force_type
+                    )
                     
-                    for item in suggestions_list:
-                        ing_name = item.get('name', '')
-                        target_obj = find_ingredient_by_name(ing_name, inventory_items)
-                                    
-                        if target_obj:
-                            is_match = True
-                            if force_type:
-                                ft = force_type.upper()
-                                if ft == 'COFFEE_BEAN':
-                                    is_match = (target_obj.physical_state == 'SOLID_EXTRACTABLE')
-                                elif ft == 'DAIRY':
-                                    is_match = (target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID')
-                                elif ft == 'SODA_SYRUP':
-                                    is_match = (target_obj.physical_state == 'SYRUP' and target_obj.mixology_function == 'FLAVORING')
-                                elif ft == 'ADDITIVE':
-                                    is_match = (target_obj.mixology_function in ['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
-                                else:
-                                    is_match = (target_obj.ingredient_type == force_type)
-                            if not is_match:
-                                logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' which does not match force_type '{force_type}'")
-                                continue
-                            intensity_delta = 0
-                            active_ingredients = []
-                            for ing_name in ingredients:
-                                if ing_name and ing_name != "NONE - Initial Synthesis":
-                                    ing_clean = ing_name.strip().lower()
-                                    ing_obj = next((inv for inv in inventory_items if inv.name.lower() == ing_clean), None)
-                                    if not ing_obj:
-                                        ing_obj = Ingredient.objects.filter(Q(name__iexact=ing_clean) | Q(brand__iexact=ing_clean)).first()
-                                    if ing_obj:
-                                        active_ingredients.append(ing_obj)
+                    for chunk in stream:
+                        if chunk['type'] == 'suggestion':
+                            item = chunk['data']
+                            ing_name = item.get('name', '')
+                            target_obj = find_ingredient_by_name(ing_name, inventory_items)
                             
-                            if active_ingredients:
-                                avg_intensity = sum(ing.intensity for ing in active_ingredients) / len(active_ingredients)
-                                intensity_delta = abs(target_obj.intensity - avg_intensity)
-                            else:
-                                intensity_delta = 3
-                            
-                            resonance = 85 + (max(0, 3 - intensity_delta) * 4) + random.uniform(0.1, 2.5)
-                            
-                            amount = item.get('amount')
-                            if drink_type == 'COFFEE':
-                                amount = sanitize_coffee_amount(target_obj, amount)
-
-                            multibrand_names = get_multibrand_names_in_inventory()
-                            enriched.append({
-                                'id': target_obj.id,
-                                'name': get_display_name(target_obj, multibrand_names),
-                                'category': target_obj.category,
-                                'type': target_obj.ingredient_type,
-                                'intensity': target_obj.intensity,
-                                'sweetness': target_obj.sweetness,
-                                'acidity': target_obj.acidity,
-                                'bitterness': target_obj.bitterness,
-                                'complexity': target_obj.complexity,
-                                'base_suitability': target_obj.base_suitability,
-                                'accent_suitability': target_obj.accent_suitability,
-                                'physical_state': target_obj.physical_state,
-                                'mixology_function': target_obj.mixology_function,
-                                'is_ready_to_drink': target_obj.is_ready_to_drink,
-                                'is_dry': target_obj.is_dry,
-                                'favorite': target_obj.favorite,
-                                'resonance': round(min(resonance, 99.8), 1),
-                                'reason': item.get('reason', 'Molecular Affinity Match'),
-                                'amount': amount,
-                                'profile': item.get('profile', None)
-                            })
-                    
-                    if drink_type == 'COFFEE' and rebalancing:
-                        logger.warning(f"AISuggestion - Info - Raw AI rebalancing before sanitization: {rebalancing}")
-                        sanitized_rebalancing = {}
-                        
-                        beans_in_rebal = {}
-                        dairy_in_rebal = {}
-                        other_in_rebal = {}
-                        
-                        for key, val in rebalancing.items():
-                            target_obj = find_ingredient_by_name(key, inventory_items)
                             if target_obj:
-                                val_float = float(val) if val is not None else 0.0
-                                if target_obj.physical_state == 'SOLID_EXTRACTABLE':
-                                    beans_in_rebal[key] = val_float
-                                elif target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID':
-                                    dairy_in_rebal[key] = val_float
-                                else:
-                                    other_in_rebal[key] = val_float
-                            else:
-                                logger.warning(f"AISuggestion - Warning - Rebalancing key '{key}' not found in inventory, skipping raw value {val}")
+                                is_match = True
+                                if force_type:
+                                    ft = force_type.upper()
+                                    if ft == 'COFFEE_BEAN':
+                                        is_match = (target_obj.physical_state == 'SOLID_EXTRACTABLE')
+                                    elif ft == 'DAIRY':
+                                        is_match = (target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID')
+                                    elif ft == 'SODA_SYRUP':
+                                        is_match = (target_obj.physical_state == 'SYRUP' and target_obj.mixology_function == 'FLAVORING')
+                                    elif ft == 'ADDITIVE':
+                                        is_match = (target_obj.mixology_function in ['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
+                                    else:
+                                        is_match = (target_obj.ingredient_type == force_type)
+                                if not is_match:
+                                    logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' which does not match force_type '{force_type}'")
+                                    continue
                                 
-                        # Sanitize coffee beans (sum to 18.0g)
-                        if beans_in_rebal:
-                            total_bean_val = sum(beans_in_rebal.values())
-                            if total_bean_val > 0:
-                                for key, val in beans_in_rebal.items():
-                                    sanitized_rebalancing[key] = round((val / total_bean_val) * 18.0, 1)
-                            else:
-                                num_beans = len(beans_in_rebal)
-                                for key in beans_in_rebal:
-                                    sanitized_rebalancing[key] = round(18.0 / num_beans, 1)
-                                    
-                        # Sanitize dairy (sum to 50.0ml)
-                        if dairy_in_rebal:
-                            total_dairy_val = sum(dairy_in_rebal.values())
-                            if total_dairy_val > 0:
-                                for key, val in dairy_in_rebal.items():
-                                    sanitized_rebalancing[key] = round((val / total_dairy_val) * 50.0, 1)
-                            else:
-                                num_dairy = len(dairy_in_rebal)
-                                for key in dairy_in_rebal:
-                                    sanitized_rebalancing[key] = round(50.0 / num_dairy, 1)
-                                    
-                        # Sanitize additives/others (15.0ml each)
-                        for key in other_in_rebal:
-                            sanitized_rebalancing[key] = 15.0
-                            
-                        rebalancing = sanitized_rebalancing
-                        logger.warning(f"AISuggestion - Info - Sanitized rebalancing: {rebalancing}")
+                                intensity_delta = 0
+                                active_ingredients = []
+                                for ing_name_active in ingredients:
+                                    if ing_name_active and ing_name_active != "NONE - Initial Synthesis":
+                                        ing_clean = ing_name_active.strip().lower()
+                                        ing_obj = next((inv for inv in inventory_items if inv.name.lower() == ing_clean), None)
+                                        if not ing_obj:
+                                            ing_obj = Ingredient.objects.filter(Q(name__iexact=ing_clean) | Q(brand__iexact=ing_clean)).first()
+                                        if ing_obj:
+                                            active_ingredients.append(ing_obj)
+                                
+                                if active_ingredients:
+                                    avg_intensity = sum(ing.intensity for ing in active_ingredients) / len(active_ingredients)
+                                    intensity_delta = abs(target_obj.intensity - avg_intensity)
+                                else:
+                                    intensity_delta = 3
+                                
+                                amount = item.get('amount')
+                                if drink_type == 'COFFEE':
+                                    amount = sanitize_coffee_amount(target_obj, amount)
 
-                    if enriched:
-                        logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
-                        yield f"data: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': rebalancing, 'seal_recommended': seal_recommended, 'seal_resonance': seal_resonance, 'reasoning': reasoning})}\n\n"
-                        return
-                
-                retry_note = "Your last synthesis signal was unparseable. Adhere strictly to the JSON array format using the Inventory Registry's exact names. [NO MARKDOWN]"
+                                enriched_item = {
+                                    'id': target_obj.id,
+                                    'name': get_display_name(target_obj, multibrand_names),
+                                    'category': target_obj.category,
+                                    'type': target_obj.ingredient_type,
+                                    'intensity': target_obj.intensity,
+                                    'sweetness': target_obj.sweetness,
+                                    'acidity': target_obj.acidity,
+                                    'bitterness': target_obj.bitterness,
+                                    'complexity': target_obj.complexity,
+                                    'base_suitability': target_obj.base_suitability,
+                                    'accent_suitability': target_obj.accent_suitability,
+                                    'physical_state': target_obj.physical_state,
+                                    'mixology_function': target_obj.mixology_function,
+                                    'is_ready_to_drink': target_obj.is_ready_to_drink,
+                                    'is_dry': target_obj.is_dry,
+                                    'favorite': target_obj.favorite,
+                                    'reason': item.get('reason', 'Molecular Affinity Match'),
+                                    'amount': amount,
+                                    'profile': item.get('profile', None)
+                                }
+                                enriched.append(enriched_item)
+                                
+                                card_class = 'border-success border-opacity-25'
+                                text_class = 'text-gradient-lab'
+                                icon_html = ''
+                                if enriched_item['favorite']:
+                                    card_class = 'border-favorite glow-favorite'
+                                    text_class = 'text-warning'
+                                    icon_html = '<i class="bi bi-star-fill text-warning me-1" style="filter: drop-shadow(0 0 5px var(--fizz-amber));"></i>'
+                                elif mode == 'experimental':
+                                    card_class = 'border-experimental glow-experimental'
+                                    text_class = 'text-experimental'
+                                    icon_html = '<i class="bi bi-flask me-1"></i>'
+                                else:
+                                    card_class = 'border-neural glow-neural'
+                                    text_class = 'text-neural'
+                                    icon_html = '<i class="bi bi-cpu me-1"></i>'
+
+                                html_str = render_to_string('flavors/_recommendation_card.html', {
+                                    'card_type': 'ingredient',
+                                    'rec': enriched_item,
+                                    'card_class': card_class,
+                                    'text_class': text_class,
+                                    'icon_html': icon_html,
+                                    'profile_json': json.dumps(enriched_item.get('profile') or {})
+                                })
+                                html_str = html_str.replace('\n', '')
+                                yield f"event: message\ndata: {html_str}\n\n"
+                                
+                        elif chunk['type'] == 'complete':
+                            final_data = chunk['data']
+                            rebalancing = final_data.get('rebalancing', {})
+                            
+                            if drink_type == 'COFFEE' and rebalancing:
+                                beans_in_rebal = {}
+                                dairy_in_rebal = {}
+                                other_in_rebal = {}
+                                
+                                for key, val in rebalancing.items():
+                                    target_obj = find_ingredient_by_name(key, inventory_items)
+                                    if target_obj:
+                                        val_float = float(val) if val is not None else 0.0
+                                        if target_obj.physical_state == 'SOLID_EXTRACTABLE':
+                                            beans_in_rebal[key] = val_float
+                                        elif target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID':
+                                            dairy_in_rebal[key] = val_float
+                                        else:
+                                            other_in_rebal[key] = val_float
+                                            
+                                if beans_in_rebal:
+                                    total_bean_val = sum(beans_in_rebal.values())
+                                    if total_bean_val > 0:
+                                        for key, val in beans_in_rebal.items():
+                                            sanitized_rebalancing[key] = round((val / total_bean_val) * 18.0, 1)
+                                    else:
+                                        num_beans = len(beans_in_rebal)
+                                        for key in beans_in_rebal:
+                                            sanitized_rebalancing[key] = round(18.0 / num_beans, 1)
+                                            
+                                if dairy_in_rebal:
+                                    total_dairy_val = sum(dairy_in_rebal.values())
+                                    if total_dairy_val > 0:
+                                        for key, val in dairy_in_rebal.items():
+                                            sanitized_rebalancing[key] = round((val / total_dairy_val) * 50.0, 1)
+                                    else:
+                                        num_dairy = len(dairy_in_rebal)
+                                        for key in dairy_in_rebal:
+                                            sanitized_rebalancing[key] = round(50.0 / num_dairy, 1)
+                                            
+                                for key, val in other_in_rebal.items():
+                                    sanitized_rebalancing[key] = round(val, 1)
+                            else:
+                                sanitized_rebalancing = rebalancing
+                                
+                            rebalancing = sanitized_rebalancing
+                            
+                            if enriched:
+                                logger.info(f"AISuggestion - Info - Successfully fetched {len(enriched)} suggestions on attempt {attempt+1}")
+                                yield f"event: remove_spinner\ndata: \n\n"
+                                yield f"event: json\ndata: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': rebalancing, 'seal_recommended': final_data.get('seal_recommended', False), 'reasoning': final_data.get('reasoning', '')})}\n\n"
+                                return
+                            
+                            break # Exit chunk loop
+                    
+                except Exception as e:
+                    logger.error(f"AISuggestion - Error - Stream attempt {attempt+1} failed: {e}", exc_info=True)
+                    if attempt == 2:
+                        raise e
 
             # Fallback to standard/algorithmic recommendations if AI returned nothing
             logger.warning("AISuggestion - Warning - AI returned no matches. Falling back to algorithmic recommendations.")
@@ -640,6 +648,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             if len(ing_ids) >= 2:
                 scale_factor = 15.0 / len(ing_ids)
             
+            enriched = []
             for item in recs_data.get('recommended', []):
                 target_obj = item['ingredient']
                 amount = None
@@ -661,41 +670,80 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     'accent_suitability': target_obj.accent_suitability,
                     'is_ready_to_drink': target_obj.is_ready_to_drink,
                     'is_dry': target_obj.is_dry,
-                    'resonance': round(min(item['score'] * scale_factor, 99.8), 1),  # Map score to 0-100 scale dynamically
                     'reason': f"Algorithmic: {item['reason']}",
                     'amount': amount,
                     'profile': None
                 })
             
-            yield f"data: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': {}, 'seal_recommended': False, 'seal_resonance': 0, 'reasoning': 'AI suggestions fallback.'})}\n\n"
+            yield f"event: remove_spinner\ndata: \n\n"
+            yield f"event: json\ndata: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': {}, 'seal_recommended': False,  'reasoning': 'AI suggestions fallback.'})}\n\n"
 
-        return StreamingHttpResponse(generator(), content_type='text/event-stream')
+        response = StreamingHttpResponse(generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
     except Exception as e:
         logger.error(f"AISuggestion - Error - Autonomous Suggestion Failed: {e}", exc_info=True)
         def error_generator():
-            yield f"data: {json.dumps({'status': 'error', 'message': f'Autonomous Suggestion Failed: {str(e)}'})}\n\n"
-        return StreamingHttpResponse(error_generator(), content_type='text/event-stream')
+            yield f"event: remove_spinner\ndata: \n\n"
+            yield f"event: json\ndata: {json.dumps({'status': 'error', 'message': f'Autonomous Suggestion Failed: {str(e)}'})}\n\n"
+        response = StreamingHttpResponse(error_generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
-def ai_synthesize_api(request: HttpRequest) -> JsonResponse:
-    """Generate a flavor synthesis report for a finalized compound."""
+@require_http_methods(["GET", "POST"])
+def ai_synthesize_api(request: HttpRequest) -> HttpResponse:
+    """Generate a flavor synthesis report for a finalized compound (supports streaming)."""
     try:
-        data = json.loads(request.body)
-        ingredients = data.get('ingredients', [])
-        drink_type = data.get('drink_type', 'SODA').upper()
+        if request.method == "POST":
+            data = json.loads(request.body)
+            ingredients = data.get('ingredients', [])
+            drink_type = data.get('drink_type', 'SODA').upper()
+        else:
+            ingredients_str = request.GET.get('ingredients', '[]')
+            try:
+                ingredients = json.loads(ingredients_str)
+            except Exception:
+                ingredients = []
+            drink_type = request.GET.get('drink_type', 'SODA').upper()
         
         if not ingredients:
             return JsonResponse({'error': 'No ingredients provided.'}, status=400)
         
-        summary = AIAssistant.synthesize_flavor_summary(ingredients, drink_type)
-        logger.info(f"AISynthesis - Info - Generated flavor report for {len(ingredients)} ingredients")
-        return JsonResponse({'status': 'success', 'summary': summary})
+        def sse_generator():
+            import time
+            stream = AIAssistant.synthesize_flavor_summary_stream(ingredients, drink_type)
+            for chunk_json in stream:
+                if chunk_json.startswith('data: '):
+                    try:
+                        data_str = chunk_json[6:].strip()
+                        if not data_str or data_str == '[DONE]': continue
+                        parsed = json.loads(data_str)
+                        if 'chunk' in parsed:
+                            chunk_text = parsed['chunk'].replace('\n', '<br>')
+                            logger.info(f"SynthesisStream - Yielding chunk at {time.time()}")
+                            yield f"event: message\ndata: {chunk_text}\n\n"
+                    except:
+                        pass
+            yield "event: remove_spinner\ndata: \n\n"
+            
+        response = StreamingHttpResponse(sse_generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
     except Exception as e:
-        logger.error(f"AISynthesis - Error - Surprise mix synthesis report failed: {e}", exc_info=True)
-        return JsonResponse({'error': f"Synthesis Report Failed: {str(e)}"}, status=500)
+        logger.error(f"SynthesisAPI - Error: {e}", exc_info=True)
+        def error_generator():
+            yield f"event: message\ndata: <span class='text-danger'>Error: {str(e)}</span>\n\n"
+        response = StreamingHttpResponse(error_generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+
 
 
 @csrf_exempt

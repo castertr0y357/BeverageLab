@@ -18,7 +18,11 @@ class CoffeeEngine(BaseEngine):
         query = Ingredient.objects.filter(is_in_inventory=True)
         if not experimental:
             # For coffee standard mode, base ingredients must be coffee beans
-            query = query.filter(compatible_systems__icontains=self.drink_type, ingredient_type='COFFEE_BEAN')
+            query = query.filter(
+                compatible_systems__icontains=self.drink_type,
+                physical_state='SOLID_EXTRACTABLE',
+                mixology_function='FLAVORING'
+            )
             
         if exclude_ids:
             filtered_query = query.exclude(id__in=exclude_ids)

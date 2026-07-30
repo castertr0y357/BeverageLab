@@ -239,7 +239,7 @@
                                  data-is-decaf="{% if 'decaf' in ingredient.name|lower %}true{% else %}false{% endif %}"
                                  data-profile=''>
                                 <span class="fw-bold fs-5 mb-2">{% if ingredient.favorite %}★ {% endif %}{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}</span>
-                                <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
+                                <span class="badge-fizz bg-{{ ingredient.category|lower }}">{{ ingredient.category }}</span>
                                 <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
                                     <span class="text-gradient-lab font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
                                     <span class="text-experimental font-monospace">A: {{ ingredient.accent_suitability|floatformat:1 }}</span>
@@ -608,6 +608,7 @@
                     activeProgressTimer = setTimeout(resolve, 750);
                 });
             } else {
+                activeProgressQueue.length = 0; // Clear queue to prevent infinite loop
                 break;
             }
         }
@@ -1364,7 +1365,8 @@
     }
 
     function getBadgeColor(category) {
-        return `bg-${category}`;
+        if (!category) return 'bg-neutral';
+        return `bg-${category.toLowerCase().trim()}`;
     }
 
     // Global state for AI synthesis history
@@ -1706,6 +1708,7 @@
     async function triggerFlavorSynthesis() {
         const reportContainer = document.getElementById('synthesisReportContainer');
         const reportBody = document.getElementById('synthesisReportBody');
+        console.log('[Synthesis] triggerFlavorSynthesis called. Mode:', currentLabMode, 'Ingredients:', selectedIngredients.length);
         
         reportContainer.style.display = 'block';
         reportBody.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div><span class="ms-2 small text-dim">Compiling synthesis report...</span></div>';
@@ -1747,25 +1750,16 @@
                     })
                 });
 
-                const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify({
-                        ingredients: mappedIngredients,
-                        drink_type: currentLabMode
-                    })
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
                 });
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
 
-                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestCoffeeChemistryData = data;
                 updateSelectedArea(true);
-                let aiProfileData = null;
-                try {
-                    aiProfileData = await aiRes.json();
-                } catch (e) {
-                    console.error("AI profile synthesis failed", e);
-                }
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -1943,11 +1937,40 @@
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
-                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
+                                    <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
+                                        <span id="aiProfileText"></span>
+                                        <div id="aiProfileSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Synthesizing profile...</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     `;
+                    
+                    // Native SSE consumption (replaces HTMX)
+                    const eventSource = new EventSource(sseUrl);
+                    
+                    eventSource.addEventListener('message', function(e) {
+                        const textSpan = reportBody.querySelector('#aiProfileText');
+                        if (textSpan) {
+                            textSpan.innerHTML += e.data;
+                        }
+                    });
+                    
+                    eventSource.addEventListener('remove_spinner', function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    });
+                    
+                    eventSource.onerror = function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    };
+
                     // Scroll to report
                     reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 } else {
@@ -1971,25 +1994,16 @@
                     })
                 });
 
-                const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify({
-                        ingredients: mappedIngredients,
-                        drink_type: currentLabMode
-                    })
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
                 });
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
 
-                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestSodaChemistryData = data;
                 updateSelectedArea(true);
-                let aiProfileData = null;
-                try {
-                    aiProfileData = await aiRes.json();
-                } catch (e) {
-                    console.error("AI profile synthesis failed", e);
-                }
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -2095,11 +2109,40 @@
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
-                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
+                                    <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
+                                        <span id="aiProfileText"></span>
+                                        <div id="aiProfileSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Synthesizing profile...</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     `;
+                    
+                    // Native SSE consumption (replaces HTMX)
+                    const eventSource = new EventSource(sseUrl);
+                    
+                    eventSource.addEventListener('message', function(e) {
+                        const textSpan = reportBody.querySelector('#aiProfileText');
+                        if (textSpan) {
+                            textSpan.innerHTML += e.data;
+                        }
+                    });
+                    
+                    eventSource.addEventListener('remove_spinner', function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    });
+                    
+                    eventSource.onerror = function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    };
+
                     // Scroll to report
                     reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 } else {
@@ -2121,25 +2164,16 @@
                     })
                 });
 
-                const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify({
-                        ingredients: mappedIngredients,
-                        drink_type: currentLabMode
-                    })
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
                 });
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
 
-                const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+                const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestCryoChemistryData = data;
                 updateSelectedArea(true);
-                let aiProfileData = null;
-                try {
-                    aiProfileData = await aiRes.json();
-                } catch (e) {
-                    console.error("AI profile synthesis failed", e);
-                }
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -2180,7 +2214,7 @@
                     let prepStepsHtml = '';
                     if (data.preparation_steps && data.preparation_steps.length > 0) {
                         const updatedSteps = data.preparation_steps.map(step => {
-                            if (step.startsWith("Step 2:")) {
+                            if (currentLabMode === 'SLUSHIE' && step.startsWith("Step 2:") && data.ingredients && data.ingredients.filler) {
                                 return `Step 2: Add exactly ${data.ingredients.filler.volume_ml.toFixed(1)}ml of ${data.ingredients.filler.name} to the pitcher. Whisk vigorously for 30-45 seconds to achieve full molecular suspension.`;
                             }
                             return step;
@@ -2253,37 +2287,89 @@
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
-                                    <p class="mb-0 small text-white opacity-90" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
+                                    <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
+                                        <span id="aiProfileText"></span>
+                                        <div id="aiProfileSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Synthesizing profile...</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     `;
+                    
+                    // Native SSE consumption (replaces HTMX)
+                    const eventSource = new EventSource(sseUrl);
+                    
+                    eventSource.addEventListener('message', function(e) {
+                        const textSpan = reportBody.querySelector('#aiProfileText');
+                        if (textSpan) {
+                            textSpan.innerHTML += e.data;
+                        }
+                    });
+                    
+                    eventSource.addEventListener('remove_spinner', function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    });
+                    
+                    eventSource.onerror = function(e) {
+                        const spinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (spinner) spinner.remove();
+                        eventSource.close();
+                    };
+
                     // Scroll to report
                     reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 } else {
                     reportBody.innerHTML = `<div class="text-warning small">Chemistry compilation failed.</div>`;
                 }
             } else {
-                const r = await fetch('/api/ai/synthesize/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: JSON.stringify({
-                        ingredients: selectedIngredients,
-                        drink_type: currentLabMode
-                    })
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(selectedIngredients)
                 });
-                const data = await r.json();
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
 
-                if (data.status === 'success') {
-                    reportBody.innerHTML = `<div style="white-space:pre-line;">${data.summary}</div>`;
-                    // Scroll to report
-                    reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                } else {
-                    reportBody.innerHTML = `<div class="text-warning small">Laboratory Error: ${data.error || 'Synthesis report failed.'}</div>
-                                           <button class="btn btn-xs btn-outline-warning mt-2 w-100" onclick="triggerFlavorSynthesis()">Retry Synthesis</button>`;
-                }
+                reportBody.innerHTML = `
+                    <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
+                        <span id="aiProfileText"></span>
+                        <div id="aiProfileSpinner" class="mt-2">
+                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                            <span class="ms-2 text-dim small">Synthesizing profile...</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Native SSE consumption (replaces HTMX)
+                const eventSource = new EventSource(sseUrl);
+                
+                eventSource.addEventListener('message', function(e) {
+                    const textSpan = reportBody.querySelector('#aiProfileText');
+                    if (textSpan) {
+                        textSpan.innerHTML += e.data;
+                    }
+                });
+                
+                eventSource.addEventListener('remove_spinner', function(e) {
+                    const spinner = reportBody.querySelector('#aiProfileSpinner');
+                    if (spinner) spinner.remove();
+                    eventSource.close();
+                });
+                
+                eventSource.onerror = function(e) {
+                    const spinner = reportBody.querySelector('#aiProfileSpinner');
+                    if (spinner) spinner.remove();
+                    eventSource.close();
+                };
+
+                // Scroll to report
+                reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
             }
         } catch (err) {
+            console.error('[Synthesis] FATAL ERROR in triggerFlavorSynthesis:', err);
             reportBody.innerHTML = `<div class="text-danger small">Connectivity Error: Could not reach the synthesis substrate.</div>
                                    <button class="btn btn-xs btn-outline-warning mt-2 w-100" onclick="triggerFlavorSynthesis()">Retry Synthesis</button>`;
         }
@@ -2669,7 +2755,8 @@
                 drink_type: currentLabMode,
                 mode: recommendationMode,
                 exclude: stepExcludingNames,
-                force_type: forceType
+                force_type: forceType,
+                stream_html: true
             } : { 
                 ingredient_ids: ingredientIds,
                 drink_type: currentLabMode,
@@ -2681,18 +2768,21 @@
             if (recommendationsController) {
                 recommendationsController.abort();
             }
-            recommendationsController = new AbortController();
+            const currentController = new AbortController();
+            recommendationsController = currentController;
 
             try {
                 const r = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                     body: JSON.stringify(payload),
-                    signal: recommendationsController.signal
+                    signal: currentController.signal
                 });
 
-                let data;
+                let data = null;
                 if (isAiEngine) {
+                    let isFirstCard = true;
+                    window.didStreamCards = false;
                     const reader = r.body.getReader();
                     const decoder = new TextDecoder();
                     let buffer = '';
@@ -2705,53 +2795,96 @@
                         const lines = buffer.split('\n\n');
                         buffer = lines.pop();
                         
-                        for (const line of lines) {
-                            if (line.trim().startsWith('data:')) {
-                                const jsonStr = line.replace('data:', '').trim();
+                        for (const chunk of lines) {
+                            if (!chunk.trim()) continue;
+                            const chunkLines = chunk.split('\n');
+                            let eventType = 'message';
+                            let dataStr = '';
+                            
+                            for (const line of chunkLines) {
+                                if (line.startsWith('event:')) {
+                                    eventType = line.replace('event:', '').trim();
+                                } else if (line.startsWith('data:')) {
+                                    dataStr = line.substring(5).trim();
+                                }
+                            }
+                            if (eventType === 'message' && dataStr) {
+                                window.didStreamCards = true;
+                                console.log("Received chunk at " + new Date().toISOString().substring(11, 23) + ":", dataStr);
+                                if (isFirstCard) {
+                                    isFirstCard = false;
+                                    container.innerHTML = `
+                                        <div id="ai-cards-container" class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5">
+                                            ${dataStr}
+                                            <div class="ai-loading-placeholder col animate-fade-in"><div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center border-neural border-opacity-25" style="border-style: dashed;"><div class="spinner-border text-neural spinner-border-sm mb-2" role="status"></div></div></div>
+                                            <div class="ai-loading-placeholder col animate-fade-in"><div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center border-neural border-opacity-25" style="border-style: dashed;"><div class="spinner-border text-neural spinner-border-sm mb-2" role="status"></div></div></div>
+                                            <div class="ai-loading-placeholder col animate-fade-in"><div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center border-neural border-opacity-25" style="border-style: dashed;"><div class="spinner-border text-neural spinner-border-sm mb-2" role="status"></div></div></div>
+                                            <div class="ai-loading-placeholder col animate-fade-in"><div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center border-neural border-opacity-25" style="border-style: dashed;"><div class="spinner-border text-neural spinner-border-sm mb-2" role="status"></div></div></div>
+                                        </div>
+                                    `;
+                                } else {
+                                    const placeholders = document.querySelectorAll('.ai-loading-placeholder');
+                                    if (placeholders.length > 0) {
+                                        placeholders[0].insertAdjacentHTML('beforebegin', dataStr);
+                                        if (placeholders.length > 1) {
+                                            placeholders[placeholders.length - 1].remove();
+                                        }
+                                    } else {
+                                        const grid = document.getElementById('ai-cards-container');
+                                        if (grid) grid.insertAdjacentHTML('beforeend', dataStr);
+                                    }
+                                }
+                            } else if (eventType === 'remove_spinner') {
+                                activeProgressQueue.length = 0; // Force clear any pending progress
+                                const placeholders = document.querySelectorAll('.ai-loading-placeholder');
+                                placeholders.forEach(p => p.remove());
+                                const bigSpinner = document.getElementById('recommendationProgress');
+                                if (bigSpinner) bigSpinner.remove();
+                            } else if (eventType === 'json' && dataStr) {
                                 try {
-                                    const parsed = JSON.parse(jsonStr);
-                                    if (parsed.status === 'progress') {
-                                        activeProgressQueue.push(parsed.message);
-                                        processActiveProgressQueue();
-                                    } else if (parsed.status === 'success') {
+                                    const parsed = JSON.parse(dataStr);
+                                    if (parsed.type === 'complete_data' || parsed.status === 'success') {
                                         data = parsed;
-                                    } else if (parsed.status === 'error') {
+                                    }
+                                } catch(e) {}
+                            } else if (eventType === 'progress' && dataStr) {
+                                try {
+                                    const parsed = JSON.parse(dataStr);
+                                    activeProgressQueue.push(parsed.message);
+                                    processActiveProgressQueue();
+                                } catch(e) {}
+                            } else if (dataStr) {
+                                try {
+                                    const parsed = JSON.parse(dataStr);
+                                    if (parsed.status === 'error') {
                                         throw new Error(parsed.message);
                                     }
-                                } catch (e) {
-                                    console.error("Error parsing recommendation stream line:", line, e);
-                                }
+                                } catch(e) {}
                             }
                         }
                     }
-                    // Wait for progress queue processing to complete
                     while (isProcessingProgressQueue || activeProgressQueue.length > 0) {
                         await new Promise(resolve => setTimeout(resolve, 50));
                     }
                 } else {
                     data = await r.json();
+                    container.innerHTML = '';
                 }
                 
-                container.innerHTML = '';
-                
                 // Apply Neural Re-balancing to existing ingredients
-                if (data.rebalancing && Object.keys(data.rebalancing).length > 0) {
+                if (data && data.rebalancing && Object.keys(data.rebalancing).length > 0) {
                     console.log("Applying Neural Re-balancing:", data.rebalancing);
                     selectedIngredients.forEach((ing, index) => {
-                        // Coffee beans are governed by the shot/gram budget system, never by AI rebalancing
                         const ingType = (ing.type || ing.ingredient_type || '').toUpperCase();
                         if (ingType === 'COFFEE_BEAN') {
-                            console.log(`Skipping neural re-balancing for coffee bean (chemistry-managed): ${ing.name}`);
                             return;
                         }
                         if (ing.isUserOverridden) {
-                            console.log(`Skipping neural re-balancing for user-overridden ingredient: ${ing.name}`);
                             return;
                         }
                         const normalizedName = ing.name.toLowerCase().trim();
                         for (const [key, value] of Object.entries(data.rebalancing)) {
                             const normalizedKey = key.toLowerCase().trim();
-                            // Fuzzy match: exact, substring, or partial overlap
                             if (normalizedKey === normalizedName ||
                                 normalizedName.includes(normalizedKey) ||
                                 normalizedKey.includes(normalizedName)) {
@@ -2759,12 +2892,21 @@
                                 ing.isAiBalanced = true;
                                 const standard = coffeeAmountForIngredient(ing, index, coffeeSizeOz, coffeeBaseType);
                                 ing.aiRatio = standard > 0 ? (ing.amount / standard) : 1.0;
-                                console.log(`Neural Re-balanced: ${ing.name} → ${value} (Ratio: ${ing.aiRatio})`);
                                 break;
                             }
                         }
                     });
-                    updateSelectedArea(); // Refresh UI with new volumes
+                    updateSelectedArea();
+                }
+
+                if (isAiEngine && data && data.reasoning) {
+                    const reasoningHtml = `
+                        <div class="pe-3">
+                            <div class="small fw-bold text-neural mb-1"><i class="bi bi-cpu"></i> NEURAL BALANCE STRATEGY</div>
+                            <div class="small italic opacity-75">${data.reasoning}</div>
+                        </div>
+                    `;
+                    appendChatMessage('assistant', reasoningHtml);
                 }
 
                 let suggestions = isAiEngine ? (data.suggestions || []) : (data.recommended || []);
@@ -2780,58 +2922,23 @@
                         }
                     }
                 });
-                
-                // 🧪 Integrated Sorting Protocol: Add Seal Mix to the list so it can compete with ingredients
-                if (isAiEngine && data.seal_recommended) {
-                    suggestions.push({
-                        isSeal: true,
-                        resonance: data.seal_resonance || 0,
-                        name: 'SEAL MIX'
-                    });
-                }
 
-                // Sort combined list by resonance (High to Low)
-                if (suggestions && suggestions.length > 0) {
-                    suggestions.sort((a, b) => (b.resonance || 0) - (a.resonance || 0));
-                }
                 
                 if (suggestions.length === 0 && !data.seal_recommended) {
                     container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-muted">No ideal matches in lab inventory. <button type="button" class="btn btn-link px-0 text-gradient-lab" onclick="skipOptimization()">Seal current mix</button>.</p></div>';
                     return;
                 }
 
-                if (isAiEngine && data.reasoning) {
-                    const reasoningHtml = `
-                        <div class="pe-3">
-                            <div class="small fw-bold text-neural mb-1"><i class="bi bi-cpu"></i> NEURAL BALANCE STRATEGY</div>
-                            <div class="small italic opacity-75">${data.reasoning}</div>
-                        </div>
-                    `;
-                    appendChatMessage('assistant', reasoningHtml);
-                }
 
-                const row = document.createElement('div');
-                row.className = 'row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5';
-                
-                suggestions.forEach(rec => {
-                    const col = document.createElement('div');
-                    col.className = 'col animate-fade-in';
+                if (!window.didStreamCards) {
+                    const row = document.createElement('div');
+                    row.className = 'row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5';
                     
-                    if (rec.isSeal) {
-                        // 🧪 Neural Seal Recommendation
-                        col.innerHTML = `
-                            <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-neural glow-neural"
-                                 onclick="skipOptimization()">
-                                <div class="rounded-circle bg-neural bg-opacity-10 p-3 mb-2">
-                                    <i class="bi bi-check2-circle text-neural fs-3"></i>
-                                </div>
-                                <div class="fw-bold text-neural small">SEAL MIX</div>
-                                <div class="text-xs text-neural opacity-75 mt-1">🧪 ${rec.resonance}% Resonance</div>
-                                <div class="text-xs opacity-50">Profile balanced</div>
-                            </div>
-                        `;
-                    } else {
-                        // 🧪 Ingredient Recommendation
+                    suggestions.forEach((rec, idx) => {
+                        const col = document.createElement('div');
+                        col.className = 'col animate-fade-in';
+                        col.style.animationDelay = `${idx * 150}ms`;
+                        
                         const badgeClass = getBadgeColor(rec.category);
                         const isExperimentalMode = recommendationMode === 'experimental';
                         
@@ -2853,25 +2960,22 @@
                             iconHtml = '<i class="bi bi-cpu me-1"></i>';
                         }
                         
-                        const profileJson = rec.profile ? JSON.stringify(rec.profile).replace(/"/g, '&quot;') : '';
-                        
                         col.innerHTML = `
                             <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn ${cardClass}"
                                  data-id="${rec.id}" data-name="${rec.name}" data-intensity="${rec.intensity}" data-category="${rec.category}"
-                                 data-sweetness="${rec.sweetness || 0}" data-acidity="${rec.acidity || 0}"
-                                 data-bitterness="${rec.bitterness || 0}" data-complexity="${rec.complexity || 0}"
-                                 data-base-suitability="${rec.base_suitability || 3.0}" data-accent-suitability="${rec.accent_suitability || 3.0}"
-                                 data-is-ready-to-drink="${rec.is_ready_to_drink === true || rec.is_ready_to_drink === 'true'}"
-                                 data-profile='${profileJson}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}"
-                                 data-favorite="${rec.favorite === true || rec.favorite === 'true'}">
+                                 data-sweetness="${rec.sweetness}" data-acidity="${rec.acidity}"
+                                 data-bitterness="${rec.bitterness}" data-complexity="${rec.complexity}"
+                                 data-base-suitability="${rec.base_suitability}" data-accent-suitability="${rec.accent_suitability}"
+                                 data-is-ready-to-drink="${rec.is_ready_to_drink}"
+                                 data-profile='${JSON.stringify(rec.profile || {})}' data-amount="${rec.amount || ''}" data-type="${rec.type || ''}"
+                                 data-favorite="${rec.favorite ? 'true' : 'false'}">
                                     <span class="fw-bold fs-5 mb-1">${rec.favorite ? '★ ' : ''}${rec.name}</span>
                                     <div class="d-flex gap-2 align-items-center mb-2">
-                                        <span class="badge-fizz ${badgeClass}">${rec.category}</span>
-                                        ${rec.resonance ? `<span class="text-info fw-black small" style="text-shadow: 0 0 8px var(--fizz-cyan);">🧪 ${rec.resonance}%</span>` : ''}
+                                        <span class="badge-fizz bg-${badgeClass}">${rec.category || ''}</span>
                                     </div>
                                     <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
-                                        <span class="text-gradient-lab font-monospace">B: ${parseFloat(rec.base_suitability || 3.0).toFixed(1)}</span>
-                                        <span class="text-experimental font-monospace">A: ${parseFloat(rec.accent_suitability || 3.0).toFixed(1)}</span>
+                                        <span class="text-gradient-lab font-monospace">B: ${rec.base_suitability.toFixed(1)}</span>
+                                        <span class="text-experimental font-monospace">A: ${rec.accent_suitability.toFixed(1)}</span>
                                     </div>
                                     <div class="mt-auto">
                                         <small class="${textClass} fw-bold" style="font-size: 0.7rem;">
@@ -2880,20 +2984,20 @@
                                     </div>
                             </div>
                         `;
-                    }
-                    row.appendChild(col);
-                });
-                
-                container.appendChild(row);
+                        row.appendChild(col);
+                    });
+                    
+                    container.appendChild(row);
+                }
 
                 const actionsContainer = document.createElement('div');
-                actionsContainer.className = 'row g-3 mt-2';
+                actionsContainer.className = 'row g-3 mt-3 rec-actions-container w-100';
                 
                 let colsHtml = '';
                 if (suggestions.length > 0) {
                     colsHtml += `
                         <div class="col-${ingredientIds.length >= 2 ? '6' : '12'}">
-                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="fetchRecommendations()">
+                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10 w-100" onclick="fetchRecommendations()">
                                 <i class="bi bi-arrow-repeat fs-3 mb-1 text-accent animate-spin-hover"></i>
                                 <span class="fw-bold small text-uppercase text-accent">Recommend More</span>
                             </div>
@@ -2903,7 +3007,7 @@
                 if (ingredientIds.length >= 2) {
                     colsHtml += `
                         <div class="col-${suggestions.length > 0 ? '6' : '12'}">
-                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="skipOptimization()">
+                            <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10 w-100" onclick="skipOptimization()">
                                 <i class="bi bi-shield-check fs-3 mb-1 text-success"></i>
                                 <span class="fw-bold small text-uppercase">Seal Mix</span>
                             </div>
@@ -2911,7 +3015,11 @@
                     `;
                 }
                 
-                if (colsHtml) {
+                if (colsHtml && !currentController.signal.aborted) {
+                    // Remove any existing actions container to prevent duplication
+                    const existingActions = container.querySelectorAll('.rec-actions-container');
+                    existingActions.forEach(e => e.remove());
+                    
                     actionsContainer.innerHTML = colsHtml;
                     container.appendChild(actionsContainer);
                 }
@@ -2921,25 +3029,25 @@
                     const recContainer = document.getElementById('similarRecipes');
                     if (recContainer) {
                         let recHtml = '';
-                        data.recipes.forEach(r => {
+                        for (const r of data.recipes) {
                             recHtml += `
                                 <a href="/ingredients/recipes/${r.id}/" class="fizz-pill bg-dark bg-opacity-50 text-white text-decoration-none border-white border-opacity-10 hover-lime d-flex align-items-center gap-2">
                                     <i class="bi bi-journal-text small"></i> ${r.name}
                                 </a>`;
-                        });
+                        }
                         recContainer.innerHTML = recHtml;
                     }
                 }
-                recommendationsController = null;
         } catch (err) {
             if (err.name === 'AbortError') {
-                console.log("Recommendation fetch aborted.");
                 return;
             }
             console.error('Synthesis Error:', err);
             container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-danger">Substrate Error: Laboratory signal lost.</p></div>';
         } finally {
-            recommendationsController = null;
+            if (recommendationsController === currentController) {
+                recommendationsController = null;
+            }
         }
     }
 
@@ -2949,7 +3057,8 @@
         const lib = document.getElementById('partitionedBasesContainer');
         if (lib) lib.style.display = 'none';
         updateSelectedArea(true);
-        debouncedTriggerFlavorSynthesis();
+        // Call directly (no debounce) to avoid race conditions with the timeout being cleared
+        triggerFlavorSynthesis();
     }
 
     function updateSelectedArea(isDone = false) {

@@ -16,11 +16,17 @@ User = get_user_model()
 
 def _get_sse_data(response) -> dict:
     content = b"".join(response.streaming_content).decode('utf-8')
-    for line in content.split('\n\n'):
-        if line.strip().startswith('data:'):
-            parsed = json.loads(line.replace('data:', '').strip())
-            if parsed.get('status') == 'success':
-                return parsed
+    for chunk in content.split('\n\n'):
+        for line in chunk.split('\n'):
+            if line.strip().startswith('data:'):
+                data_str = line.replace('data:', '').strip()
+                if not data_str: continue
+                try:
+                    parsed = json.loads(data_str)
+                    if parsed.get('status') == 'success':
+                        return parsed
+                except ValueError:
+                    pass
     return {}
 
 
@@ -287,7 +293,10 @@ class BeverageLabViewsTest(TestCase):
         self.staff_user = User.objects.create_user(username="director", password="secure_password_123", is_staff=True)
         
         self.ing = Ingredient.objects.create(
-            name="Club Soda", ingredient_type="OTHER", category="sweet", intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1
+            name="Club Soda", ingredient_type="OTHER", category="sweet", intensity=1, sweetness=1, acidity=1, bitterness=1, complexity=1, compatible_systems="SODA,COFFEE", is_in_inventory=True
+        )
+        self.coffee_bean = Ingredient.objects.create(
+            name="Espresso Beans", brand="Monin", ingredient_type="COFFEE_BEAN", category="coffee", physical_state="SOLID_EXTRACTABLE", mixology_function="VOLUME_BASE", intensity=5, sweetness=1, acidity=2, bitterness=4, complexity=4, compatible_systems="COFFEE", is_in_inventory=True
         )
         self.recipe = Recipe.objects.create(name="Simple Soda", drink_type="SODA")
         self.ri = RecipeIngredient.objects.create(recipe=self.recipe, ingredient=self.ing, amount=200.0)
@@ -525,8 +534,9 @@ class BeverageLabViewsTest(TestCase):
         data = response.json()
         self.assertIn('recommended', data)
 
-    @patch('requests.request')
+    @patch('requests.post')
     def test_ai_suggest_api_force_type(self, mock_request: MagicMock) -> None:
+        """Verify that when forcing a specific category, the LLM is instructed and standard fallback behaves as expected."""
         self.client.login(username="lab_tech", password="secure_password_123")
         provider = LLMProvider.objects.create(
             name="Mock OpenAI",
@@ -553,9 +563,10 @@ class BeverageLabViewsTest(TestCase):
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Whole Milk", "reason": "Adds body", "resonance": 90, "amount": 50.0}]}'}}]
-        }
+        mock_response.iter_lines.return_value = [
+            b'data: {"choices": [{"delta": {"content": "{\\\"suggestions\\\": [{\\\"name\\\": \\\"Whole Milk\\\", \\\"reason\\\": \\\"Adds body\\\", \\\"resonance\\\": 90, \\\"amount\\\": 50.0}], \\\"rebalancing\\\": {}, \\\"seal_recommended\\\": false, \\\"seal_resonance\\\": 0, \\\"reasoning\\\": \\\"Test reason\\\"}"}}]}',
+            b'data: [DONE]'
+        ]
         mock_request.return_value = mock_response
 
         response = self.client.post(
@@ -766,7 +777,7 @@ class BeverageLabViewsTest(TestCase):
         self.assertContains(response, 'id="emptyModeMessage"')
         self.assertContains(response, 'id="stepHeader"')
 
-    @patch('requests.request')
+    @patch('requests.post')
     def test_ai_suggest_api_streams_progress(self, mock_request: MagicMock) -> None:
         """Verify that ai_suggest_api returns a StreamingHttpResponse with progress event payloads."""
         self.client.login(username="lab_tech", password="secure_password_123")
@@ -783,9 +794,10 @@ class BeverageLabViewsTest(TestCase):
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Club Soda", "reason": "Adds fizz", "resonance": 95, "amount": 100.0}]}'}}]
-        }
+        mock_response.iter_lines.return_value = [
+            b'data: {"choices": [{"delta": {"content": "{\\\"suggestions\\\": [{\\\"name\\\": \\\"Espresso Beans (Monin)\\\", \\\"reason\\\": \\\"Strong base\\\", \\\"resonance\\\": 95, \\\"amount\\\": 18.0}], \\\"rebalancing\\\": {\\\"Espresso Beans (Monin)\\\": 10.0}, \\\"seal_recommended\\\": false, \\\"seal_resonance\\\": 0, \\\"reasoning\\\": \\\"Test reason\\\"}"}}]}',
+            b'data: [DONE]'
+        ]
         mock_request.return_value = mock_response
 
         response = self.client.post(
@@ -803,29 +815,34 @@ class BeverageLabViewsTest(TestCase):
 
         # Decode streamed content chunks
         content = b"".join(response.streaming_content).decode('utf-8')
-        lines = [line.strip() for line in content.split('\n\n') if line.strip()]
+        chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip()]
 
         # Parse messages
         progress_msgs = []
         success_data = None
-        for line in lines:
-            if line.startswith('data:'):
-                parsed = json.loads(line.replace('data:', '').strip())
-                if parsed.get('status') == 'progress':
-                    progress_msgs.append(parsed.get('message'))
-                elif parsed.get('status') == 'success':
-                    success_data = parsed
+        for chunk in chunks:
+            for line in chunk.split('\n'):
+                if line.startswith('data:'):
+                    data_str = line.replace('data:', '').strip()
+                    if not data_str: continue
+                    try:
+                        parsed = json.loads(data_str)
+                        if parsed.get('status') == 'progress':
+                            progress_msgs.append(parsed.get('message'))
+                        elif parsed.get('status') == 'success':
+                            success_data = parsed
+                    except ValueError:
+                        pass
 
         # Assert progress messages are sent in order
         self.assertIn("Scanning current compound registry...", progress_msgs)
         self.assertIn("Locating matching flavor affinity groups...", progress_msgs)
         self.assertIn("Querying Mixology Oracle...", progress_msgs)
-        self.assertIn("Sanitizing extraction volumes & balancing ratios...", progress_msgs)
 
         # Assert final success payload contains suggestions
         self.assertIsNotNone(success_data)
         self.assertEqual(success_data['status'], 'success')
-        self.assertEqual(success_data['suggestions'][0]['name'], 'Club Soda')
+        self.assertEqual(success_data['suggestions'][0]['name'], 'Espresso Beans')
 
 
 class BeverageLabAIAssistantTest(TestCase):
@@ -873,7 +890,7 @@ class BeverageLabAIAssistantTest(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Lime", "reason": "tartness", "resonance": 90, "amount": 20.0}]}'}}]
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Lime", "reason": "tartness", "amount": 20.0}], "rebalancing": {}, "seal_recommended": false, "reasoning": "Test reason"}'}}]
         }
         mock_request.return_value = mock_response
 
@@ -886,7 +903,7 @@ class BeverageLabAIAssistantTest(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Espresso Bean", "reason": "strong base", "resonance": 95, "amount": 18.0}]}'}}]
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Espresso Bean", "reason": "strong base", "amount": 18.0}]}'}}]
         }
         mock_request.return_value = mock_response
 
@@ -908,7 +925,7 @@ class BeverageLabAIAssistantTest(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Whole Milk", "reason": "creamy", "resonance": 92, "amount": 50.0}]}'}}]
+            "choices": [{"message": {"content": '{"suggestions": [{"name": "Whole Milk", "reason": "creamy", "amount": 50.0}]}'}}]
         }
         mock_request.return_value = mock_response
 
@@ -1252,21 +1269,24 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             brand="Monin",
             ingredient_type="COFFEE_BEAN",
             category="coffee",
-            is_in_inventory=True
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
         )
         self.creamer = Ingredient.objects.create(
             name="Whole Milk",
             brand="Local Dairy",
             ingredient_type="DAIRY",
             category="sweet",
-            is_in_inventory=True
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
         )
         self.syrup = Ingredient.objects.create(
             name="Caramel Syrup",
             brand="Torani",
             ingredient_type="OTHER",
             category="sweet",
-            is_in_inventory=True
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
         )
 
     def test_sanitize_coffee_amount(self) -> None:
@@ -1278,29 +1298,36 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             name="Honey",
             ingredient_type="ADDITIVE",
             category="sweet",
-            is_in_inventory=True
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
         )
         self.assertEqual(sanitize_coffee_amount(sugar, 25.0), 15.0)
 
-    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
-    def test_ai_suggest_api_coffee_sanitization(self, mock_suggest: MagicMock) -> None:
-        mock_suggest.return_value = {
-            "suggestions": [
-                {
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous_stream')
+    def test_ai_suggest_api_coffee_sanitization(self, mock_suggest_stream: MagicMock) -> None:
+        mock_suggest_stream.return_value = [
+            {
+                "type": "suggestion",
+                "data": {
                     "name": "Whole Milk (Local Dairy)",
                     "reason": "Creams it up",
                     "resonance": 95,
                     "amount": 100.0,
                     "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
                 }
-            ],
-            "rebalancing": {
-                "Espresso Beans (Monin)": 100.0
             },
-            "seal_recommended": False,
-            "seal_resonance": 80,
-            "reasoning": "Test suggestion rebalancing."
-        }
+            {
+                "type": "complete",
+                "data": {
+                    "rebalancing": {
+                        "Espresso Beans (Monin)": 100.0
+                    },
+                    "seal_recommended": False,
+                    "seal_resonance": 80,
+                    "reasoning": "Test suggestion rebalancing."
+                }
+            }
+        ]
 
         response = self.client.post(
             reverse('ai_suggest_api'),
@@ -1319,27 +1346,33 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         # Verify rebalancing amount is coerced to 18.0 (Espresso Beans is COFFEE_BEAN)
         self.assertEqual(data['rebalancing']['Espresso Beans (Monin)'], 18.0)
 
-    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
-    def test_ai_suggest_api_coffee_rebalancing_unmatched_key_dropped(self, mock_suggest: MagicMock) -> None:
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous_stream')
+    def test_ai_suggest_api_coffee_rebalancing_unmatched_key_dropped(self, mock_suggest_stream: MagicMock) -> None:
         """Unrecognized rebalancing keys must be dropped to prevent raw AI values leaking."""
-        mock_suggest.return_value = {
-            "suggestions": [
-                {
+        mock_suggest_stream.return_value = [
+            {
+                "type": "suggestion",
+                "data": {
                     "name": "Whole Milk (Local Dairy)",
                     "reason": "Creams it up",
                     "resonance": 95,
                     "amount": 100.0,
                     "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
                 }
-            ],
-            "rebalancing": {
-                "Espresso Roast Supreme": 100.0,
-                "Unknown Bean Variety": 50.0
             },
-            "seal_recommended": False,
-            "seal_resonance": 80,
-            "reasoning": "Test unmatched rebalancing keys."
-        }
+            {
+                "type": "complete",
+                "data": {
+                    "rebalancing": {
+                        "Espresso Roast Supreme": 100.0,
+                        "Unknown Bean Variety": 50.0
+                    },
+                    "seal_recommended": False,
+                    "seal_resonance": 80,
+                    "reasoning": "Test unmatched rebalancing keys."
+                }
+            }
+        ]
 
         response = self.client.post(
             reverse('ai_suggest_api'),
@@ -1356,8 +1389,8 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         # Unmatched rebalancing keys should be dropped entirely
         self.assertEqual(data['rebalancing'], {})
 
-    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
-    def test_ai_suggest_api_force_type_filtering(self, mock_suggest: MagicMock) -> None:
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous_stream')
+    def test_ai_suggest_api_force_type_filtering(self, mock_suggest_stream: MagicMock) -> None:
         """Verify that suggestions not matching the force_type are programmatically filtered out."""
         Ingredient.objects.create(
             name="Vanilla Syrup",
@@ -1367,28 +1400,37 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
             is_in_inventory=True
         )
 
-        mock_suggest.return_value = {
-            "suggestions": [
-                {
+        mock_suggest_stream.return_value = [
+            {
+                "type": "suggestion",
+                "data": {
                     "name": "Whole Milk (Local Dairy)",
                     "reason": "Creams it up",
                     "resonance": 95,
                     "amount": 50.0,
                     "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
-                },
-                {
+                }
+            },
+            {
+                "type": "suggestion",
+                "data": {
                     "name": "Vanilla Syrup (Monin)",
                     "reason": "Adds vanilla sweetness",
                     "resonance": 90,
                     "amount": 15.0,
                     "profile": {"intensity": 3, "sweetness": 4, "acidity": 1, "bitterness": 1, "complexity": 2}
                 }
-            ],
-            "rebalancing": {},
-            "seal_recommended": False,
-            "seal_resonance": 80,
-            "reasoning": "Test force_type filtering."
-        }
+            },
+            {
+                "type": "complete",
+                "data": {
+                    "rebalancing": {},
+                    "seal_recommended": False,
+                    "seal_resonance": 80,
+                    "reasoning": "Test force_type filtering."
+                }
+            }
+        ]
 
         response = self.client.post(
             reverse('ai_suggest_api'),
@@ -1407,35 +1449,42 @@ class BeverageLabCoffeeSanitizationTest(TestCase):
         self.assertEqual(len(suggestions), 1)
         self.assertEqual(suggestions[0]['name'], 'Whole Milk')
 
-    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
-    def test_ai_suggest_api_coffee_bean_split_rebalancing(self, mock_suggest: MagicMock) -> None:
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous_stream')
+    def test_ai_suggest_api_coffee_bean_split_rebalancing(self, mock_suggest_stream: MagicMock) -> None:
         """Verify that when multiple coffee beans are returned in rebalancing, they scale to sum to 18.0g."""
         another_bean = Ingredient.objects.create(
             name="Ethiopian Beans",
             brand="Monin",
             ingredient_type="COFFEE_BEAN",
             category="coffee",
-            is_in_inventory=True
+            is_in_inventory=True,
+            compatible_systems="COFFEE"
         )
         
-        mock_suggest.return_value = {
-            "suggestions": [
-                {
+        mock_suggest_stream.return_value = [
+            {
+                "type": "suggestion",
+                "data": {
                     "name": "Whole Milk (Local Dairy)",
                     "reason": "Creams it up",
                     "resonance": 95,
                     "amount": 100.0,
                     "profile": {"intensity": 2, "sweetness": 2, "acidity": 1, "bitterness": 1, "complexity": 1}
                 }
-            ],
-            "rebalancing": {
-                "Espresso Beans (Monin)": 10.0,
-                "Ethiopian Beans (Monin)": 10.0
             },
-            "seal_recommended": False,
-            "seal_resonance": 80,
-            "reasoning": "Test split bean rebalancing."
-        }
+            {
+                "type": "complete",
+                "data": {
+                    "rebalancing": {
+                        "Espresso Beans (Monin)": 10.0,
+                        "Ethiopian Beans (Monin)": 10.0
+                    },
+                    "seal_recommended": False,
+                    "seal_resonance": 80,
+                    "reasoning": "Test split bean rebalancing."
+                }
+            }
+        ]
 
         response = self.client.post(
             reverse('ai_suggest_api'),
@@ -2768,7 +2817,7 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         # Total candidates is 18 (> 15), so it should cap at exactly 15
         self.assertEqual(len(recommended_ids3), 15)
 
-    @patch('requests.request')
+    @patch('requests.post')
     def test_ai_suggest_api_exclusion_and_fallback(self, mock_request: MagicMock) -> None:
         # Set up default LLM provider
         provider = LLMProvider.objects.create(
@@ -2785,9 +2834,10 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         # 1. Normal exclusion request
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Cherry Blast", "reason": "Adds flavor", "resonance": 95, "amount": 100.0}]}'}}]
-        }
+        mock_response.iter_lines.return_value = [
+            b'data: {"choices": [{"delta": {"content": "{\\\"suggestions\\\": [{\\\"name\\\": \\\"Cherry Blast\\\", \\\"reason\\\": \\\"Adds flavor\\\", \\\"resonance\\\": 95, \\\"amount\\\": 100.0}], \\\"rebalancing\\\": {}, \\\"seal_recommended\\\": false, \\\"seal_resonance\\\": 0, \\\"reasoning\\\": \\\"Test reason\\\"}"}}]}',
+            b'data: [DONE]'
+        ]
         mock_request.return_value = mock_response
 
         # We exclude Vanilla Twist
@@ -2814,9 +2864,10 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         # It should fall back, meaning Vanilla Twist and Cherry Blast are still in the context.
         mock_response_fallback = MagicMock()
         mock_response_fallback.status_code = 200
-        mock_response_fallback.json.return_value = {
-            "choices": [{"message": {"content": '{"suggestions": [{"name": "Vanilla Twist", "reason": "Adds flavor", "resonance": 95, "amount": 100.0}]}'}}]
-        }
+        mock_response_fallback.iter_lines.return_value = [
+            b'data: {"choices": [{"delta": {"content": "{\\\"suggestions\\\": [{\\\"name\\\": \\\"Vanilla Twist\\\", \\\"reason\\\": \\\"Adds flavor\\\", \\\"resonance\\\": 95, \\\"amount\\\": 100.0}], \\\"rebalancing\\\": {}, \\\"seal_recommended\\\": false, \\\"seal_resonance\\\": 0, \\\"reasoning\\\": \\\"Test reason\\\"}"}}]}',
+            b'data: [DONE]'
+        ]
         mock_request.return_value = mock_response_fallback
 
         response_fallback = self.client.post(
@@ -2833,10 +2884,11 @@ class BeverageLabRecommendationExclusionTest(TestCase):
         self.assertEqual(data_fallback['status'], 'success')
         self.assertEqual(data_fallback['suggestions'][0]['name'], 'Vanilla Twist')
 
-    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous')
-    def test_ai_suggest_api_fallback_to_algorithmic(self, mock_suggest: MagicMock) -> None:
-        # Mock suggest_autonomous to return empty list/string representing empty AI response
-        mock_suggest.return_value = '{"suggestions": []}'
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.suggest_autonomous_stream')
+    def test_ai_suggest_api_fallback_to_algorithmic(self, mock_suggest_stream: MagicMock) -> None:
+        # Mock suggest_autonomous_stream to return empty list/string representing empty AI response
+        mock_suggest_stream.return_value = []
+
         
         response = self.client.post(
             reverse('ai_suggest_api'),

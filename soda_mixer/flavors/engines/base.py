@@ -193,7 +193,15 @@ class BaseEngine:
         and select recommendations based on inventory size and compatibility scores.
         """
         if force_type:
-            system_candidates = system_candidates.filter(ingredient_type=force_type)
+            ft = force_type.upper()
+            if ft == 'COFFEE_BEAN':
+                system_candidates = system_candidates.filter(physical_state='SOLID_EXTRACTABLE')
+            elif ft == 'DAIRY':
+                system_candidates = system_candidates.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+            elif ft == 'SODA_SYRUP':
+                system_candidates = system_candidates.filter(physical_state='SYRUP', mixology_function='FLAVORING')
+            else:
+                system_candidates = system_candidates.filter(mixology_function='FLAVORING').exclude(physical_state='SYRUP')
 
         if not base_ingredients:
             recommendations = []
@@ -358,7 +366,15 @@ class BaseEngine:
             system_candidates = system_candidates.exclude(id__in=exclude_pool_ids)
         
         if force_type:
-            system_candidates = system_candidates.filter(ingredient_type=force_type)
+            ft = force_type.upper()
+            if ft == 'COFFEE_BEAN':
+                system_candidates = system_candidates.filter(physical_state='SOLID_EXTRACTABLE')
+            elif ft == 'DAIRY':
+                system_candidates = system_candidates.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+            elif ft == 'SODA_SYRUP':
+                system_candidates = system_candidates.filter(physical_state='SYRUP', mixology_function='FLAVORING')
+            else:
+                system_candidates = system_candidates.filter(mixology_function='FLAVORING').exclude(physical_state='SYRUP')
 
         recommendations = []
         

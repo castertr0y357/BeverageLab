@@ -1,0 +1,63 @@
+{% if card_type == 'seal' %}
+<div class="col animate-fade-in" id="rec-card-seal">
+    <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-neural glow-neural"
+         onclick="skipOptimization()">
+        <div class="rounded-circle bg-neural bg-opacity-10 p-3 mb-2">
+            <i class="bi bi-check2-circle text-neural fs-3"></i>
+        </div>
+        <div class="fw-bold text-neural small">SEAL MIX</div>
+        <div class="text-xs opacity-50">Profile balanced</div>
+    </div>
+</div>
+{% elif card_type == 'ingredient' %}
+<div class="col animate-fade-in" id="rec-card-{{ rec.id }}">
+    <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer select-ingredient-btn {{ card_class }}"
+         data-id="{{ rec.id }}" data-name="{{ rec.name }}" data-intensity="{{ rec.intensity|default:0 }}" data-category="{{ rec.category|default:'' }}"
+         data-sweetness="{{ rec.sweetness|default:0 }}" data-acidity="{{ rec.acidity|default:0 }}"
+         data-bitterness="{{ rec.bitterness|default:0 }}" data-complexity="{{ rec.complexity|default:0 }}"
+         data-base-suitability="{{ rec.base_suitability|default:3.0 }}" data-accent-suitability="{{ rec.accent_suitability|default:3.0 }}"
+         data-is-ready-to-drink="{{ rec.is_ready_to_drink|yesno:'true,false' }}"
+         data-profile='{{ profile_json|safe }}' data-amount="{{ rec.amount|default:'' }}" data-type="{{ rec.type|default:'' }}"
+         data-favorite="{{ rec.favorite|yesno:'true,false' }}">
+            <span class="fw-bold fs-5 mb-1">{% if rec.favorite %}★ {% endif %}{{ rec.name }}</span>
+            <div class="d-flex gap-2 align-items-center mb-2">
+                <span class="badge-fizz bg-{{ rec.category|lower|default:'neutral' }}">{{ rec.category|default:'' }}</span>
+            </div>
+            <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
+                <span class="text-gradient-lab font-monospace">B: {{ rec.base_suitability|default:3.0|floatformat:1 }}</span>
+                <span class="text-experimental font-monospace">A: {{ rec.accent_suitability|default:3.0|floatformat:1 }}</span>
+            </div>
+            <div class="mt-auto">
+                <small class="{{ text_class }} fw-bold" style="font-size: 0.7rem;">
+                    {{ icon_html|safe }}{{ rec.reason }}
+                </small>
+            </div>
+    </div>
+</div>
+{% elif card_type == 'actions' %}
+<div class="row g-3 mt-2 w-100 animate-fade-in" id="rec-actions">
+    {% if has_suggestions %}
+    <div class="col-{{ btn_cols }}">
+        <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="fetchRecommendations()">
+            <i class="bi bi-arrow-repeat fs-3 mb-1 text-accent animate-spin-hover"></i>
+            <span class="fw-bold small text-uppercase text-accent">Recommend More</span>
+        </div>
+    </div>
+    {% endif %}
+    {% if has_multiple_ingredients %}
+    <div class="col-{{ btn_cols_seal }}">
+        <div class="glass-card p-3 d-flex flex-column align-items-center justify-content-center text-center cursor-pointer border-white border-opacity-10" onclick="skipOptimization()">
+            <i class="bi bi-shield-check fs-3 mb-1 text-success"></i>
+            <span class="fw-bold small text-uppercase">Seal Mix</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% elif card_type == 'spinner' %}
+<div class="col animate-fade-in" id="rec-spinner">
+    <div class="glass-card p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center border-white border-opacity-10">
+        <div class="spinner-border text-neural opacity-50 mb-2" role="status" style="width: 1.5rem; height: 1.5rem;"></div>
+        <div class="fw-bold text-neural small opacity-50">Synthesizing...</div>
+    </div>
+</div>
+{% endif %}

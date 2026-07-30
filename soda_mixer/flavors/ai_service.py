@@ -62,7 +62,6 @@ Structured Output JSON Schema:
         "Active Ingredient 2": 50.0
     },
     "seal_recommended": false,
-    "seal_resonance": 90,
     "reasoning": "Scientific mixology analysis (max 2 sentences)."
 }"""
     
@@ -188,7 +187,6 @@ Structured Output JSON Schema:
         "Active Ingredient 2": 50.0
     },
     "seal_recommended": false,
-    "seal_resonance": 90,
     "reasoning": "Scientific mixology analysis (max 2 sentences)."
 }"""
 
@@ -244,84 +242,72 @@ Structured Output JSON Schema:
                         {
                             "name": "Vanilla",
                             "reason": "Adds creamy sweet vanilla notes",
-                            "resonance": 95,
                             "amount": 15.0,
                             "profile": {"intensity": 1, "sweetness": 5, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Caramel Apple",
                             "reason": "Adds buttery caramel notes",
-                            "resonance": 92,
                             "amount": 15.0,
                             "profile": {"intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3}
                         },
                         {
                             "name": "Mint",
                             "reason": "Provides a clean, cooling accent",
-                            "resonance": 88,
                             "amount": 15.0,
                             "profile": {"intensity": 3, "sweetness": 1, "acidity": 1, "bitterness": 2, "complexity": 2}
                         },
                         {
                             "name": "Cucumber",
                             "reason": "Adds a crisp refreshing undertone",
-                            "resonance": 85,
                             "amount": 15.0,
                             "profile": {"intensity": 2, "sweetness": 1, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Espresso Roast Blend",
                             "reason": "Reinforces bold dark roast flavor",
-                            "resonance": 80,
                             "amount": 18.0,
                             "profile": {"intensity": 5, "sweetness": 2, "acidity": 2, "bitterness": 4, "complexity": 3}
                         },
                         {
                             "name": "Hazelnut",
                             "reason": "Offers sweet nutty complexity",
-                            "resonance": 78,
                             "amount": 15.0,
                             "profile": {"intensity": 2, "sweetness": 4, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Cinnamon",
                             "reason": "Warm baking spice warmth",
-                            "resonance": 76,
                             "amount": 15.0,
                             "profile": {"intensity": 3, "sweetness": 2, "acidity": 1, "bitterness": 2, "complexity": 3}
                         },
                         {
                             "name": "Chocolate Syrup",
                             "reason": "Deep rich cocoa notes",
-                            "resonance": 74,
                             "amount": 15.0,
                             "profile": {"intensity": 4, "sweetness": 4, "acidity": 1, "bitterness": 3, "complexity": 4}
                         },
                         {
                             "name": "Whole Milk",
                             "reason": "Provides rich dairy suspension",
-                            "resonance": 72,
                             "amount": 50.0,
                             "profile": {"intensity": 1, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Heavy Cream",
                             "reason": "Elevates lipid mouthfeel thickness",
-                            "resonance": 70,
                             "amount": 15.0,
                             "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Oat Milk",
                             "reason": "Silky grain-based body profile",
-                            "resonance": 68,
                             "amount": 50.0,
                             "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 1, "complexity": 2}
                         },
                         {
                             "name": "Honey",
                             "reason": "Nectarous viscosity stabilizer",
-                            "resonance": 65,
                             "amount": 15.0,
                             "profile": {"intensity": 2, "sweetness": 5, "acidity": 2, "bitterness": 1, "complexity": 3}
                         }
@@ -331,7 +317,6 @@ Structured Output JSON Schema:
                         "Whole Milk": 50.0
                     },
                     "seal_recommended": False,
-                    "seal_resonance": 80,
                     "reasoning": "Standard coffee extraction profile (MOCK_MODE)."
                 })
             return json.dumps({
@@ -339,91 +324,78 @@ Structured Output JSON Schema:
                     {
                         "name": "Lemon Lime",
                         "reason": "Acidity balances sweetness",
-                        "resonance": 95,
                         "amount": 25.0,
                         "profile": {"intensity": 4, "sweetness": 2, "acidity": 5, "bitterness": 1, "complexity": 2}
                     },
                     {
                         "name": "Club Soda",
                         "reason": "Effervescence provides clean background",
-                        "resonance": 90,
                         "amount": 120.0,
                         "profile": {"intensity": 1, "sweetness": 1, "acidity": 2, "bitterness": 1, "complexity": 1}
                     },
                     {
                         "name": "Vanilla",
                         "reason": "Adds smooth vanilla undertones",
-                        "resonance": 88,
                         "amount": 15.0,
                         "profile": {"intensity": 1, "sweetness": 5, "acidity": 1, "bitterness": 1, "complexity": 2}
                     },
                     {
                         "name": "Mint",
                         "reason": "Provides a clean, cooling finish",
-                        "resonance": 85,
                         "amount": 15.0,
                         "profile": {"intensity": 3, "sweetness": 1, "acidity": 1, "bitterness": 2, "complexity": 2}
                     },
                     {
                         "name": "Strawberry",
                         "reason": "Infuses bright berry sweetness",
-                        "resonance": 82,
                         "amount": 20.0,
                         "profile": {"intensity": 2, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2}
                     },
                     {
                         "name": "Ginger Syrup",
                         "reason": "Zesty heat spice bridge",
-                        "resonance": 80,
                         "amount": 15.0,
                         "profile": {"intensity": 4, "sweetness": 3, "acidity": 2, "bitterness": 2, "complexity": 3}
                     },
                     {
                         "name": "Peach Syrup",
                         "reason": "Fleshy stone fruit sweetness",
-                        "resonance": 78,
                         "amount": 20.0,
                         "profile": {"intensity": 2, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 2}
                     },
                     {
                         "name": "Mango Syrup",
                         "reason": "Rich tropical ester profile",
-                        "resonance": 75,
                         "amount": 25.0,
                         "profile": {"intensity": 3, "sweetness": 4, "acidity": 2, "bitterness": 1, "complexity": 3}
                     },
                     {
                         "name": "Raspberry Syrup",
                         "reason": "Tart red berry acidity",
-                        "resonance": 72,
                         "amount": 15.0,
                         "profile": {"intensity": 3, "sweetness": 3, "acidity": 4, "bitterness": 1, "complexity": 2}
                     },
                     {
                         "name": "Lavender Syrup",
                         "reason": "Soft floral herbal aroma",
-                        "resonance": 70,
                         "amount": 10.0,
                         "profile": {"intensity": 2, "sweetness": 3, "acidity": 1, "bitterness": 2, "complexity": 3}
                     },
                     {
                         "name": "Hibiscus Syrup",
                         "reason": "Cranberry-like botanical tartness",
-                        "resonance": 68,
                         "amount": 15.0,
                         "profile": {"intensity": 3, "sweetness": 2, "acidity": 4, "bitterness": 2, "complexity": 3}
                     },
                     {
                         "name": "Grapefruit Syrup",
                         "reason": "Bitter citrus clean edge",
-                        "resonance": 65,
                         "amount": 20.0,
                         "profile": {"intensity": 4, "sweetness": 2, "acidity": 4, "bitterness": 3, "complexity": 3}
                     }
                 ],
                 "rebalancing": {},
                 "seal_recommended": False,
-                "seal_resonance": 75,
                 "reasoning": "Standard laboratory carbonation enhancement (MOCK_MODE)."
             })
         elif "[AUTONOMOUS SYNTHESIS REQUEST]" in user_prompt:
@@ -793,6 +765,100 @@ Instruction: Analyze the active mixture '{current_compound_str}' and evaluate ho
         return cls._extract_json(response)
 
     @classmethod
+    def suggest_autonomous_stream(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Generator[Dict[str, Any], None, None]:
+        """
+        Streaming version of suggest_autonomous. Yields individual parsed suggestion objects as they arrive, 
+        and then yields a final 'complete' object containing the full structured response (rebalancing, reasoning).
+        """
+        drink_type = drink_type.upper()
+        tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
+        
+        if not inventory:
+            inventory = cls.get_static_ingredients_context(drink_type=drink_type)
+
+        current_compound_details = []
+        from .models import Ingredient
+        from django.db.models import Q
+        
+        for ing_name in ingredients:
+            db_ing = Ingredient.objects.filter(Q(name__iexact=ing_name) | Q(brand__iexact=ing_name)).first()
+            if not db_ing:
+                cleaned_name = re.sub(r'\s*\([^)]*\)', '', ing_name).strip()
+                db_ing = Ingredient.objects.filter(Q(name__iexact=cleaned_name) | Q(brand__iexact=cleaned_name)).first()
+            
+            if db_ing:
+                ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
+                profile_part = f", Profile: {db_ing.flavor_notes}" if db_ing.flavor_notes else ""
+                sensory_part = f", Sensory: {db_ing.ai_notes}" if db_ing.ai_notes else ""
+                if db_ing.ingredient_type == 'COFFEE_BEAN':
+                    decaf_str = "Decaf" if db_ing.is_decaf else "Regular"
+                    details = f"Type: {db_ing.ingredient_type}, Roast: {db_ing.roast_level}, {decaf_str}{profile_part}{sensory_part}"
+                else:
+                    details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}{profile_part}{sensory_part}"
+                current_compound_details.append(f"{ing_display} ({details})")
+            else:
+                current_compound_details.append(ing_name)
+                
+        current_compound_str = ", ".join(current_compound_details) if current_compound_details else "NONE - Initial Synthesis"
+        
+        force_rule = ""
+        if force_type:
+            force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
+            force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+            
+        exclude_str = f"Exclude these previously suggested items: {', '.join(exclude)}." if exclude else "None"
+
+        prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+
+Task: Recommending between 10 to 15 compatible ingredients from the Inventory Registry to create/stabilize a drink compound. Prioritize ingredients marked with '*FAVORITE*'.
+
+[DYNAMIC REQUEST PARAMETERS]:
+Current Mode: {drink_type} | Mode: {tone}
+Active Mixture: {current_compound_str}
+Force Type Constraint: {force_type or 'None'}{force_rule}
+Exclusion List: {exclude_str}
+
+Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture, not just the base ingredient. Avoid recommending items that clash with any part of the active mixture.
+"""
+        if retry_note:
+            prompt += f"\n[RETRY COMMAND]: {retry_note}\n"
+
+        stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type)
+        
+        buffer = ""
+        yielded_names = set()
+        
+        for event in stream:
+            # event is typically 'data: {"chunk": "..."}\n\n'
+            if event.startswith('data: '):
+                try:
+                    data_str = event[6:].strip()
+                    if not data_str or data_str == '[DONE]': continue
+                    data_json = json.loads(data_str)
+                    chunk = data_json.get('chunk', '')
+                    buffer += chunk
+                    
+                    # Regex to find all complete flat objects
+                    all_objects = re.findall(r'\{[^{}]+\}', buffer)
+                    for obj_str in all_objects:
+                        try:
+                            obj = json.loads(obj_str)
+                            if 'name' in obj and ('reason' in obj or 'amount' in obj):
+                                name = obj['name'].strip()
+                                if name not in yielded_names:
+                                    yielded_names.add(name)
+                                    yield {"type": "suggestion", "data": obj}
+                        except json.JSONDecodeError:
+                            pass
+                except json.JSONDecodeError:
+                    pass
+                    
+        # Yield the final complete object for rebalancing/reasoning
+        final_json = cls._extract_json(buffer)
+        if final_json:
+            yield {"type": "complete", "data": final_json}
+
+    @classmethod
     def synthesize_surprise_mix(cls, inventory: Optional[str] = None, mode: str = 'standard', drink_type: str = 'SODA') -> Optional[Dict[str, Any]]:
         """
         Autonomous Synthesis: Select a cohesive set of ingredients from the inventory.
@@ -913,6 +979,51 @@ Paragraph 2 — EXPECTED TASTE: What will this drink taste like? Describe the op
 
 Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
         return cls.chat(prompt, drink_type=drink_type)
+
+    @classmethod
+    def synthesize_flavor_summary_stream(cls, ingredients: List[Dict[str, Any]], drink_type: str = 'SODA') -> Generator[str, None, None]:
+        """
+        Streaming version of synthesize_flavor_summary.
+        """
+        drink_type = drink_type.upper()
+        drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
+        
+        enriched_list = []
+        for i in ingredients:
+            name = i.get('name', 'Unknown Reagent')
+            itype = str(i.get('type', i.get('ingredient_type', ''))).upper()
+            amt = i.get('amount')
+            amt_str = f" ({amt}g)" if itype == 'COFFEE_BEAN' else (f" ({amt}ml)" if amt else "")
+            
+            notes = i.get('flavor_notes', '')
+            if isinstance(notes, list):
+                notes = ", ".join(notes)
+            ai_notes = i.get('ai_notes', '')
+            
+            profile_part = f", Profile: {notes}" if notes else ""
+            sensory_part = f", Sensory: {ai_notes}" if ai_notes else ""
+            
+            if itype == 'COFFEE_BEAN':
+                roast = i.get('roast_level', 'MEDIUM')
+                decaf = "Decaf" if i.get('is_decaf') or i.get('is_decaf') == 'true' or i.get('is_decaf') is True else "Regular"
+                desc = f"{name}{amt_str} [Type: {itype}, Roast: {roast}, {decaf}{profile_part}{sensory_part}]"
+            else:
+                desc = f"{name}{amt_str} [Type: {itype}, Category: {i.get('category', 'sweet')}{profile_part}{sensory_part}]"
+            enriched_list.append(desc)
+        
+        ingredient_list = '\n'.join(f"- {item}" for item in enriched_list)
+        
+        prompt = f"""FLAVOR SYNTHESIS REPORT
+
+Finalized {drink_label} compound:
+{ingredient_list}
+
+Write a concise 2-paragraph lab report:
+Paragraph 1 — FLAVOR SYNERGY: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance, complementary/contrasting notes).
+Paragraph 2 — EXPECTED TASTE: What will this drink taste like? Describe the opening, body, and finish. Keep it vivid and specific.
+
+Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
+        yield from cls.chat_stream(prompt, drink_type=drink_type)
 
     @classmethod
     def analyze_flavor_profile(cls, name: str, description: str) -> Optional[Dict[str, float]]:
