@@ -1445,16 +1445,20 @@ function cancelInFlightLLMCalls() {
                     })
                 });
 
-                const aiParams = new URLSearchParams({
-                    drink_type: currentLabMode,
-                    ingredients: JSON.stringify(mappedIngredients)
-                });
-                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
-
                 const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestCoffeeChemistryData = data;
                 updateSelectedArea(true);
+
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
+                });
+                if (data.barista_notes) {
+                    aiParams.append('barista_notes', data.barista_notes);
+                }
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
+
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -1625,7 +1629,13 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">BARISTA RECOMMENDATIONS</h6>
-                                    <p class="mb-0 italic small text-dim mb-3">"${data.barista_notes}"</p>
+                                    <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
+                                        <span id="aiBaristaNotesText"></span>
+                                        <div id="aiBaristaNotesSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Consulting mixologist...</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 ${prepStepsHtml}
@@ -1654,9 +1664,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
+                    eventSource.addEventListener('mixologist_notes', function(e) {
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
+                        const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
+                        if (notesSpan) {
+                            notesSpan.innerHTML += e.data;
+                        }
+                    });
+                    
                     eventSource.addEventListener('remove_spinner', function(e) {
-                        const spinner = reportBody.querySelector('#aiProfileSpinner');
-                        if (spinner) spinner.remove();
+                        const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (profileSpinner) profileSpinner.remove();
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
                         eventSource.close();
                     });
                     
@@ -1689,16 +1710,21 @@ function cancelInFlightLLMCalls() {
                     })
                 });
 
-                const aiParams = new URLSearchParams({
-                    drink_type: currentLabMode,
-                    ingredients: JSON.stringify(mappedIngredients)
-                });
-                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
-
                 const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestSodaChemistryData = data;
                 updateSelectedArea(true);
+
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
+                });
+                if (data.barista_notes) {
+                    aiParams.append('barista_notes', data.barista_notes);
+                }
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
+
+
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -1797,7 +1823,13 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
-                                    <p class="mb-0 italic small text-dim mb-3">"${data.barista_notes}"</p>
+                                    <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
+                                        <span id="aiBaristaNotesText"></span>
+                                        <div id="aiBaristaNotesSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Consulting mixologist...</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 ${prepStepsHtml}
@@ -1826,9 +1858,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
+                    eventSource.addEventListener('mixologist_notes', function(e) {
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
+                        const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
+                        if (notesSpan) {
+                            notesSpan.innerHTML += e.data;
+                        }
+                    });
+                    
                     eventSource.addEventListener('remove_spinner', function(e) {
-                        const spinner = reportBody.querySelector('#aiProfileSpinner');
-                        if (spinner) spinner.remove();
+                        const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (profileSpinner) profileSpinner.remove();
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
                         eventSource.close();
                     });
                     
@@ -1859,16 +1902,21 @@ function cancelInFlightLLMCalls() {
                     })
                 });
 
-                const aiParams = new URLSearchParams({
-                    drink_type: currentLabMode,
-                    ingredients: JSON.stringify(mappedIngredients)
-                });
-                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
-
                 const chemRes = await chemistryPromise;
                 const data = await chemRes.json();
                 latestCryoChemistryData = data;
                 updateSelectedArea(true);
+
+                const aiParams = new URLSearchParams({
+                    drink_type: currentLabMode,
+                    ingredients: JSON.stringify(mappedIngredients)
+                });
+                if (data.mixologist_notes) {
+                    aiParams.append('barista_notes', data.mixologist_notes);
+                }
+                const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
+
+
 
                 if (data.recipe_validation) {
                     let validationClass = "bg-success border-success text-success";
@@ -1975,7 +2023,13 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
                                     <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
-                                    <p class="mb-0 italic small text-dim mb-3">"${data.mixologist_notes}"</p>
+                                    <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
+                                        <span id="aiBaristaNotesText"></span>
+                                        <div id="aiBaristaNotesSpinner" class="mt-2">
+                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <span class="ms-2 text-dim small">Consulting mixologist...</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 ${prepStepsHtml}
@@ -2004,9 +2058,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
+                    eventSource.addEventListener('mixologist_notes', function(e) {
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
+                        const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
+                        if (notesSpan) {
+                            notesSpan.innerHTML += e.data;
+                        }
+                    });
+                    
                     eventSource.addEventListener('remove_spinner', function(e) {
-                        const spinner = reportBody.querySelector('#aiProfileSpinner');
-                        if (spinner) spinner.remove();
+                        const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
+                        if (profileSpinner) profileSpinner.remove();
+                        const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                        if (notesSpinner) notesSpinner.remove();
                         eventSource.close();
                     });
                     
@@ -2029,6 +2094,17 @@ function cancelInFlightLLMCalls() {
                 const sseUrl = `/api/ai/synthesize/?${aiParams.toString()}`;
 
                 reportBody.innerHTML = `
+                    <div class="border-top border-white border-opacity-10 pt-3 mb-3">
+                        <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                        <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
+                            <span id="aiBaristaNotesText"></span>
+                            <div id="aiBaristaNotesSpinner" class="mt-2">
+                                <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                <span class="ms-2 text-dim small">Consulting mixologist...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
                     <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
                         <span id="aiProfileText"></span>
                         <div id="aiProfileSpinner" class="mt-2">
@@ -2037,6 +2113,7 @@ function cancelInFlightLLMCalls() {
                         </div>
                     </div>
                 `;
+
                 
                 // Native SSE consumption (replaces HTMX)
                 const eventSource = new EventSource(sseUrl);
@@ -2048,9 +2125,20 @@ function cancelInFlightLLMCalls() {
                     }
                 });
                 
+                eventSource.addEventListener('mixologist_notes', function(e) {
+                    const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                    if (notesSpinner) notesSpinner.remove();
+                    const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
+                    if (notesSpan) {
+                        notesSpan.innerHTML += e.data;
+                    }
+                });
+                
                 eventSource.addEventListener('remove_spinner', function(e) {
-                    const spinner = reportBody.querySelector('#aiProfileSpinner');
-                    if (spinner) spinner.remove();
+                    const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
+                    if (profileSpinner) profileSpinner.remove();
+                    const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
+                    if (notesSpinner) notesSpinner.remove();
                     eventSource.close();
                 });
                 

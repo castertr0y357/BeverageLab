@@ -54,10 +54,16 @@ class AIPromptsMixin:
                 "amount": 15.0
             }
         ],
-        "rebalancing": {
-            "Active Ingredient 1": 18.0,
-            "Active Ingredient 2": 50.0
-        },
+        "rebalancing": [
+            {
+                "name": "Active Ingredient 1",
+                "amount": 18.0
+            },
+            {
+                "name": "Active Ingredient 2",
+                "amount": 50.0
+            }
+        ],
         "seal_recommended": false,
         "reasoning": "Scientific mixology analysis (max 2 sentences)."
     }"""
@@ -92,6 +98,75 @@ class AIPromptsMixin:
         "bitterness_score": integer (1 to 5, default 3),
         "flavor_notes": string (comma-separated descriptors, e.g. 'earthy, chocolatey')
     }"""
+
+    @classmethod
+    def get_autonomous_json_schema(cls, enable_thinking=False):
+        schema = {
+            "type": "object",
+            "properties": {
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "reason": {"type": "string"},
+                            "amount": {"type": "number"}
+                        },
+                        "required": ["name", "reason", "amount"],
+                        "additionalProperties": False
+                    }
+                },
+                "rebalancing": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "amount": {"type": "number"}
+                        },
+                        "required": ["name", "amount"],
+                        "additionalProperties": False
+                    }
+                },
+                "seal_recommended": {"type": "boolean"},
+                "reasoning": {"type": "string"}
+            },
+            "required": ["suggestions", "rebalancing", "seal_recommended", "reasoning"],
+            "additionalProperties": False
+        }
+        if not enable_thinking:
+            schema["properties"] = {"chemical_analysis": {"type": "string"}, **schema["properties"]}
+            schema["required"] = ["chemical_analysis"] + schema["required"]
+        return schema
+
+    @classmethod
+    def get_surprise_mix_json_schema(cls, enable_thinking=False):
+        schema = {
+            "type": "object",
+            "properties": {
+                "design_intent": {"type": "string"},
+                "selection": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "role": {"type": "string"},
+                            "amount": {"type": "number"}
+                        },
+                        "required": ["name", "role", "amount"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            "required": ["design_intent", "selection"],
+            "additionalProperties": False
+        }
+        if not enable_thinking:
+            schema["properties"] = {"chemical_analysis": {"type": "string"}, **schema["properties"]}
+            schema["required"] = ["chemical_analysis"] + schema["required"]
+        return schema
 
     @classmethod
     def get_system_prompt(cls, drink_type: Optional[str] = None) -> str:
@@ -168,10 +243,16 @@ class AIPromptsMixin:
                 "amount": 15.0
             }
         ],
-        "rebalancing": {
-            "Active Ingredient 1": 18.0,
-            "Active Ingredient 2": 50.0
-        },
+        "rebalancing": [
+            {
+                "name": "Active Ingredient 1",
+                "amount": 18.0
+            },
+            {
+                "name": "Active Ingredient 2",
+                "amount": 50.0
+            }
+        ],
         "seal_recommended": false,
         "reasoning": "Scientific mixology analysis (max 2 sentences)."
     }"""

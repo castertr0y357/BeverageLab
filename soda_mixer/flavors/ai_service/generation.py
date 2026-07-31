@@ -89,6 +89,7 @@ class AIGenerationMixin:
                 inventory = cls.get_static_ingredients_context(drink_type=drink_type)
     
             current_compound_details = []
+            current_volume = 0.0
             from ..models import Ingredient
             from django.db.models import Q
             
@@ -105,11 +106,22 @@ class AIGenerationMixin:
                     if db_ing.ingredient_type == 'COFFEE_BEAN':
                         decaf_str = "Decaf" if db_ing.is_decaf else "Regular"
                         details = f"Type: {db_ing.ingredient_type}, Roast: {db_ing.roast_level}, {decaf_str}{profile_part}{sensory_part}"
+                        current_volume += 18.0
                     else:
                         details = f"Type: {db_ing.ingredient_type}, Category: {db_ing.category}{profile_part}{sensory_part}"
+                        if drink_type == 'COFFEE' and db_ing.mixology_function == 'VOLUME_BASE' and db_ing.physical_state == 'LIQUID':
+                            current_volume += 50.0
+                        elif drink_type == 'SLUSHIE' and db_ing.mixology_function == 'VOLUME_BASE':
+                            current_volume += 80.0
+                        elif drink_type == 'SLUSHIE' and db_ing.category == 'payload':
+                            current_volume += 40.0
+                        else:
+                            current_volume += 15.0
                     current_compound_details.append(f"{ing_display} ({details})")
                 else:
                     current_compound_details.append(ing_name)
+                    if ing_name != "NONE - Initial Synthesis":
+                        current_volume += 15.0
                     
             current_compound_str = ", ".join(current_compound_details) if current_compound_details else "NONE - Initial Synthesis"
             
@@ -119,6 +131,13 @@ class AIGenerationMixin:
                 force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
                 
             exclude_str = f"Exclude these previously suggested items: {', '.join(exclude)}." if exclude else "None"
+            
+            math_rule = ""
+            if drink_type in ['SODA', 'SLUSHIE'] and current_compound_str != "NONE - Initial Synthesis":
+                remaining = max(0.0, 160.0 - current_volume)
+                math_rule = f"\nMATH GROUNDING: The active mixture currently uses approximately {current_volume}ml of volume. You have a strict remaining budget of {remaining}ml (Total max 160ml). Distribute this remaining budget across your suggestions."
+            elif drink_type == 'COFFEE' and current_compound_str != "NONE - Initial Synthesis":
+                math_rule = f"\nMATH GROUNDING: The active mixture uses approximately {current_volume} (g/ml). Follow the Core Synthesis Mode Rules for coffee ratios."
     
             prompt = f"""[STRUCTURED DATA REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
     
@@ -128,7 +147,7 @@ class AIGenerationMixin:
     Current Mode: {drink_type}
     Active Mixture: {current_compound_str}
     Force Type Constraint: {force_type or 'None'}{force_rule}
-    Exclusion List: {exclude_str}
+    Exclusion List: {exclude_str}{math_rule}
     
     Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture. For the 'reason' field, provide a detailed, vivid 15-25 word mixology explanation of exactly why the ingredient's flavor molecules synergize with the active compound.
     """
@@ -292,7 +311,7 @@ class AIGenerationMixin:
             return cls.chat(prompt, drink_type=drink_type)
 
     @classmethod
-    def synthesize_flavor_summary_stream(cls, ingredients: List[Dict[str, Any]], drink_type: str = 'SODA') -> Generator[str, None, None]:
+    def synthesize_flavor_summary_stream(cls, ingredients: List[Dict[str, Any]], drink_type: str = 'SODA', barista_notes: str = '') -> Generator[str, None, None]:
             """
             Streaming version of synthesize_flavor_summary.
             """
@@ -323,12 +342,21 @@ class AIGenerationMixin:
                 enriched_list.append(desc)
             
             ingredient_list = '\n'.join(f"- {item}" for item in enriched_list)
+            barista_context = f"\n\n    Chemistry Lab Notes:\n    {barista_notes}" if barista_notes else ""
             
             prompt = f"""FLAVOR SYNTHESIS REPORT
     
     Finalized {drink_label} compound:
-    {ingredient_list}
+    {ingredient_list}{barista_context}
     
+    You must provide your output in TWO exact sections. 
+    
+    First, start with exactly this line:
+    [MIXOLOGIST_NOTES]
+    Write a short, personalized note about this mix. You may selectively incorporate the Chemistry Lab Notes if they highlight safety or structural risks (like curdling or overflow), otherwise you can ignore them. Do not just parrot them.
+    
+    Then, output exactly this line:
+    [PROFILE_DESCRIPTION]
     Write a detailed, vivid 3-paragraph lab report:
     Paragraph 1 — FLAVOR SYNERGY & AROMA: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance). Describe the initial aroma.
     Paragraph 2 — THE TASTING EXPERIENCE: What will this drink taste like? Describe the opening notes, the body, and the finish sequentially.

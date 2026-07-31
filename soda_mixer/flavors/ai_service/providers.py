@@ -7,6 +7,7 @@ import logging
 from typing import List, Dict, Any, Optional, Union, Generator
 
 from ..models import LLMProvider, SystemConfiguration
+from .prompts import AIPromptsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -184,8 +185,26 @@ class AIProvidersMixin:
                 # Enforce JSON output mode if a structured data query is detected
                 user_prompt = messages[-1]['content'] if messages else ""
                 is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
-                if is_json_request:
-                    data["response_format"] = {"type": "json_object"}
+                is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+                enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
+                if is_surprise_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "surprise_mix",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_json_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "beverage_recommendation",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
+                        }
+                    }
     
             response = cls._safe_request('POST', url, headers=headers, json=data, timeout=30)
             result = response.json()
@@ -224,8 +243,12 @@ class AIProvidersMixin:
             }
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
-            if is_json_request:
-                data["format"] = "json"
+            is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
+            if is_surprise_request:
+                data["format"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_json_request:
+                data["format"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
     
             logger.warning(f"Ollama Chat - Request payload: {json.dumps(data)}")
             response = cls._safe_request('POST', url, json=data, timeout=120)
@@ -293,12 +316,18 @@ class AIProvidersMixin:
                 
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+            is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
             generation_config["temperature"] = 0.9 if mode == 'experimental' else 0.3
             generation_config["topP"] = 0.95 if mode == 'experimental' else 0.5
-            if is_json_request:
+            if is_surprise_request:
                 generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_json_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
                 
             if "thinking" in model.lower():
                 if getattr(provider, 'enable_thinking', False):
@@ -342,8 +371,26 @@ class AIProvidersMixin:
             else:
                 user_prompt = messages[-1]['content'] if messages else ""
                 is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
-                if is_json_request:
-                    data["response_format"] = {"type": "json_object"}
+                is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+                enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
+                if is_surprise_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "surprise_mix",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_json_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "beverage_recommendation",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
+                        }
+                    }
     
             response = requests.post(url, headers=headers, json=data, stream=True, timeout=60)
             response.raise_for_status()
@@ -386,8 +433,12 @@ class AIProvidersMixin:
             }
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
-            if is_json_request:
-                data["format"] = "json"
+            is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
+            if is_surprise_request:
+                data["format"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_json_request:
+                data["format"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
     
             logger.warning(f"Ollama Stream Chat - Request payload: {json.dumps(data)}")
             response = requests.post(url, json=data, stream=True, timeout=120)
@@ -457,12 +508,18 @@ class AIProvidersMixin:
             
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
+            is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
             generation_config["temperature"] = 0.9 if mode == 'experimental' else 0.3
             generation_config["topP"] = 0.95 if mode == 'experimental' else 0.5
-            if is_json_request:
+            if is_surprise_request:
                 generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_json_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
                 
             if "thinking" in model.lower():
                 if getattr(provider, 'enable_thinking', False):

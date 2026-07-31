@@ -257,7 +257,12 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 
                         elif chunk['type'] == 'complete':
                             final_data = chunk['data']
-                            rebalancing = final_data.get('rebalancing', {})
+                            rebalancing_raw = final_data.get('rebalancing', {})
+                            
+                            if isinstance(rebalancing_raw, list):
+                                rebalancing = {item.get('name'): item.get('amount') for item in rebalancing_raw if item.get('name') is not None}
+                            else:
+                                rebalancing = rebalancing_raw
                             
                             if drink_type == 'COFFEE' and rebalancing:
                                 beans_in_rebal = {}
@@ -394,6 +399,7 @@ def ai_synthesize_api(request: HttpRequest) -> HttpResponse:
             data = json.loads(request.body)
             ingredients = data.get('ingredients', [])
             drink_type = data.get('drink_type', 'SODA').upper()
+            barista_notes = data.get('barista_notes', '')
         else:
             ingredients_str = request.GET.get('ingredients', '[]')
             try:
@@ -401,13 +407,16 @@ def ai_synthesize_api(request: HttpRequest) -> HttpResponse:
             except Exception:
                 ingredients = []
             drink_type = request.GET.get('drink_type', 'SODA').upper()
+            barista_notes = request.GET.get('barista_notes', '')
         
         if not ingredients:
             return JsonResponse({'error': 'No ingredients provided.'}, status=400)
         
         def sse_generator():
             import time
-            stream = AIAssistant.synthesize_flavor_summary_stream(ingredients, drink_type)
+            stream = AIAssistant.synthesize_flavor_summary_stream(ingredients, drink_type, barista_notes=barista_notes)
+            current_event = 'mixologist_notes'
+            buffer = ""
             for chunk_json in stream:
                 if chunk_json.startswith('data: '):
                     try:
@@ -415,11 +424,52 @@ def ai_synthesize_api(request: HttpRequest) -> HttpResponse:
                         if not data_str or data_str == '[DONE]': continue
                         parsed = json.loads(data_str)
                         if 'chunk' in parsed:
-                            chunk_text = parsed['chunk'].replace('\n', '<br>')
-                            logger.info(f"SynthesisStream - Yielding chunk at {time.time()}")
-                            yield f"event: message\ndata: {chunk_text}\n\n"
+                            chunk_text = parsed['chunk']
+                            buffer += chunk_text
+                            
+                            # Clean up start marker
+                            if '[MIXOLOGIST_NOTES]' in buffer:
+                                buffer = buffer.replace('[MIXOLOGIST_NOTES]', '')
+                                if buffer.startswith('\n'):
+                                    buffer = buffer.lstrip('\n')
+                                    
+                            if '[PROFILE_DESCRIPTION]' in buffer:
+                                parts = buffer.split('[PROFILE_DESCRIPTION]')
+                                if parts[0]:
+                                    c = parts[0].strip('\n').replace('\n', '<br>')
+                                    if c:
+                                        yield f"event: mixologist_notes\ndata: {c}\n\n"
+                                
+                                current_event = 'message'
+                                buffer = parts[1]
+                                if buffer.startswith('\n'):
+                                    buffer = buffer.lstrip('\n')
+                                
+                                if buffer:
+                                    c = buffer.replace('\n', '<br>')
+                                    yield f"event: {current_event}\ndata: {c}\n\n"
+                                    buffer = ""
+                            else:
+                                last_bracket = buffer.rfind('[')
+                                if last_bracket != -1 and current_event == 'mixologist_notes':
+                                    safe_part = buffer[:last_bracket]
+                                    buffer = buffer[last_bracket:]
+                                else:
+                                    safe_part = buffer
+                                    buffer = ""
+                                
+                                if safe_part:
+                                    c = safe_part.replace('\n', '<br>')
+                                    if c:
+                                        yield f"event: {current_event}\ndata: {c}\n\n"
                     except:
                         pass
+            
+            if buffer:
+                c = buffer.replace('[MIXOLOGIST_NOTES]', '').replace('\n', '<br>')
+                if c:
+                    yield f"event: {current_event}\ndata: {c}\n\n"
+                    
             yield "event: remove_spinner\ndata: \n\n"
             
         response = StreamingHttpResponse(sse_generator(), content_type='text/event-stream')
