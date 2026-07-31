@@ -162,7 +162,7 @@ class AIProvidersMixin:
                     if 'generateContent' in m.get('supportedGenerationMethods', [])]
 
     @classmethod
-    def _call_openai(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
+    def _call_openai(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> str:
             url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
             headers = {
                 "Authorization": f"Bearer {provider.api_key}",
@@ -172,7 +172,8 @@ class AIProvidersMixin:
             data = {
                 "model": model_name,
                 "messages": messages,
-                "temperature": 0.7
+                "temperature": 0.9 if mode == 'experimental' else 0.3,
+                "top_p": 0.95 if mode == 'experimental' else 0.5
             }
             if model_name.startswith('o1') or model_name.startswith('o3'):
                 if getattr(provider, 'enable_thinking', False):
@@ -198,7 +199,7 @@ class AIProvidersMixin:
             return content
 
     @classmethod
-    def _call_ollama(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
+    def _call_ollama(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> str:
             # Ollama /api/chat — native format.
             url = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/') + "/api/chat"
             model_name = provider.default_model or "mistral"
@@ -217,7 +218,8 @@ class AIProvidersMixin:
                 "think": think_val,
                 "options": {
                     "num_predict": 2048,
-                    "temperature": 0.5
+                    "temperature": 0.9 if mode == 'experimental' else 0.3,
+                    "top_p": 0.95 if mode == 'experimental' else 0.5
                 }
             }
             user_prompt = messages[-1]['content'] if messages else ""
@@ -238,7 +240,7 @@ class AIProvidersMixin:
             return content
 
     @classmethod
-    def _call_claude(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
+    def _call_claude(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> str:
             url = "https://api.anthropic.com/v1/messages"
             headers = {
                 "x-api-key": provider.api_key,
@@ -254,8 +256,10 @@ class AIProvidersMixin:
                 "model": model_name,
                 "system": system,
                 "messages": actual_messages,
-                "max_tokens": 1024
-            }
+                "max_tokens": 1024,
+                "temperature": 0.9 if mode == 'experimental' else 0.3,
+                "top_p": 0.95 if mode == 'experimental' else 0.5,
+}
             
             if "claude-3-7" in model_name.lower() or "sonnet" in model_name.lower():
                 if getattr(provider, 'enable_thinking', False):
@@ -270,7 +274,7 @@ class AIProvidersMixin:
             return response.json()['content'][0]['text']
 
     @classmethod
-    def _call_gemini(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> str:
+    def _call_gemini(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> str:
             api_key = provider.api_key
             model = provider.default_model or "gemini-1.5-flash"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
@@ -291,6 +295,8 @@ class AIProvidersMixin:
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             
             generation_config = {}
+            generation_config["temperature"] = 0.9 if mode == 'experimental' else 0.3
+            generation_config["topP"] = 0.95 if mode == 'experimental' else 0.5
             if is_json_request:
                 generation_config["responseMimeType"] = "application/json"
                 
@@ -319,14 +325,15 @@ class AIProvidersMixin:
             return content
 
     @classmethod
-    def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> Generator[str, None, None]:
             url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
             headers = {
                 "Authorization": f"Bearer {provider.api_key}",
                 "Content-Type": "application/json"
             }
             model_name = provider.default_model or "gpt-3.5-turbo"
-            data = {"model": model_name, "messages": messages, "temperature": 0.7, "stream": True}
+            data = {"model": model_name, "messages": messages, "temperature": 0.9 if mode == 'experimental' else 0.3,
+                "top_p": 0.95 if mode == 'experimental' else 0.5, "stream": True}
             if model_name.startswith('o1') or model_name.startswith('o3'):
                 if getattr(provider, 'enable_thinking', False):
                     data["reasoning_effort"] = getattr(provider, 'thinking_effort', 'medium')
@@ -355,7 +362,7 @@ class AIProvidersMixin:
                         except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    def _call_ollama_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> Generator[str, None, None]:
             url = cls._resolve_base_url(provider, "http://localhost:11434").rstrip('/') + "/api/chat"
             model_name = provider.default_model or "mistral"
             if getattr(provider, 'enable_thinking', False):
@@ -373,7 +380,8 @@ class AIProvidersMixin:
                 "think": think_val,
                 "options": {
                     "num_predict": 2048,
-                    "temperature": 0.5
+                    "temperature": 0.9 if mode == 'experimental' else 0.3,
+                    "top_p": 0.95 if mode == 'experimental' else 0.5
                 }
             }
             user_prompt = messages[-1]['content'] if messages else ""
@@ -393,7 +401,7 @@ class AIProvidersMixin:
                     except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_claude_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    def _call_claude_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> Generator[str, None, None]:
             url = "https://api.anthropic.com/v1/messages"
             headers = {"x-api-key": provider.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
             system = messages[0]['content']
@@ -406,7 +414,10 @@ class AIProvidersMixin:
                 "system": system,
                 "messages": actual_messages,
                 "max_tokens": 1024,
-                "stream": True
+                
+                "temperature": 0.9 if mode == 'experimental' else 0.3,
+                "top_p": 0.95 if mode == 'experimental' else 0.5,
+"stream": True
             }
             
             if "claude-3-7" in model_name.lower() or "sonnet" in model_name.lower():
@@ -434,7 +445,7 @@ class AIProvidersMixin:
                         except json.JSONDecodeError: pass
 
     @classmethod
-    def _call_gemini_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    def _call_gemini_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> Generator[str, None, None]:
             api_key = provider.api_key
             model = provider.default_model or "gemini-1.5-flash"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
@@ -448,6 +459,8 @@ class AIProvidersMixin:
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             
             generation_config = {}
+            generation_config["temperature"] = 0.9 if mode == 'experimental' else 0.3
+            generation_config["topP"] = 0.95 if mode == 'experimental' else 0.5
             if is_json_request:
                 generation_config["responseMimeType"] = "application/json"
                 

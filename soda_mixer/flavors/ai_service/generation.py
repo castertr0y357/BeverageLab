@@ -20,7 +20,6 @@ class AIGenerationMixin:
             Returns 10 to 15 specific ingredient recommendations from the inventory.
             """
             drink_type = drink_type.upper()
-            tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
             
             # Fallback if inventory is not passed explicitly
             if not inventory:
@@ -65,17 +64,17 @@ class AIGenerationMixin:
     Task: Recommending between 10 to 15 compatible ingredients from the Inventory Registry to create/stabilize a drink compound. Prioritize ingredients marked with '*FAVORITE*'.
     
     [DYNAMIC REQUEST PARAMETERS]:
-    Current Mode: {drink_type} | Mode: {tone}
+    Current Mode: {drink_type}
     Active Mixture: {current_compound_str}
     Force Type Constraint: {force_type or 'None'}{force_rule}
     Exclusion List: {exclude_str}
     
-    Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture, not just the base ingredient. Avoid recommending items that clash with any part of the active mixture.
+    Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture. For the 'reason' field, provide a detailed, vivid 15-25 word mixology explanation of exactly why the ingredient's flavor molecules synergize with the active compound.
     """
             if retry_note:
                 prompt += f"\n[RETRY COMMAND]: {retry_note}\n"
     
-            response = cls.chat(prompt, context=inventory, drink_type=drink_type)
+            response = cls.chat(prompt, context=inventory, drink_type=drink_type, mode=mode)
             return cls._extract_json(response)
 
     @classmethod
@@ -85,7 +84,6 @@ class AIGenerationMixin:
             and then yields a final 'complete' object containing the full structured response (rebalancing, reasoning).
             """
             drink_type = drink_type.upper()
-            tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
             
             if not inventory:
                 inventory = cls.get_static_ingredients_context(drink_type=drink_type)
@@ -127,17 +125,17 @@ class AIGenerationMixin:
     Task: Recommending between 10 to 15 compatible ingredients from the Inventory Registry to create/stabilize a drink compound. Prioritize ingredients marked with '*FAVORITE*'.
     
     [DYNAMIC REQUEST PARAMETERS]:
-    Current Mode: {drink_type} | Mode: {tone}
+    Current Mode: {drink_type}
     Active Mixture: {current_compound_str}
     Force Type Constraint: {force_type or 'None'}{force_rule}
     Exclusion List: {exclude_str}
     
-    Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture, not just the base ingredient. Avoid recommending items that clash with any part of the active mixture.
+    Instruction: Analyze the active mixture '{current_compound_str}' and evaluate how all of its ingredients interact. Recommend items that complement the overall taste profile of the entire active mixture. For the 'reason' field, provide a detailed, vivid 15-25 word mixology explanation of exactly why the ingredient's flavor molecules synergize with the active compound.
     """
             if retry_note:
                 prompt += f"\n[RETRY COMMAND]: {retry_note}\n"
     
-            stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type)
+            stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type, mode=mode)
             
             buffer = ""
             yielded_names = set()
@@ -180,7 +178,6 @@ class AIGenerationMixin:
             Coffee: 3-5 ingredients, including a stabilizer.
             """
             drink_type = drink_type.upper()
-            tone = "safe and balanced" if mode == 'standard' else "bold and experimental"
             drink_label = {'SODA': 'soda', 'COFFEE': 'coffee drink', 'SLUSHIE': 'slushie'}.get(drink_type, 'drink')
             count_limit = "BETWEEN 2 and 4" if drink_type != 'COFFEE' else "BETWEEN 3 and 5"
     
@@ -190,7 +187,7 @@ class AIGenerationMixin:
     2. Select a base (e.g. coffee bean) and complementary reagents.
     3. Provide a suggested 'amount'. The base coffee beans MUST default to 18.0 (representing 18.0g weight in grams). Dairy/milks (type DAIRY) must default to 50.0 (representing 50.0ml volume in milliliters), and other minor additives/syrups/accents (type ADDITIVE) must default to 15.0 (representing 15.0ml volume in milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
     4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
-    5. For each ingredient, provide a specific 'role' (max 8 words).
+    5. For each ingredient, provide a specific 'role' (10 to 20 words detailing its flavor contribution).
     6. MANDATORY: Include exactly one 'Dairy & Plant Milk' (type DAIRY) as the secondary ingredient (directly after the base coffee beans, at index 1 / position 2 of the list) with a default amount of 50.0. Minor additives (type ADDITIVE) like Heavy Cream must NOT be used as this secondary ingredient."""
                 example = """{
         "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
@@ -205,7 +202,7 @@ class AIGenerationMixin:
     2. Select a base (e.g. fruit syrup) and complementary reagents.
     3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 80ml base, 40ml payload, 20ml accents).
     4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
-    5. For each ingredient, provide a specific 'role' (max 8 words)."""
+    5. For each ingredient, provide a specific 'role' (10 to 20 words detailing its flavor contribution)."""
                 example = """{
         "design_intent": "A refreshing frozen berry fruit blend.",
         "selection": [
@@ -219,7 +216,7 @@ class AIGenerationMixin:
     2. Select a base (e.g. sweet syrup) and complementary reagents.
     3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 100ml base, 50ml payload, 25ml accents).
     4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
-    5. For each ingredient, provide a specific 'role' (max 8 words)."""
+    5. For each ingredient, provide a specific 'role' (10 to 20 words detailing its flavor contribution)."""
                 example = """{
         "design_intent": "A sharp carbonated citrus blend.",
         "selection": [
@@ -243,9 +240,8 @@ class AIGenerationMixin:
     Inventory Registry for Selection: See context.
     
     [DYNAMIC REQUEST PARAMETERS]:
-    Lab Mode: {tone}
-    """
-            response = cls.chat(prompt, context=inventory, drink_type=drink_type)
+        """
+            response = cls.chat(prompt, context=inventory, drink_type=drink_type, mode=mode)
             return cls._extract_json(response)
 
     @classmethod
@@ -287,9 +283,10 @@ class AIGenerationMixin:
     Finalized {drink_label} compound:
     {ingredient_list}
     
-    Write a concise 2-paragraph lab report:
-    Paragraph 1 — FLAVOR SYNERGY: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance, complementary/contrasting notes).
-    Paragraph 2 — EXPECTED TASTE: What will this drink taste like? Describe the opening, body, and finish. Keep it vivid and specific.
+    Write a detailed, vivid 3-paragraph lab report:
+    Paragraph 1 — FLAVOR SYNERGY & AROMA: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance). Describe the initial aroma.
+    Paragraph 2 — THE TASTING EXPERIENCE: What will this drink taste like? Describe the opening notes, the body, and the finish sequentially.
+    Paragraph 3 — OVERALL IMPRESSION: A concluding sentence on the final aesthetic and vibe of the compound.
     
     Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
             return cls.chat(prompt, drink_type=drink_type)
@@ -332,9 +329,10 @@ class AIGenerationMixin:
     Finalized {drink_label} compound:
     {ingredient_list}
     
-    Write a concise 2-paragraph lab report:
-    Paragraph 1 — FLAVOR SYNERGY: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance, complementary/contrasting notes).
-    Paragraph 2 — EXPECTED TASTE: What will this drink taste like? Describe the opening, body, and finish. Keep it vivid and specific.
+    Write a detailed, vivid 3-paragraph lab report:
+    Paragraph 1 — FLAVOR SYNERGY & AROMA: Why do these ingredients work together? Reference specific flavor science (acidity, sweetness, bitterness, intensity balance). Describe the initial aroma.
+    Paragraph 2 — THE TASTING EXPERIENCE: What will this drink taste like? Describe the opening notes, the body, and the finish sequentially.
+    Paragraph 3 — OVERALL IMPRESSION: A concluding sentence on the final aesthetic and vibe of the compound.
     
     Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
             yield from cls.chat_stream(prompt, drink_type=drink_type)

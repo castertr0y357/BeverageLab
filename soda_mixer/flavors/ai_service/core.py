@@ -313,7 +313,7 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
                 return "This is a mock laboratory response from the Beverage Laboratory AI Substrate in offline MOCK_MODE."
 
     @classmethod
-    def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None) -> str:
+    def chat(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None, mode: str = 'standard') -> str:
             """
             Send a prompt to the configured LLM provider.
             history: List of previous messages for context.
@@ -350,25 +350,25 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
     
             try:
                 if provider.provider_type == 'OPENAI':
-                    return cls._call_openai(provider, messages)
+                    return cls._call_openai(provider, messages, mode=mode)
                 elif provider.provider_type == 'CLAUDE':
-                    return cls._call_claude(provider, messages)
+                    return cls._call_claude(provider, messages, mode=mode)
                 elif provider.provider_type == 'GEMINI':
-                    return cls._call_gemini(provider, messages)
+                    return cls._call_gemini(provider, messages, mode=mode)
                 elif provider.provider_type == 'OLLAMA':
-                    return cls._call_ollama(provider, messages)
+                    return cls._call_ollama(provider, messages, mode=mode)
                 else:
                     # Generic OpenAI-compatible
-                    return cls._call_openai(provider, messages)
+                    return cls._call_openai(provider, messages, mode=mode)
             except Exception as e:
                 logger.error(f"AICommunication - Error - Laboratory AI Communication Failure ({provider.name}): {e}")
                 return f"Laboratory Error: Failed to reach the assistant ({str(e)})."
 
     @classmethod
-    def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None) -> Generator[str, None, None]:
+    def chat_stream(cls, user_prompt: str, history: Optional[List[Dict[str, str]]] = None, provider: Optional[LLMProvider] = None, context: Optional[Union[str, List[str]]] = None, drink_type: Optional[str] = None, mode: str = 'standard') -> Generator[str, None, None]:
             """Stream a prompt response from the configured LLM provider."""
             if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
-                text = cls.chat(user_prompt, history, provider, context, drink_type=drink_type)
+                text = cls.chat(user_prompt, history, provider, context, drink_type=drink_type, mode=mode)
                 yield f"data: {json.dumps({'chunk': text})}\n\n"
                 return
     
@@ -395,15 +395,15 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
     
             try:
                 if provider.provider_type == 'OPENAI':
-                    yield from cls._call_openai_stream(provider, messages)
+                    yield from cls._call_openai_stream(provider, messages, mode=mode)
                 elif provider.provider_type == 'CLAUDE':
-                    yield from cls._call_claude_stream(provider, messages)
+                    yield from cls._call_claude_stream(provider, messages, mode=mode)
                 elif provider.provider_type == 'GEMINI':
-                    yield from cls._call_gemini_stream(provider, messages)
+                    yield from cls._call_gemini_stream(provider, messages, mode=mode)
                 elif provider.provider_type == 'OLLAMA':
-                    yield from cls._call_ollama_stream(provider, messages)
+                    yield from cls._call_ollama_stream(provider, messages, mode=mode)
                 else:
-                    yield from cls._call_openai_stream(provider, messages)
+                    yield from cls._call_openai_stream(provider, messages, mode=mode)
             except Exception as e:
                 logger.error(f"AICommunication - Error - Laboratory AI Communication Failure ({provider.name}): {e}")
                 error_chunk = json.dumps({'chunk': f"Laboratory Error: Failed to reach the assistant ({str(e)})."})

@@ -28,7 +28,7 @@
                 <span class="text-experimental font-monospace">A: {{ rec.accent_suitability|default:3.0|floatformat:1 }}</span>
             </div>
             <div class="mt-auto">
-                <small class="{{ text_class }} fw-bold" style="font-size: 0.7rem;">
+                <small class="{{ text_class }} fw-bold" style="font-size: 0.7rem; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;">
                     {{ icon_html|safe }}{{ rec.reason }}
                 </small>
             </div>
