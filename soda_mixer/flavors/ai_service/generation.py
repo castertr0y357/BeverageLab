@@ -365,3 +365,29 @@ class AIGenerationMixin:
     Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
             yield from cls.chat_stream(prompt, drink_type=drink_type)
 
+    @classmethod
+    def generate_recipe_name(cls, ingredient_names: List[str], drink_type: str = 'SODA') -> str:
+        """
+        Generate a highly creative recipe name lazily via LLM.
+        """
+        drink_type = drink_type.upper()
+        if not ingredient_names:
+            return "Mystery Mix"
+        
+        ingredients_str = ", ".join(ingredient_names)
+        prompt = f"""[STRUCTURED DATA REQUEST] — RAW STRING ONLY. [NO PREAMBLE].
+        
+You are a highly creative master mixologist.
+Task: Generate a single, highly creative, memorable, and aesthetic name for a {drink_type} beverage.
+Ingredients in the mixture: {ingredients_str}.
+
+Constraints:
+- Provide ONLY the name, nothing else.
+- Maximum 3 words.
+- Do not use quotes around the name.
+- Do not add any extra text or explanation.
+"""
+        response = cls.chat(prompt, drink_type=drink_type, mode='creative')
+        if not response:
+            return "Mystery Mix"
+        return response.strip(' "\'')

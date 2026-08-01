@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, MixHistory, MixHistoryIngredient, SystemConfiguration, LLMProvider
-from ..recommendations import generate_recipe_name, suggest_categories, get_recommendation, get_tiered_recommendation, calculate_recipe_stats
+from ..recommendations import suggest_categories, calculate_recipe_stats
 from ..ai_service import AIAssistant
 
 User = get_user_model()
@@ -328,43 +328,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         self.assertEqual(self.ing_soda.ingredient_type, "SODA_SYRUP")
         self.assertEqual(self.ing_soda.compatible_systems, "SODA,SLUSHIE")
 
-    def test_recommendation_filtering_by_system_compatibility(self) -> None:
-        # Clear seeded ingredients to have a clean slate for recommendations test
-        Ingredient.all_objects.all().delete()
-        
-        self.ing_soda = Ingredient.objects.create(
-            name="Soda Syrup Cola",
-            ingredient_type="SODA_SYRUP",
-            category="sweet",
-            is_in_inventory=True,
-            compatible_systems="SODA"
-        )
-        self.ing_coffee = Ingredient.objects.create(
-            name="Coffee Bean Kenya",
-            ingredient_type="COFFEE_BEAN",
-            category="coffee",
-            is_in_inventory=True,
-            compatible_systems="COFFEE"
-        )
-        self.ing_slushie = Ingredient.objects.create(
-            name="Slushie Syrup Blue Raspberry",
-            ingredient_type="SODA_SYRUP",
-            category="berry",
-            is_in_inventory=True,
-            compatible_systems="SLUSHIE"
-        )
 
-        # Standard mode recommendations in Coffee drink lab should only return Coffee system compatible ingredients
-        recs_std = get_recommendation([self.ing_coffee.id], drink_type="COFFEE", experimental=False)
-        rec_ingredients_std = [r['ingredient'] for r in recs_std['recommended']]
-        for ing in rec_ingredients_std:
-            self.assertIn("COFFEE", ing.compatible_systems)
-
-        # Experimental mode bypasses system compatibility filters
-        recs_exp = get_recommendation([self.ing_coffee.id], drink_type="COFFEE", experimental=True)
-        rec_ingredients_exp = [r['ingredient'] for r in recs_exp['recommended']]
-        # Should be able to find self.ing_soda (compatible only with SODA) in results
-        self.assertTrue(any(ing.id == self.ing_soda.id for ing in rec_ingredients_exp))
 
     def test_ready_to_drink_attributes_and_recipe_property(self) -> None:
         """Verify is_ready_to_drink field on Ingredient and has_ready_to_drink property on Recipe."""

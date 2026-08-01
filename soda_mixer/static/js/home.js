@@ -895,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize from localStorage
         const savedMode = localStorage.getItem('lab_mode') || 'SODA';
         const savedRecMode = localStorage.getItem('recommendation_mode') || 'standard';
-        const savedEngineMode = localStorage.getItem('engine_mode') || 'algorithmic';
+
         const savedCoffeeStyle = localStorage.getItem('coffee_style') || 'hot';
         const savedCoffeeSizeOz = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
         const savedCoffeeBaseType = localStorage.getItem('coffee_base_type') || 'espresso';
@@ -905,7 +905,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setLabMode(savedMode, true); 
         setRecommendationMode(savedRecMode);
-        setEngineMode(savedEngineMode);
+
 
         // Apply saved coffee controls (run after setLabMode so DOM is ready)
         coffeeStyle = savedCoffeeStyle;
@@ -958,28 +958,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    let engineMode = 'algorithmic';
-    function setEngineMode(mode) {
-        engineMode = mode;
-        localStorage.setItem('engine_mode', mode);
-        
-        const algoBtn = document.getElementById('toggleEngineAlgorithmic');
-        const aiBtn = document.getElementById('toggleEngineAI');
-        
-        if (algoBtn) {
-            algoBtn.classList.toggle('active-lab-mode', mode === 'algorithmic');
-            algoBtn.classList.toggle('text-dim', mode !== 'algorithmic');
-        }
-        
-        if (aiBtn) {
-            aiBtn.classList.toggle('active-lab-mode', mode === 'ai');
-            aiBtn.classList.toggle('text-dim', mode !== 'ai');
-        }
-        
-        if (selectedIngredients.length > 0) {
-            fetchRecommendations();
-        }
-    }
+
 
     function setLabMode(mode, isInit = false) {
         cancelInFlightLLMCalls();
@@ -1198,7 +1177,7 @@ function cancelInFlightLLMCalls() {
 
         const profileObj = typeof profile === 'string' && profile.trim() !== '' ? JSON.parse(profile) : profile;
         const parsedAmount = amount ? parseFloat(amount) : null;
-        const isAiBalanced = (engineMode === 'ai' && parsedAmount !== null);
+        const isAiBalanced = (parsedAmount !== null);
         let aiRatio = 1.0;
         
         if (isAiBalanced && currentLabMode === 'COFFEE') {
@@ -1222,11 +1201,11 @@ function cancelInFlightLLMCalls() {
         selectedIngredients.push({
             id: id,
             name: name,
-            intensity: profileObj ? profileObj.intensity : parseInt(intensity), 
-            sweetness: profileObj ? profileObj.sweetness : parseInt(sweetness),
-            acidity: profileObj ? profileObj.acidity : parseInt(acidity),
-            bitterness: profileObj ? profileObj.bitterness : parseInt(bitterness),
-            complexity: profileObj ? profileObj.complexity : parseInt(complexity),
+            intensity: (profileObj && profileObj.intensity !== undefined) ? profileObj.intensity : (parseInt(intensity) || 0), 
+            sweetness: (profileObj && profileObj.sweetness !== undefined) ? profileObj.sweetness : (parseInt(sweetness) || 0),
+            acidity: (profileObj && profileObj.acidity !== undefined) ? profileObj.acidity : (parseInt(acidity) || 0),
+            bitterness: (profileObj && profileObj.bitterness !== undefined) ? profileObj.bitterness : (parseInt(bitterness) || 0),
+            complexity: (profileObj && profileObj.complexity !== undefined) ? profileObj.complexity : (parseInt(complexity) || 0),
             category: category,
             type: type,
             amount: parsedAmount,
@@ -1235,9 +1214,9 @@ function cancelInFlightLLMCalls() {
             isReadyToDrink: isReadyToDrink || (profileObj && (profileObj.is_ready_to_drink === true || profileObj.is_ready_to_drink === 'true')),
             isDry: isDry || (profileObj && (profileObj.is_dry === true || profileObj.is_dry === 'true')),
             roast_level: roastLevel || (profileObj ? profileObj.roast_level : null),
-            body_intensity: profileObj ? profileObj.intensity : parseInt(intensity),
-            acidity_score: profileObj ? profileObj.acidity : parseInt(acidity),
-            bitterness_score: profileObj ? profileObj.bitterness : parseInt(bitterness),
+            body_intensity: (profileObj && profileObj.intensity !== undefined) ? profileObj.intensity : (parseInt(intensity) || 0),
+            acidity_score: (profileObj && profileObj.acidity !== undefined) ? profileObj.acidity : (parseInt(acidity) || 0),
+            bitterness_score: (profileObj && profileObj.bitterness !== undefined) ? profileObj.bitterness : (parseInt(bitterness) || 0),
             flavor_notes: parsedNotes,
             is_decaf: isDecaf || (profileObj ? (profileObj.is_decaf === true || profileObj.is_decaf === 'true') : false) || name.toLowerCase().includes('decaf'),
             profile: profileObj,
@@ -2460,7 +2439,7 @@ function cancelInFlightLLMCalls() {
             const ingredientIds = selectedIngredients.map(i => i.id === 'virtual_water' ? 0 : parseInt(i.id));
             const maxIngredients = currentLabMode === 'COFFEE' ? 5 : 4;
             
-            const newStepKey = `${currentLabMode}_${recommendationMode}_${engineMode}_${ingredientIds.join(',')}`;
+            const newStepKey = `${currentLabMode}_${recommendationMode}_ai_${ingredientIds.join(',')}`;
             if (newStepKey !== currentStepKey) {
                 currentStepKey = newStepKey;
                 stepExcludingIds = [];
@@ -2531,7 +2510,7 @@ function cancelInFlightLLMCalls() {
             container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
             library.style.display = 'none'; // Hide library when focused on recommendations
 
-            const isAiEngine = engineMode === 'ai';
+            const isAiEngine = true;
             const url = isAiEngine ? '/api/ai/suggest/' : '/api/recommendations/';
             const payload = isAiEngine ? {
                 ingredients: selectedIngredients.map(i => i.name),
@@ -3405,7 +3384,7 @@ function updateSelectedArea(isDone = false) {
                                 ${['intensity', 'sweetness', 'acidity', 'bitterness', 'complexity'].map(attr => {
                                     const val = (ing.profile && ing.profile[attr] !== undefined) ? ing.profile[attr] : (ing[attr] || 0);
                                     const isSynthesized = ing.profile && ing.profile[attr] !== undefined;
-                                    const isNeural = (engineMode === 'ai') || ing.isAiBalanced || isSynthesized;
+                                    const isNeural = true || ing.isAiBalanced || isSynthesized;
                                     const color = isNeural ? 'var(--fizz-cyan)' : 'var(--text-dim)';
                                     return `
                                         <div class="d-flex justify-content-between align-items-center gap-2">

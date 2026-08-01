@@ -11,114 +11,19 @@ from django.db.models import Q
 from ...models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, BackgroundExecutionTask
 from ...tasks_registry import submit_task
 from ...recommendations import (
-    get_recommendation, get_tiered_recommendation,
-    generate_recipe_name, suggest_categories, calculate_recipe_stats
+    suggest_categories, calculate_recipe_stats
 )
 from ...ai_service import AIAssistant
 from .helpers import *
 
 def get_recommendations_api(request: HttpRequest) -> JsonResponse:
-    """API endpoint for tiered ingredient recommendations."""
+    """API endpoint for tiered ingredient recommendations (Deprecated, now returns empty)."""
     try:
-        data = json.loads(request.body)
-        ingredient_ids = data.get('ingredient_ids', [])
-        ingredient_ids = [0 if i == 'virtual_water' else int(i) for i in ingredient_ids if str(i).isdigit() or i == 'virtual_water']
-        experimental = data.get('mode') == 'experimental' or data.get('experimental', False)
-        force_type = data.get('force_type') # e.g. 'ADDITIVE'
-        drink_type = data.get('drink_type', 'SODA').upper()
-        exclude_ids = data.get('exclude_ids', [])
-        exclude_ids = [int(i) for i in exclude_ids if str(i).isdigit()]
-
-        # Merge all selected ingredients into the exclude pool to prevent duplicate recommendations!
-        for ing_id in ingredient_ids:
-            if ing_id > 0 and ing_id not in exclude_ids:
-                exclude_ids.append(ing_id)
-
-        serialized_recs: List[Dict[str, Any]] = []
-        multibrand_names = get_multibrand_names_in_inventory()
-
-        if len(ingredient_ids) == 0:
-            result = get_recommendation([], drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
-            serialized_recs = [
-                {
-                    'id': r['ingredient'].id,
-                    'name': get_display_name(r['ingredient'], multibrand_names),
-                    'category': r['ingredient'].category,
-                    'type': r['ingredient'].ingredient_type,
-                    'physical_state': r['ingredient'].physical_state,
-                    'mixology_function': r['ingredient'].mixology_function,
-                    'intensity': r['ingredient'].intensity,
-                    'sweetness': r['ingredient'].sweetness,
-                    'acidity': r['ingredient'].acidity,
-                    'bitterness': r['ingredient'].bitterness,
-                    'complexity': r['ingredient'].complexity,
-                    'base_suitability': r['ingredient'].base_suitability,
-                    'accent_suitability': r['ingredient'].accent_suitability,
-                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
-                    'is_dry': r['ingredient'].is_dry,
-                    'favorite': r['ingredient'].favorite,
-                    'score': r['score'],
-                    'reason': r['reason'],
-                    'tier': 'suggestions'
-                } for r in result.get('recommended', [])
-            ]
-        elif len(ingredient_ids) == 1:
-            result = get_recommendation(ingredient_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
-            serialized_recs = [
-                {
-                    'id': r['ingredient'].id,
-                    'name': get_display_name(r['ingredient'], multibrand_names),
-                    'category': r['ingredient'].category,
-                    'type': r['ingredient'].ingredient_type,
-                    'physical_state': r['ingredient'].physical_state,
-                    'mixology_function': r['ingredient'].mixology_function,
-                    'intensity': r['ingredient'].intensity,
-                    'sweetness': r['ingredient'].sweetness,
-                    'acidity': r['ingredient'].acidity,
-                    'bitterness': r['ingredient'].bitterness,
-                    'complexity': r['ingredient'].complexity,
-                    'base_suitability': r['ingredient'].base_suitability,
-                    'accent_suitability': r['ingredient'].accent_suitability,
-                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
-                    'is_dry': r['ingredient'].is_dry,
-                    'favorite': r['ingredient'].favorite,
-                    'score': r['score'],
-                    'reason': r['reason'],
-                    'tier': 'secondary'
-                } for r in result.get('recommended', [])
-            ]
-        else:
-            result = get_recommendation(ingredient_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=exclude_ids)
-            scale_factor = 15.0 / len(ingredient_ids)
-            serialized_recs = [
-                {
-                    'id': r['ingredient'].id,
-                    'name': get_display_name(r['ingredient'], multibrand_names),
-                    'category': r['ingredient'].category,
-                    'type': r['ingredient'].ingredient_type,
-                    'physical_state': r['ingredient'].physical_state,
-                    'mixology_function': r['ingredient'].mixology_function,
-                    'intensity': r['ingredient'].intensity,
-                    'sweetness': r['ingredient'].sweetness,
-                    'acidity': r['ingredient'].acidity,
-                    'bitterness': r['ingredient'].bitterness,
-                    'complexity': r['ingredient'].complexity,
-                    'base_suitability': r['ingredient'].base_suitability,
-                    'accent_suitability': r['ingredient'].accent_suitability,
-                    'is_ready_to_drink': r['ingredient'].is_ready_to_drink,
-                    'is_dry': r['ingredient'].is_dry,
-                    'favorite': r['ingredient'].favorite,
-                    'score': r['score'],
-                    'reason': r['reason'],
-                    'tier': 'tertiary'
-                } for r in result.get('recommended', [])
-            ]
-
-        serialized = {'recommended': serialized_recs, 'recipes': []}
+        serialized = {'recommended': [], 'recipes': []}
         return JsonResponse(serialized)
-    except json.JSONDecodeError as e:
-        logger.warning(f"RecommendationsAPI - Warning - Invalid JSON payload: {e}")
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.warning(f"RecommendationsAPI - Warning - {e}")
+        return JsonResponse({'error': str(e)}, status=400)
 
 def get_category_suggestions_api(request: HttpRequest) -> JsonResponse:
     """Return suggested category names and all existing categories."""

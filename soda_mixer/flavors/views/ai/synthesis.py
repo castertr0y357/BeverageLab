@@ -11,19 +11,29 @@ from django.db.models import Q
 from ...models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, BackgroundExecutionTask
 from ...tasks_registry import submit_task
 from ...recommendations import (
-    get_recommendation, get_tiered_recommendation,
-    generate_recipe_name, suggest_categories, calculate_recipe_stats
+    suggest_categories, calculate_recipe_stats
 )
 from ...ai_service import AIAssistant
 from .helpers import *
 
 def generate_name_api(request: HttpRequest) -> JsonResponse:
-    """Return a suggested recipe name for a list of ingredient IDs."""
+    """Return a suggested recipe name for a list of ingredient IDs using LLM."""
     try:
         data = json.loads(request.body)
         ingredient_ids = data.get('ingredient_ids', [])
         ingredient_ids = [0 if i == 'virtual_water' else int(i) for i in ingredient_ids if str(i).isdigit() or i == 'virtual_water']
-        name = generate_recipe_name(ingredient_ids)
+        drink_type = data.get('drink_type', 'SODA')
+        
+        ingredients = []
+        for i_id in ingredient_ids:
+            if i_id == 0:
+                ingredients.append("Water")
+            else:
+                ing = Ingredient.objects.filter(id=i_id).first()
+                if ing:
+                    ingredients.append(ing.name)
+                    
+        name = AIAssistant.generate_recipe_name(ingredients, drink_type=drink_type)
         return JsonResponse({'name': name})
     except json.JSONDecodeError as e:
         logger.warning(f"GenerateNameAPI - Warning - Invalid JSON payload: {e}")
@@ -320,62 +330,10 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     if attempt == 2:
                         raise e
 
-            # Fallback to standard/algorithmic recommendations if AI returned nothing
-            logger.warning("AISuggestion - Warning - AI returned no matches. Falling back to algorithmic recommendations.")
-            
-            # Map name strings back to database IDs
-            ing_ids = []
-            for name in ingredients:
-                if name == "NONE - Initial Synthesis" or name == "virtual_water" or name == "Carbonated Water" or name == "Ice":
-                    continue
-                ing_obj = Ingredient.objects.filter(name__iexact=name).first()
-                if ing_obj:
-                    ing_ids.append(ing_obj.id)
-            
-            # Map exclude names back to database IDs
-            excl_ids = []
-            for name in exclude:
-                ing_obj = Ingredient.objects.filter(name__iexact=name).first()
-                if ing_obj:
-                    excl_ids.append(ing_obj.id)
-            
-            from soda_mixer.flavors.recommendations import get_recommendation
-            experimental = (mode == 'experimental')
-            
-            recs_data = get_recommendation(ing_ids, drink_type=drink_type, experimental=experimental, force_type=force_type, exclude_ids=excl_ids)
-            scale_factor = 15.0
-            if len(ing_ids) >= 2:
-                scale_factor = 15.0 / len(ing_ids)
-            
-            enriched = []
-            for item in recs_data.get('recommended', []):
-                target_obj = item['ingredient']
-                amount = None
-                if drink_type == 'COFFEE':
-                    amount = sanitize_coffee_amount(target_obj, None)
-                
-                multibrand_names = get_multibrand_names_in_inventory()
-                enriched.append({
-                    'id': target_obj.id,
-                    'name': get_display_name(target_obj, multibrand_names),
-                    'category': target_obj.category,
-                    'type': target_obj.ingredient_type,
-                    'intensity': target_obj.intensity,
-                    'sweetness': target_obj.sweetness,
-                    'acidity': target_obj.acidity,
-                    'bitterness': target_obj.bitterness,
-                    'complexity': target_obj.complexity,
-                    'base_suitability': target_obj.base_suitability,
-                    'accent_suitability': target_obj.accent_suitability,
-                    'is_ready_to_drink': target_obj.is_ready_to_drink,
-                    'is_dry': target_obj.is_dry,
-                    'reason': f"Algorithmic: {item['reason']}",
-                    'amount': amount,
-                    'profile': None
-                })
-            
+            # Fallback to empty recommendations if AI returned nothing
+            logger.warning("AISuggestion - Warning - AI returned no matches. Returning empty suggestions.")
             yield f"event: remove_spinner\ndata: \n\n"
-            yield f"event: json\ndata: {json.dumps({'status': 'success', 'suggestions': enriched, 'rebalancing': {}, 'seal_recommended': False,  'reasoning': 'AI suggestions fallback.'})}\n\n"
+            yield f"event: json\ndata: {json.dumps({'status': 'success', 'suggestions': [], 'rebalancing': {}, 'seal_recommended': False,  'reasoning': 'AI suggestions fallback.'})}\n\n"
 
         response = StreamingHttpResponse(generator(), content_type='text/event-stream')
         response['Cache-Control'] = 'no-cache'

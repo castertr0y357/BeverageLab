@@ -11,8 +11,7 @@ from django.db.models import Q
 from ...models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, BackgroundExecutionTask
 from ...tasks_registry import submit_task
 from ...recommendations import (
-    get_recommendation, get_tiered_recommendation,
-    generate_recipe_name, suggest_categories, calculate_recipe_stats
+    suggest_categories, calculate_recipe_stats
 )
 from ...ai_service import AIAssistant
 from .helpers import *
