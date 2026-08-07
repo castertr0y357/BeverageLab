@@ -330,7 +330,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         else:
             shot_count = 4
         coffee_base_vol = round(shot_count * 0.9, 2)
-        hot_water_vol = 0.0
+        if espresso_hot_mode == 'water':
+            hot_water_vol = coffee_base_vol
+        else:
+            hot_water_vol = 0.0
     else:
         # Route B: Standard Brew
         shot_count = 0
@@ -341,12 +344,7 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
             coffee_base_vol = round(cup_size_oz * 0.70, 2)
 
     # 5. Dynamic Whole Milk / Dairy Payload (Floating Filler Rule)
-    if is_short_milk and dairy_inputs:
-        # For short milk drinks (Cortado/Macchiato), the cup size is just the shot count.
-        # We expand the liquid budget to allow for a 1:1 milk-to-espresso ratio.
-        liquid_budget_oz = (coffee_base_vol * 2.0) + modifier_budget
-        
-    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget
+    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget - hot_water_vol
     if secondary_liquid_vol < 0.0:
         secondary_liquid_vol = 0.0
 
@@ -456,10 +454,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
 
     # Base Modifiers format
     base_modifiers_output = []
-    if ice_volume_oz > 0.0:
+    if ice_melt_water_vol > 0.0:
         base_modifiers_output.append({
-            "name": "Ice",
-            "volume_oz": ice_volume_oz
+            "name": "Ice Melt Water",
+            "volume_oz": ice_melt_water_vol
         })
 
     def format_list_with_and(items: List[str]) -> str:

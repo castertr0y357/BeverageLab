@@ -69,10 +69,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (synthesisData.name) {
             document.getElementById('recipeNameField').value = synthesisData.name;
         }
+
+        // Auto-archive when hitting synopsis
+        autoArchiveSynopsis(synthesisData);
     } else {
         document.getElementById('synthesisReportBody').innerHTML = "<div class='text-warning'>No compound data found in local storage or session. Please return to the laboratory.</div>";
     }
 });
+
+function autoArchiveSynopsis(data) {
+    // Generate a hash based on ingredients to avoid double-saving if the page is refreshed
+    const hash = data.drink_type + '_' + (data.ingredients || []).map(i => i.id + '_' + i.amount).join('-');
+    const storageKey = 'synopsis_archived_' + btoa(hash).substring(0, 32);
+    
+    if (sessionStorage.getItem(storageKey)) {
+        console.log("Already archived this synopsis session.");
+        return;
+    }
+    
+    fetch('/api/history/save/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.status === 'saved') {
+            sessionStorage.setItem(storageKey, 'true');
+            console.log("Auto-archived mix to history.");
+        }
+    })
+    .catch(err => console.error('Archive auto-save failed:', err));
+}
 
 function setSynopsisScale(scale) {
     synopsisBottleScale = scale;

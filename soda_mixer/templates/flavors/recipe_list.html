@@ -9,9 +9,6 @@
         <h2 class="mb-0 text-white">LABORATORY <span class="text-lab-accent">NOTEBOOK</span></h2>
         <p class="text-dim mb-0">Archived formulas and analyzed experimental results.</p>
     </div>
-    <a href="{% url 'dashboard' %}" class="btn btn-primary px-4">
-        <i class="bi bi-flask"></i> New Formula
-    </a>
 </div>
 
 {% if all_categories %}
@@ -132,9 +129,6 @@
             <i class="bi bi-book display-4 text-dim mb-4 d-block opacity-25"></i>
             <h4 class="text-white mb-2">Laboratory Notebook is Empty</h4>
             <p class="text-dim mb-4">{% if active_category_id %}No formulas detected in this classification cluster.{% else %}No archived experimental results found in the registry.{% endif %}</p>
-            <a href="{% url 'dashboard' %}" class="btn btn-accent px-5 py-2 fw-black">
-                <i class="bi bi-plus-circle me-1"></i> Initiate Synthesis Protocol
-            </a>
         </div>
     </div>
     {% endfor %}

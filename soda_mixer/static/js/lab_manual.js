@@ -3934,25 +3934,7 @@ function updateSelectedArea(isDone = false) {
             mixerForm.appendChild(notesInput);
         });
 
-        fetch('/api/history/save/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-            body: JSON.stringify(data)
-        })
-        .then(r => r.json())
-        .then(res => {
-            if (res.status === 'saved') {
-                mixerForm.submit();
-            } else {
-                alert('Archive failure: ' + (res.error || 'Unknown error'));
-                saveBtn.innerHTML = '<i class="bi bi-journal-plus me-2"></i> ARCHIVE SYNTHESIS';
-                saveBtn.disabled = false;
-            }
-        })
-        .catch(err => {
-            console.error('Laboratory Archival Exception:', err);
-            mixerForm.submit(); // Submit anyway on network error to allow recovery via view logic
-        });
+        mixerForm.submit();
     }
 
     function setCreationMethod(method) {

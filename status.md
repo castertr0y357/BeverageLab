@@ -135,5 +135,6 @@
 - [x] Fixed SODA synthesis block hanging by updating home.html SODA fetch API logic to use HTMX SSE events stream, matching SLUSHIE and COFFEE.
 - [x] Restored dynamic color classes on the ingredient recommendation cards in _recommendation_card.html.
 - [x] Updated the UI for AI flavor suggestion streaming to keep the initial full-width 'Computing molecular affinity...' loading spinner active until the very first recommendation arrives. Once the first recommendation streams in, the UI transitions to the grid layout populated with the recommendation card and 4 individual card-style spinners (placeholders) which are dynamically removed as the remaining suggestions continue to stream in.
- 
- 
+- [x] Implemented auto-archiving for synthesis protocols via Javascript sessionStorage on the synopsis page, allowing all creation modes to archive correctly. Removed redundant history save API calls from lab_manual.js.
+- [x] Fixed backend Coffee Chemistry test suite: corrected Americano hot water dilution assignments, prevented Short Milk drinks from destructively overwriting the target liquid budget, fixed total volume logic to subtract hot water, and corrected Melt-Tax naming output to 'Ice Melt Water'.
+- [x] Removed redundant 'Initiate Synthesis' buttons from the Archives (Mix History) and Laboratory Notebook (Recipe List) pages and their empty states.
