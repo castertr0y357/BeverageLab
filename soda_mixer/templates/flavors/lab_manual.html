@@ -1,0 +1,11 @@
+{% extends 'flavors/layouts/lab_base.html' %}
+{% load static %}
+
+{% block lab_content %}
+    {% include 'flavors/components/manual_builder_old.html' %}
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="{% static 'js/lab_manual.js' %}?v=30"></script>
+{% endblock %}

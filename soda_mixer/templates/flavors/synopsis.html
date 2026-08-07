@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+    <script>
+        // Immediate theme application to prevent FOUC
+        (function() {
+            const savedMode = localStorage.getItem('lab_mode') || 'SODA';
+            if (savedMode === 'COFFEE') {
+                document.documentElement.classList.add('theme-coffee');
+            } else if (savedMode === 'CRYO' || savedMode === 'SLUSHIE') {
+                document.documentElement.classList.add('theme-cryo');
+            } else {
+                document.documentElement.classList.add('theme-soda');
+            }
+        })();
+    </script>
+{% endblock %}
+
+{% block title %}Laboratory Synopsis - Beverage Laboratory{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 fw-black text-lab-accent mb-3">SYNTHESIS REVIEW</h1>
+            <p class="text-dim fs-5">Finalize compound parameters and initialize archive storage.</p>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-lab btn-sm mt-2">
+                <i class="bi bi-arrow-left"></i> Return to Labs
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-11">
+            <form id="mixerForm" action="{% url 'create_recipe' %}" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="drink_type" id="drinkTypeField" value="{{ drink_type|default:'SODA' }}">
+                <input type="hidden" name="coffee_style" id="coffeeStyleField" value="{{ coffee_style|default:'' }}">
+                <input type="hidden" name="coffee_base_type" id="coffeeBaseTypeField" value="{{ coffee_base_type|default:'' }}">
+                <input type="hidden" name="drink_size_oz" id="drinkSizeOzField" value="{{ drink_size_oz|default:'' }}">
+                <input type="hidden" name="description" id="recipeDescriptionField">
+                <input type="hidden" name="lab_mode" id="labModeField" value="synopsis">
+
+                <!-- Scale and Sweetness Controls (Hidden initially, shown by JS if Soda) -->
+                <div id="synopsisScaleContainer" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-6 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SODA BATCH SCALE</label>
+                            <div class="btn-group w-100" id="sodaScaleBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale1L" onclick="setSynopsisScale(1.0)">1.0L Bottle</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale05L" onclick="setSynopsisScale(0.5)">0.5L Bottle</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale12oz" onclick="setSynopsisScale(0.355)">12oz Glass</button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SWEETNESS STYLE</label>
+                            <div class="btn-group w-100" id="sodaSweetnessStyleBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="sweetnessCrisp" onclick="setSynopsisSweetness('CRISP')">🍃 Crisp</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="sweetnessCraft" onclick="setSynopsisSweetness('CRAFT')">🧪 Craft</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="sweetnessFountain" onclick="setSynopsisSweetness('FOUNTAIN')">🥤 Fountain</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coffee Controls (Hidden initially) -->
+                <div id="synopsisCoffeeContainer" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-4 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK STYLE</label>
+                            <div class="btn-group w-100" id="coffeeStyleBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="coffeeStyleHot" onclick="setSynopsisCoffeeStyle('HOT')">☕ Hot</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeStyleIced" onclick="setSynopsisCoffeeStyle('ICED')">❄️ Iced</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeStyleShot" onclick="setSynopsisCoffeeStyle('SHOT')">⚡ Shot</button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK SIZE</label>
+                            <div class="btn-group w-100" id="coffeeSizeBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeSize8" onclick="setSynopsisCoffeeSize(8)">8oz</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="coffeeSize12" onclick="setSynopsisCoffeeSize(12)">12oz</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeSize16" onclick="setSynopsisCoffeeSize(16)">16oz</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeSize20" onclick="setSynopsisCoffeeSize(20)">20oz</button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">COFFEE BASE</label>
+                            <div class="btn-group w-100" id="coffeeBaseBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="coffeeBaseEspresso" onclick="setSynopsisCoffeeBase('ESPRESSO')">Espresso</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeBaseBrew" onclick="setSynopsisCoffeeBase('BREW')">Std Brew</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cryo Controls (Hidden initially) -->
+                <div id="synopsisCryoContainer" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none;">
+                    <div class="row g-3 justify-content-center">
+                        <div class="col-md-8 col-sm-12">
+                            <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SLUSHIE BATCH SCALE</label>
+                            <div class="btn-group w-100" id="cryoScaleBtns">
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="cryoScale16" onclick="setSynopsisCryoScale(16)">16oz Batch</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="cryoScale32" onclick="setSynopsisCryoScale(32)">32oz Batch</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="cryoScale48" onclick="setSynopsisCryoScale(48)">48oz Batch</button>
+                                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="cryoScale64" onclick="setSynopsisCryoScale(64)">64oz Batch</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-surface p-4 mb-4">
+                    <h5 class="fw-bold mb-3 text-white border-bottom border-white border-opacity-10 pb-2">Current Compound</h5>
+                    <div class="d-flex flex-wrap gap-3" id="selectedIngredientsList">
+                        <!-- Re-populated by synopsis.js via localStorage or POST data -->
+                    </div>
+                </div>
+
+                <div id="synthesisReportContainer" class="mb-4">
+                    <div class="glass-surface p-4 border-lab">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <i class="bi bi-cpu text-lab-accent fs-5"></i>
+                            <h6 class="readout-label mb-0">SYNTHESIS ANALYSIS REPORT</h6>
+                        </div>
+                        <div id="synthesisReportBody" class="small text-white opacity-90" style="line-height: 1.6;">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-lab-accent" role="status"></div>
+                                <div class="mt-2 text-dim small">Generating molecular analysis...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-5 pt-4 border-top border-white border-opacity-10" id="formSubmitArea">
+                    <div class="row align-items-end g-3">
+                        <div class="col-md-7" id="recipeNameInput">
+                            <label class="readout-label mb-2">Finalize Formula Name</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-dark border-white border-opacity-10 text-white" 
+                                       name="name" id="recipeNameField" placeholder="Enter a name..." required>
+                                <button class="btn btn-outline-secondary border-white border-opacity-10" type="button" id="suggestBtn" onclick="fetchSuggestName()">
+                                    <i class="bi bi-magic text-lab-accent"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                                <button type="button" class="btn btn-accent btn-lg w-100 py-3 fw-black shadow-lg" id="saveMixBtn" onclick="interceptAndSave()">
+                                    <i class="bi bi-journal-plus me-2"></i> ARCHIVE SYNTHESIS
+                                </button>
+                        </div>
+                    </div>
+                    <p class="text-dim small mt-2 d-flex align-items-center gap-2">
+                        <i class="bi bi-info-circle"></i> This experiment will be auto-indexed in history.
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.CSRF_TOKEN = '{{ csrf_token }}';
+    // Data can be passed through context if POST, otherwise js grabs from localStorage
+    window.SYNOPSIS_PREFILL = {{ prefill_json|default:'null'|safe }};
+</script>
+<script src="{% static 'js/synopsis.js' %}?v=20"></script>
+{% endblock %}

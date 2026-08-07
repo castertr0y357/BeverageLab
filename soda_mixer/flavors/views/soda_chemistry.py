@@ -55,9 +55,9 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
     if not sweetness_style or sweetness_style == 'AUTO':
         baseline_sum = 0.0
         for ing in ingredients_input:
-            pstate = str(ing.get('physical_state', '')).upper()
-            mfunc = str(ing.get('mixology_function', '')).upper()
-            itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
+            pstate = str(ing.get('physical_state') or '').upper()
+            mfunc = str(ing.get('mixology_function') or '').upper()
+            itype = str(ing.get('ingredient_type') or ing.get('type') or '').upper()
             is_dry = ing.get('is_dry', False)
             
             is_flavor_modifier = False
@@ -98,9 +98,9 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
     # Partition ingredients using the Primary Flavor Anchor Protocol
     flavor_modifiers = []
     for ing in ingredients_input:
-        pstate = str(ing.get('physical_state', '')).upper()
-        mfunc = str(ing.get('mixology_function', '')).upper()
-        itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
+        pstate = str(ing.get('physical_state') or '').upper()
+        mfunc = str(ing.get('mixology_function') or '').upper()
+        itype = str(ing.get('ingredient_type') or ing.get('type') or '').upper()
         is_dry = ing.get('is_dry', False)
         
         is_flavor_modifier = False

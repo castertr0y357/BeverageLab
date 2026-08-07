@@ -5,7 +5,12 @@ from . import views
 
 urlpatterns = [
     # Main pages
-    path('', views.home, name='home'),
+    path('', views.dashboard, name='dashboard'),
+
+    # Lab Environments
+    path('lab/synopsis/', views.synopsis_view, name='synopsis_view'),
+    path('lab/<str:lab_type>/', views.lab_dispatcher, name='lab_dispatcher'),
+    path('lab/<str:lab_type>/<str:mode>/', views.lab_view, name='lab_view'),
 
     # Ingredient and Category management
     path('ingredients/', views.ingredient_list, name='ingredient_list'),
@@ -44,6 +49,8 @@ urlpatterns = [
 
     # AI Assistant endpoints
     path('api/ai/chat/', views.ai_chat_api, name='ai_chat_api'),
+    path('api/ai/quick-recommendations/', views.ai_quick_recommendations_api, name='ai_quick_recommendations_api'),
+    path('api/ai/vibe-creation/', views.ai_vibe_creation_api, name='ai_vibe_creation_api'),
     path('api/ai/provider/save/', views.save_llm_provider_api, name='save_llm_provider_api'),
     path('api/ai/provider/<int:pk>/delete/', views.delete_llm_provider_api, name='delete_llm_provider_api'),
     path('api/ai/provider/<int:pk>/models/', views.fetch_provider_models_api, name='fetch_provider_models_api'),

@@ -186,6 +186,8 @@ class AIProvidersMixin:
                 user_prompt = messages[-1]['content'] if messages else ""
                 is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
                 is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+                is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+                is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
                 enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
                 if is_surprise_request:
                     data["response_format"] = {
@@ -194,6 +196,24 @@ class AIProvidersMixin:
                             "name": "surprise_mix",
                             "strict": True,
                             "schema": AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_quick_drinks_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "quick_drinks",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_vibe_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "vibe_drink",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_recipe_json_schema(enable_thinking)
                         }
                     }
                 elif is_json_request:
@@ -244,9 +264,15 @@ class AIProvidersMixin:
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+            is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
             enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
             if is_surprise_request:
                 data["format"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_quick_drinks_request:
+                data["format"] = AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+            elif is_vibe_request:
+                data["format"] = AIPromptsMixin.get_recipe_json_schema(enable_thinking)
             elif is_json_request:
                 data["format"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
     
@@ -317,6 +343,8 @@ class AIProvidersMixin:
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+            is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
             enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
@@ -325,6 +353,12 @@ class AIProvidersMixin:
             if is_surprise_request:
                 generation_config["responseMimeType"] = "application/json"
                 generation_config["responseSchema"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_quick_drinks_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+            elif is_vibe_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_recipe_json_schema(enable_thinking)
             elif is_json_request:
                 generation_config["responseMimeType"] = "application/json"
                 generation_config["responseSchema"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
@@ -372,6 +406,8 @@ class AIProvidersMixin:
                 user_prompt = messages[-1]['content'] if messages else ""
                 is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
                 is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+                is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+                is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
                 enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
                 if is_surprise_request:
                     data["response_format"] = {
@@ -380,6 +416,24 @@ class AIProvidersMixin:
                             "name": "surprise_mix",
                             "strict": True,
                             "schema": AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_quick_drinks_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "quick_drinks",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+                        }
+                    }
+                elif is_vibe_request:
+                    data["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "vibe_drink",
+                            "strict": True,
+                            "schema": AIPromptsMixin.get_recipe_json_schema(enable_thinking)
                         }
                     }
                 elif is_json_request:
@@ -434,15 +488,26 @@ class AIProvidersMixin:
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+            is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
             enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
             if is_surprise_request:
                 data["format"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_quick_drinks_request:
+                data["format"] = AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+            elif is_vibe_request:
+                data["format"] = AIPromptsMixin.get_recipe_json_schema(enable_thinking)
             elif is_json_request:
                 data["format"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)
     
             logger.warning(f"Ollama Stream Chat - Request payload: {json.dumps(data)}")
             response = requests.post(url, json=data, stream=True, timeout=120)
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"AISynthesis - Error - Ollama API failed: {e.response.text}")
+                raise e
+                
             for line in response.iter_lines():
                 if line:
                     try:
@@ -509,6 +574,8 @@ class AIProvidersMixin:
             user_prompt = messages[-1]['content'] if messages else ""
             is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"])
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
+            is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
+            is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
             enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
@@ -517,6 +584,12 @@ class AIProvidersMixin:
             if is_surprise_request:
                 generation_config["responseMimeType"] = "application/json"
                 generation_config["responseSchema"] = AIPromptsMixin.get_surprise_mix_json_schema(enable_thinking)
+            elif is_quick_drinks_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_recipe_list_json_schema(enable_thinking)
+            elif is_vibe_request:
+                generation_config["responseMimeType"] = "application/json"
+                generation_config["responseSchema"] = AIPromptsMixin.get_recipe_json_schema(enable_thinking)
             elif is_json_request:
                 generation_config["responseMimeType"] = "application/json"
                 generation_config["responseSchema"] = AIPromptsMixin.get_autonomous_json_schema(enable_thinking)

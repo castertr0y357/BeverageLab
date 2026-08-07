@@ -30,14 +30,17 @@
                 </button>
             </div>
 
-            <!-- Laboratory Sensitivity Toggle -->
+            <!-- Creation Method Toggle -->
             <div class="d-flex justify-content-center mt-3 gap-3">
                 <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
-                    <button type="button" id="toggleStandard" class="btn rounded-pill px-5 py-3 fs-5 active-lab-mode" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
-                        <i class="bi bi-shield-check me-2"></i> Standard
+                    <button type="button" id="methodQuick" class="btn rounded-pill px-4 py-2 fs-6 text-dim" onclick="setCreationMethod('quick')">
+                        <i class="bi bi-lightning-charge me-2"></i> Quick Drinks
                     </button>
-                    <button type="button" id="toggleExperimental" class="btn rounded-pill px-5 py-3 fs-5 text-dim" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
-                        <i class="bi bi-flask me-2"></i> Experimental
+                    <button type="button" id="methodVibe" class="btn rounded-pill px-4 py-2 fs-6 text-dim" onclick="setCreationMethod('vibe')">
+                        <i class="bi bi-palette me-2"></i> Vibe Creation
+                    </button>
+                    <button type="button" id="methodManual" class="btn rounded-pill px-4 py-2 fs-6 text-dim" onclick="setCreationMethod('manual')">
+                        <i class="bi bi-tools me-2"></i> Manual Builder
                     </button>
                 </div>
             </div>
@@ -48,7 +51,7 @@
     <div class="col-lg-12" id="mixerColumn">
         <div class="glass-surface p-4 mb-4">
             <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-gradient-lab">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-lab-accent">
                     <i class="bi bi-flask fs-3"></i>
                 </div>
                 <div>
@@ -67,7 +70,7 @@
                     <div id="scaleContainerCoffee" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
                         <div class="row g-3">
                             <div class="col-md-4 col-sm-12">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK STYLE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK STYLE</label>
                                 <div class="btn-group w-100" id="coffeeStyleBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="styleHot" onclick="setCoffeeStyle('hot')">☕ Hot</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="styleIced" onclick="setCoffeeStyle('iced')">❄️ Iced</button>
@@ -75,7 +78,7 @@
                                 </div>
                             </div>
                             <div class="col-md-4 col-sm-12">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK SIZE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">DRINK SIZE</label>
                                 <div class="btn-group w-100" id="coffeeSizeBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size8oz" onclick="setCoffeeSize(8)">8oz</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="size12oz" onclick="setCoffeeSize(12)">12oz</button>
@@ -84,14 +87,14 @@
                                 </div>
                             </div>
                             <div class="col-md-4 col-sm-12">
-                                <label id="coffeeBaseLabel" class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">COFFEE BASE</label>
+                                <label id="coffeeBaseLabel" class="readout-label d-block mb-2 text-lab-accent fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">COFFEE BASE</label>
                                 <div class="btn-group w-100" id="coffeeBaseBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
                                 </div>
                             </div>
                             <div class="col-md-12 mt-3 animate-fade-in" id="espressoHotModeContainer" style="display: none;">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO STYLE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO STYLE</label>
                                 <div class="btn-group w-100" id="espressoHotModeBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="hotModeShots" onclick="setEspressoHotMode('shots')">Espresso</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="hotModeWater" onclick="setEspressoHotMode('water')">Americano</button>
@@ -104,7 +107,7 @@
                     <div id="scaleContainerSoda" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
                         <div class="row g-3">
                             <div class="col-md-6 col-sm-12">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SODA BATCH SCALE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SODA BATCH SCALE</label>
                                 <div class="btn-group w-100" id="sodaScaleBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale1L" onclick="setBottleScale(1.0)">1.0L Bottle</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale05L" onclick="setBottleScale(0.5)">0.5L Bottle</button>
@@ -112,7 +115,7 @@
                                 </div>
                             </div>
                             <div class="col-md-6 col-sm-12">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SWEETNESS STYLE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SWEETNESS STYLE</label>
                                 <div class="btn-group w-100" id="sodaSweetnessStyleBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="sweetnessCrisp" onclick="setSodaSweetnessStyle('CRISP')">🍃 Crisp</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="sweetnessCraft" onclick="setSodaSweetnessStyle('CRAFT')">🧪 Craft</button>
@@ -126,7 +129,7 @@
                     <div id="scaleContainerCryo" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none !important;">
                         <div class="row g-3">
                             <div class="col-md-10 col-sm-12 mx-auto">
-                                <label class="readout-label d-block mb-2 text-gradient-lab fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SLUSHIE BATCH SCALE</label>
+                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold text-center" style="font-size: 0.75rem; letter-spacing: 1px;">SLUSHIE BATCH SCALE</label>
                                 <div class="btn-group w-100" id="cryoScaleBtns">
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="scale16oz" onclick="setBottleScale(0.5)">16oz Batch</button>
                                     <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="scale32oz" onclick="setBottleScale(1.0)">32oz Batch</button>
@@ -140,7 +143,7 @@
                     <div class="d-flex justify-content-between align-items-end mb-2">
                         <label class="readout-label mb-0">Current Compound</label>
                         <div class="d-flex gap-2 align-items-center">
-                            <button type="button" class="btn btn-sm btn-outline-info px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" onclick="stepBack()">
+                            <button type="button" class="btn btn-sm btn-outline-lab px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" onclick="stepBack()">
                                 <i class="bi bi-arrow-left"></i> STEP BACK
                             </button>
                             <div class="dropdown d-inline-block" id="mixBeanDropdownContainer" style="display: none !important;">
@@ -150,7 +153,7 @@
                                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-white border-opacity-10 text-white" aria-labelledby="mixBeanDropdown" id="mixBeanDropdownMenu" style="max-height: 250px; overflow-y: auto;">
                                 </ul>
                             </div>
-                            <button type="button" id="analyzeBtn" class="btn btn-sm btn-outline-info px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" style="display: none;" onclick="triggerFlavorSynthesis()">
+                            <button type="button" id="analyzeBtn" class="btn btn-sm btn-outline-lab px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" style="display: none;" onclick="triggerFlavorSynthesis()">
                                 <i class="bi bi-cpu"></i> ANALYZE COMPOUND
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-danger px-3 py-1.5 fs-6 opacity-75 hover-opacity-100" onclick="resetMixer()">
@@ -171,7 +174,7 @@
                     <div id="synthesisReportContainer" class="mt-4 pt-4 border-top border-white border-opacity-10" style="display: none;">
                         <div class="glass-surface p-4 border-lab">
                             <div class="d-flex align-items-center gap-2 mb-3">
-                                <i class="bi bi-cpu text-gradient-lab fs-5"></i>
+                                <i class="bi bi-cpu text-lab-accent fs-5"></i>
                                 <h6 class="readout-label mb-0">SYNTHESIS ANALYSIS REPORT</h6>
                             </div>
                             <div id="synthesisReportBody" class="small text-white opacity-90" style="line-height: 1.6;"></div>
@@ -179,14 +182,55 @@
                     </div>
                 </div>
                 
-                <div id="stepContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5">
-                    <div class="d-flex justify-content-between align-items-center mb-4 w-100" id="stepHeader">
-                        <h5 class="fw-bold mb-0 text-gradient-lab" id="stepTitle">Step 1: Select Base Component</h5>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" onclick="surpriseMe()" id="surpriseBtn">
-                                <i class="bi bi-dice-3 me-1"></i> SURPRISE ME
+                <div class="d-flex justify-content-center mb-2">
+                    <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
+                        <button type="button" id="toggleStandard" class="btn rounded-pill px-4 py-2 fs-6 active-lab-mode fw-bold" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
+                            <i class="bi bi-shield-check"></i> Standard Mode
+                        </button>
+                        <button type="button" id="toggleExperimental" class="btn rounded-pill px-4 py-2 fs-6 text-dim fw-bold" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
+                            <i class="bi bi-flask"></i> Experimental Mode
+                        </button>
+                    </div>
+                </div>
+
+                <div id="methodIdleContainer" class="p-5 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5 text-center">
+                    <i class="bi bi-magic fs-1 text-dim mb-3 d-block"></i>
+                    <h5 class="fw-bold text-white mb-2">Select a Creation Method</h5>
+                    <p class="text-muted small mx-auto" style="max-width: 400px;">
+                        Choose Quick Drinks for AI recommendations, Vibe Creation for a mood-based drink, or Manual Builder to construct it yourself.
+                    </p>
+                </div>
+
+                <div id="aiQuickContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-4 w-100">
+                        <h5 class="fw-bold mb-0 text-lab-accent">Quick Recommendations</h5>
+                        <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" style="display: none;" onclick="generateQuickRecommendations()" id="btnGenerateQuick">
+                            <i class="bi bi-lightning-charge me-1"></i> GENERATE MORE
+                        </button>
+                    </div>
+                    <div id="quickDrinksList" class="d-flex flex-column gap-3">
+                        <!-- Streamed cards will appear here -->
+                    </div>
+                </div>
+
+                <div id="aiVibeContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5" style="display: none;">
+                    <div class="mb-4">
+                        <h5 class="fw-bold mb-3 text-lab-accent">Vibe Creation</h5>
+                        <div class="input-group mb-3">
+                            <input type="text" id="vibePromptInput" class="form-control bg-dark border-white border-opacity-10 text-white" placeholder="Describe a flavor, feeling, or vibe (e.g. 'A spicy tropical sunset')">
+                            <button class="btn btn-outline-experimental border-white border-opacity-10 px-4" type="button" onclick="generateVibeDrink()" id="btnGenerateVibe">
+                                <i class="bi bi-magic me-1"></i> SUBMIT
                             </button>
                         </div>
+                    </div>
+                    <div id="vibeDrinkResult" class="d-flex flex-column gap-3">
+                        <!-- Streamed result card will appear here -->
+                    </div>
+                </div>
+
+                <div id="stepContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-4 w-100" id="stepHeader">
+                        <h5 class="fw-bold mb-0 text-lab-accent" id="stepTitle">Step 1: Select Base Component</h5>
                     </div>
                     
                     <!-- 🧠 Neural & Algorithmic Suggestion Substrate -->
@@ -232,7 +276,7 @@
                                 <span class="fw-bold fs-5 mb-2">{% if ingredient.favorite %}★ {% endif %}{% if ingredient.show_brand and ingredient.brand %}{{ ingredient.name }} ({{ ingredient.brand }}){% else %}{{ ingredient.name }}{% endif %}</span>
                                 <span class="badge-fizz bg-{{ ingredient.category|lower }}">{{ ingredient.category }}</span>
                                 <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
-                                    <span class="text-gradient-lab font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
+                                    <span class="text-lab-accent font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
                                     <span class="text-experimental font-monospace">A: {{ ingredient.accent_suitability|floatformat:1 }}</span>
                                 </div>
                             </div>
@@ -249,7 +293,7 @@
                     <!-- Partitioned Sub-Containers for Base Selection -->
                     <div id="partitionedBasesContainer" class="w-100">
                         <div id="recommendedBasesGroup" class="mb-4">
-                            <h6 class="readout-label mb-3 text-gradient-lab" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
+                            <h6 class="readout-label mb-3 text-lab-accent" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
                             <div class="row g-3" id="recommendedBasesList"></div>
                         </div>
                         <div id="unorthodoxBasesGroup" class="mb-4">
@@ -267,7 +311,7 @@
                                 <input type="text" class="form-control bg-dark border-white border-opacity-10 text-white" 
                                        name="name" id="recipeNameField" placeholder="Enter a name..." required>
                                 <button class="btn btn-outline-secondary border-white border-opacity-10" type="button" id="suggestBtn" onclick="fetchSuggestName()">
-                                    <i class="bi bi-magic text-gradient-lab"></i>
+                                    <i class="bi bi-magic text-lab-accent"></i>
                                 </button>
                             </div>
                         </div>

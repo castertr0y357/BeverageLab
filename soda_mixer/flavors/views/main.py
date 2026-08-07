@@ -15,8 +15,8 @@ from ..recommendations import calculate_recipe_stats
 
 logger = logging.getLogger(__name__)
 
-def home(request: HttpRequest) -> HttpResponse:
-    """Home page with ingredient mixer and Hall of Fame stats."""
+def dashboard(request: HttpRequest) -> HttpResponse:
+    """Dashboard page with Hall of Fame stats and entry points to the labs."""
     ingredients = list(Ingredient.objects.filter(is_in_inventory=True))
 
     # Calculate multibrand names in active inventory
@@ -63,7 +63,7 @@ def home(request: HttpRequest) -> HttpResponse:
     last_7_days = timezone.now() - timedelta(days=7)
     kitchen_velocity = MixHistory.objects.filter(mixed_at__gte=last_7_days).count()
 
-    return render(request, 'flavors/home.html', {
+    return render(request, 'flavors/dashboard.html', {
         'ingredients': ingredients,
         'velocity': kitchen_velocity,
         'stats_json': json.dumps(stats_by_theme),

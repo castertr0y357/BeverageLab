@@ -35,7 +35,7 @@
 {% block content %}
 <div class="glass-surface p-4 mb-4 d-flex justify-content-between align-items-center border-lab">
     <div>
-        <h2 class="mb-0 text-white">REAGENT <span class="text-gradient-lab">REGISTRY</span></h2>
+        <h2 class="mb-0 text-white">REAGENT <span class="text-lab-accent">REGISTRY</span></h2>
         <p class="text-dim mb-0">Baseline components available for synthesis and extraction.</p>
     </div>
     <div class="d-flex align-items-center gap-3">
@@ -163,7 +163,7 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="readout-label" style="font-size: 0.55rem;">BASE SUITABILITY</span>
-                    <span class="text-gradient-lab fw-bold font-monospace" style="font-size: 0.65rem;">{{ ingredient.base_suitability|floatformat:1 }}/5.0</span>
+                    <span class="text-lab-accent fw-bold font-monospace" style="font-size: 0.65rem;">{{ ingredient.base_suitability|floatformat:1 }}/5.0</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="readout-label" style="font-size: 0.55rem;">ACCENT SUITABILITY</span>
@@ -258,7 +258,7 @@
             class="modal-content glass-surface border-white border-opacity-10">
             {% csrf_token %}
             <div class="modal-header border-bottom border-white border-opacity-10">
-                <h5 class="modal-title text-white"><i class="bi bi-plus-lg text-gradient-lab"></i> Register Material</h5>
+                <h5 class="modal-title text-white"><i class="bi bi-plus-lg text-lab-accent"></i> Register Material</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-body">
@@ -310,7 +310,7 @@
                 </div>
                 <!-- Coffee-Specific Fields Container -->
                 <div id="addCoffeeFields" style="display: none;" class="border border-white border-opacity-10 rounded p-3 mb-3 bg-dark bg-opacity-25">
-                    <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-gradient-lab"></i> Coffee Material Specs</h6>
+                    <h6 class="text-white mb-3 fw-bold small uppercase tracking-wider"><i class="bi bi-cup-hot text-lab-accent"></i> Coffee Material Specs</h6>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label text-white fw-bold small">Origin</label>

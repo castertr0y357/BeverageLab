@@ -183,6 +183,8 @@ def add_recipe_api(request: HttpRequest) -> JsonResponse:
         description = data.get('description', '')
         ingredients = data.get('ingredients', [])
         drink_type = data.get('drink_type', 'SODA').upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
 
         if not name:
             logger.warning("RecipeCreationAPI - Warning - Name field is empty during API recipe creation.")
@@ -222,6 +224,7 @@ def add_recipe_api(request: HttpRequest) -> JsonResponse:
         logger.info(f"RecipeCreationAPI - Info - API recipe created: {recipe.name} (ID: {recipe.id})")
         return JsonResponse({
             'id': recipe.id,
+            'uuid': str(recipe.uuid),
             'name': recipe.name,
             'message': 'Recipe created successfully'
         }, status=201)
@@ -275,6 +278,8 @@ def save_mix_to_history_api(request: HttpRequest) -> JsonResponse:
         data = json.loads(request.body)
         ingredients = data.get('ingredients', [])  # [{id, amount}, ...]
         drink_type = data.get('drink_type', 'SODA').upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
 
         if not ingredients:
             logger.warning("HistoryMixSave - Warning - No ingredients provided for mixing history.")

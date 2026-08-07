@@ -34,8 +34,8 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         is_espresso_base = False
     
     for ing in ingredients_input:
-        pstate = str(ing.get('physical_state', '')).upper()
-        itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
+        pstate = str(ing.get('physical_state') or '').upper()
+        itype = str(ing.get('ingredient_type') or ing.get('type') or '').upper()
         is_coffee = (pstate == 'SOLID_EXTRACTABLE') if pstate else (itype == 'COFFEE_BEAN')
         if is_coffee:
             base_type = str(ing.get('coffee_base_type', '')).lower()
@@ -63,13 +63,15 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     has_seen_dairy = False
 
     for idx, ing in enumerate(ingredients_input):
-        pstate = str(ing.get('physical_state', '')).upper()
-        mfunc = str(ing.get('mixology_function', '')).upper()
-        itype = str(ing.get('ingredient_type', ing.get('type', ''))).upper()
+        pstate = str(ing.get('physical_state') or '').upper()
+        mfunc = str(ing.get('mixology_function') or '').upper()
+        itype = str(ing.get('ingredient_type') or ing.get('type') or '').upper()
         
         is_coffee = (pstate == 'SOLID_EXTRACTABLE') if pstate else (itype == 'COFFEE_BEAN')
         is_dairy = (mfunc == 'VOLUME_BASE' and pstate == 'LIQUID') if mfunc else (itype == 'DAIRY')
         is_modifier = (mfunc in ['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH']) if mfunc else (itype in ['ADDITIVE', 'OTHER', 'SODA_SYRUP'])
+        
+        logger.info(f"CoffeeChemistry - Partitioning - [{idx}] Name: {ing.get('name')}, Type: {ing.get('type')}, IngType: {ing.get('ingredient_type')}, pstate: {pstate}, mfunc: {mfunc}, itype: {itype} -> is_coffee: {is_coffee}, is_dairy: {is_dairy}, is_modifier: {is_modifier}")
         
         if is_coffee:
             coffee_inputs.append(ing)
@@ -151,7 +153,15 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         # Read scores resiliently
         body = float(c.get('body_intensity', c.get('intensity', 3.0)))
         acidity = float(c.get('acidity_score', c.get('acidity', 3.0)))
-        bitter = float(c.get('bitterness_score', c.get('bitterness', 3.0)))
+        
+        bitter_raw = c.get('bitterness_score')
+        if bitter_raw is None:
+            bitter_raw = c.get('bitterness')
+        if not bitter_raw or float(bitter_raw) == 0.0:
+            bitter = 4.0  # Sensible default for coffee beans if stripped
+        else:
+            bitter = float(bitter_raw)
+        
         
         calculated_body += ratio * body
         calculated_acidity += ratio * acidity
@@ -228,6 +238,9 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
     # Cold Sugar Tax: expand modifier cap by absolute +2% if drink style is Iced.
     if "iced" in drink_cat_lower:
         modifier_cap_pct += 0.02
+        
+    if is_short_milk:
+        modifier_cap_pct = 0.04
 
     modifier_cap = liquid_budget_oz * modifier_cap_pct
 
@@ -317,28 +330,23 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
         else:
             shot_count = 4
         coffee_base_vol = round(shot_count * 0.9, 2)
-        
-        if is_short_milk:
-            hot_water_vol = 0.0
-        else:
-            if americano_toggle:
-                hot_water_vol = coffee_base_vol  # 1:1 dilution ratio
-            else:
-                hot_water_vol = 0.0
+        hot_water_vol = 0.0
     else:
         # Route B: Standard Brew
         shot_count = 0
+        hot_water_vol = 0.0
         if "iced" in drink_cat_lower:
             coffee_base_vol = round(liquid_budget_oz * 0.70, 2)
         else:
             coffee_base_vol = round(cup_size_oz * 0.70, 2)
-        hot_water_vol = 0.0
-        if is_short_milk:
-            recipe_validation = "Warning"
-            validation_notes = "Warning: Standard Brew is incompatible with Pure Espresso / Short Milk format."
 
     # 5. Dynamic Whole Milk / Dairy Payload (Floating Filler Rule)
-    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget - hot_water_vol
+    if is_short_milk and dairy_inputs:
+        # For short milk drinks (Cortado/Macchiato), the cup size is just the shot count.
+        # We expand the liquid budget to allow for a 1:1 milk-to-espresso ratio.
+        liquid_budget_oz = (coffee_base_vol * 2.0) + modifier_budget
+        
+    secondary_liquid_vol = liquid_budget_oz - coffee_base_vol - modifier_budget
     if secondary_liquid_vol < 0.0:
         secondary_liquid_vol = 0.0
 
@@ -448,15 +456,10 @@ def coffee_chemistry_api(request: HttpRequest) -> JsonResponse:
 
     # Base Modifiers format
     base_modifiers_output = []
-    if hot_water_vol > 0.0:
+    if ice_volume_oz > 0.0:
         base_modifiers_output.append({
-            "name": "Hot Water (Americano Toggle)",
-            "volume_oz": hot_water_vol
-        })
-    if ice_melt_water_vol > 0.0:
-        base_modifiers_output.append({
-            "name": "Ice Melt Water",
-            "volume_oz": ice_melt_water_vol
+            "name": "Ice",
+            "volume_oz": ice_volume_oz
         })
 
     def format_list_with_and(items: List[str]) -> str:

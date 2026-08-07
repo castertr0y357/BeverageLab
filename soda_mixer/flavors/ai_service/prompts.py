@@ -141,6 +141,37 @@ class AIPromptsMixin:
         return schema
 
     @classmethod
+    def get_recipe_json_schema(cls, enable_thinking=False):
+        return {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "ingredients": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "amount": {"type": "number"}
+                        },
+                        "required": ["name", "amount"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            "required": ["name", "description", "ingredients"],
+            "additionalProperties": False
+        }
+
+    @classmethod
+    def get_recipe_list_json_schema(cls, enable_thinking=False):
+        return {
+            "type": "array",
+            "items": cls.get_recipe_json_schema(enable_thinking)
+        }
+
+    @classmethod
     def get_surprise_mix_json_schema(cls, enable_thinking=False):
         schema = {
             "type": "object",

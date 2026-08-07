@@ -1,0 +1,14 @@
+{% extends 'flavors/layouts/lab_base.html' %}
+{% load static %}
+
+{% block lab_content %}
+    {% include 'flavors/components/vibe_creator_old.html' %}
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script id="ingredients-data" type="application/json">
+        {{ ingredients_json|safe }}
+    </script>
+    <script src="{% static 'js/lab_vibe.js' %}?v=7"></script>
+{% endblock %}

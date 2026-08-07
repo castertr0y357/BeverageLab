@@ -9,30 +9,19 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Custom Carbonated Glass CSS -->
-    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}?v=2" rel="stylesheet">
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     {% block extra_css %}{% endblock %}
-    
-    <script>
-        // Immediate theme application to prevent FOUC
-        (function() {
-            const savedMode = localStorage.getItem('lab_mode') || 'SODA';
-            if (savedMode === 'COFFEE') {
-                document.documentElement.classList.add('theme-coffee');
-            } else if (savedMode === 'SLUSHIE') {
-                document.documentElement.classList.add('theme-slushie');
-            }
-        })();
-    </script>
+
 </head>
-<body class="{% if request.resolver_match.url_name == 'home' %}home-page{% endif %}">
+<body class="{% if request.resolver_match.url_name == 'dashboard' %}home-page{% endif %}">
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top mb-4">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'home' %}">
-                <div class="fizzing text-gradient-lab fs-3">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'dashboard' %}">
+                <div class="fizzing text-lab-accent fs-3">
                     <i class="bi bi-flask"></i>
                 </div>
-                <span class="fw-bold tracking-tight text-white">BEVERAGE <span class="text-gradient-lab">LABORATORY</span></span>
+                <span class="fw-bold tracking-tight text-white">BEVERAGE <span class="text-lab-accent">LABORATORY</span></span>
             </a>
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -40,7 +29,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto gap-2">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">Synthesis Terminal</a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Synthesis Terminal</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.resolver_match.url_name == 'ingredient_list' or request.resolver_match.url_name == 'ingredient_detail' %}active{% endif %}" href="{% url 'ingredient_list' %}">Reagent Registry</a>
@@ -95,7 +84,7 @@
 
     <footer class="mt-auto py-5 border-top border-white border-opacity-10">
         <div class="container text-center">
-            <div class="text-gradient-lab fw-bold mb-2">BEVERAGE LABORATORY v3.0</div>
+            <div class="text-lab-accent fw-bold mb-2">BEVERAGE LABORATORY v3.0</div>
             <p class="text-dim small mb-0">&copy; 2026 Beverage Laboratory Research Group. Experiment responsibly.</p>
         </div>
     </footer>

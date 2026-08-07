@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+    <script>
+        // Immediate theme application to prevent FOUC based on server context
+        (function() {
+            const mode = "{{ lab_type|upper }}";
+            if (mode === 'COFFEE') {
+                document.documentElement.classList.add('theme-coffee');
+            } else if (mode === 'CRYO' || mode === 'SLUSHIE') {
+                document.documentElement.classList.add('theme-cryo');
+            } else {
+                document.documentElement.classList.add('theme-soda');
+            }
+        })();
+    </script>
+{% endblock %}
+
+{% block title %}{{ lab_type|title }} Lab - Beverage Laboratory{% endblock %}
+
+{% block content %}
+<div class="row mb-1 py-1">
+    <div class="col-12 text-center">
+        <!-- Global Feedback Substrate -->
+        {% if messages %}
+        <div class="container mt-3" style="max-width: 600px;">
+            {% for message in messages %}
+            <div class="alert bg-{{ message.tags|default:'info' }} bg-opacity-10 border border-{{ message.tags|default:'info' }} border-opacity-20 text-{{ message.tags|default:'info' }} small py-2 alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle me-2"></i> {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.5rem;"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="d-flex justify-content-center gap-3 mt-4">
+            <a href="{% url 'lab_dispatcher' 'soda' %}" class="btn btn-glass-toggle px-5 py-3 fs-4 {% if lab_type == 'SODA' %}active{% endif %}">
+                <i class="bi bi-water"></i> Soda Lab
+            </a>
+            <a href="{% url 'lab_dispatcher' 'coffee' %}" class="btn btn-glass-toggle px-5 py-3 fs-4 {% if lab_type == 'COFFEE' %}active{% endif %}">
+                <i class="bi bi-cup-hot"></i> Coffee Lab
+            </a>
+            <a href="{% url 'lab_dispatcher' 'cryo' %}" class="btn btn-glass-toggle px-5 py-3 fs-4 {% if lab_type == 'CRYO' %}active{% endif %}">
+                <i class="bi bi-snow"></i> Cryo Lab
+            </a>
+        </div>
+
+        <!-- Creation Method Toggle -->
+        <div class="d-flex justify-content-center mt-3 gap-3">
+            <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
+                <a href="{% url 'lab_view' lab_type|lower 'quick' %}" class="btn rounded-pill px-4 py-2 fs-6 {% if mode == 'quick' %}active-lab-mode fw-bold{% else %}text-dim{% endif %}">
+                    <i class="bi bi-lightning-charge me-2"></i> Quick Drinks
+                </a>
+                <a href="{% url 'lab_view' lab_type|lower 'vibe' %}" class="btn rounded-pill px-4 py-2 fs-6 {% if mode == 'vibe' %}active-lab-mode fw-bold{% else %}text-dim{% endif %}">
+                    <i class="bi bi-palette me-2"></i> Vibe Creation
+                </a>
+                <a href="{% url 'lab_view' lab_type|lower 'manual' %}" class="btn rounded-pill px-4 py-2 fs-6 {% if mode == 'manual' %}active-lab-mode fw-bold{% else %}text-dim{% endif %}">
+                    <i class="bi bi-tools me-2"></i> Manual Builder
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-2">
+    <div class="col-lg-12" id="mixerColumn">
+        <div class="glass-surface p-4 mb-4">
+
+            <form id="mixerForm" action="{% url 'create_recipe' %}" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="drink_type" id="drinkTypeField" value="{{ lab_type }}">
+                <input type="hidden" name="coffee_style" id="coffeeStyleField" value="">
+                <input type="hidden" name="coffee_base_type" id="coffeeBaseTypeField" value="">
+                <input type="hidden" name="drink_size_oz" id="drinkSizeOzField" value="">
+                <input type="hidden" name="lab_mode" id="labModeField" value="{{ mode }}">
+                
+                {% block lab_content %}{% endblock %}
+                
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .resonance-glow { box-shadow: 0 0 10px rgba(var(--lab-accent-rgb), 0.3); }
+    .dot-accent { background-color: var(--lab-accent); border-radius: 50%; display: inline-block; }
+    
+    .border-favorite {
+        border: 1px solid rgba(255, 193, 7, 0.45) !important;
+    }
+    .glow-favorite {
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.25);
+        animation: favorite-pulse 3s infinite ease-in-out;
+    }
+    @keyframes favorite-pulse {
+        0%, 100% { box-shadow: 0 0 10px rgba(255, 193, 7, 0.2); }
+        50% { box-shadow: 0 0 18px rgba(255, 193, 7, 0.4); }
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script id="ingredients-data" type="application/json">
+    {{ ingredients_json|safe }}
+</script>
+<script>
+    window.CSRF_TOKEN = '{{ csrf_token }}';
+    window.CURRENT_LAB = '{{ lab_type }}';
+    window.CURRENT_MODE = '{{ mode }}';
+    
+    // Enforce Theme for current lab
+    localStorage.setItem('lab_mode', window.CURRENT_LAB);
+    document.documentElement.classList.remove('theme-coffee', 'theme-cryo', 'theme-slushie');
+    if (window.CURRENT_LAB === 'COFFEE') {
+        document.documentElement.classList.add('theme-coffee');
+    } else if (window.CURRENT_LAB === 'CRYO') {
+        document.documentElement.classList.add('theme-cryo');
+    }
+</script>
+<!-- Child templates will load their specific JS files here -->
+{% endblock %}

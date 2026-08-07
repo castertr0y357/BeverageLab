@@ -14,11 +14,11 @@
     <div class="col-lg-8">
         <div class="glass-surface p-4 mb-4 border-lab">
             <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-gradient-lab">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-lab-accent">
                     <i class="bi bi-sliders fs-3"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0 text-white">FORMULA <span class="text-gradient-lab">CALIBRATION</span></h3>
+                    <h3 class="mb-0 text-white">FORMULA <span class="text-lab-accent">CALIBRATION</span></h3>
                     <p class="text-dim mb-0">Adjusting molecular balance for <span class="text-white fw-bold">{{ recipe.name }}</span>.</p>
                 </div>
             </div>
@@ -48,7 +48,7 @@
 
                 <!-- Coffee Specific Parameters -->
                 <div id="coffeeParams" class="glass-card p-4 mb-4 border-white border-opacity-10 bg-white bg-opacity-5" style="display: {% if recipe.drink_type == 'COFFEE' %}block{% else %}none{% endif %};">
-                    <h6 class="readout-label mb-4 text-gradient-lab">EXTRACTION PROTOCOLS</h6>
+                    <h6 class="readout-label mb-4 text-lab-accent">EXTRACTION PROTOCOLS</h6>
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="readout-label mb-2">BREW METHOD</label>
@@ -104,7 +104,7 @@
                 </div>
                     
                 <div class="pb-3 mb-4 border-bottom border-white border-opacity-10">
-                    <h5 class="text-gradient-lab mb-0">Active Core Components</h5>
+                    <h5 class="text-lab-accent mb-0">Active Core Components</h5>
                 </div>
                 
                 <div id="selectedIngredientsList" class="mb-5">
@@ -178,7 +178,7 @@
                 </div>
                     
                 <div class="pb-3 mb-4 border-bottom border-white border-opacity-10 mt-5">
-                    <h5 class="text-gradient-lab mb-0">Integrate Additional Compounds</h5>
+                    <h5 class="text-lab-accent mb-0">Integrate Additional Compounds</h5>
                 </div>
                 
                 <div class="row g-3" id="availableIngredients">
@@ -210,15 +210,15 @@
             <h6 class="readout-label mb-3">CALIBRATION PROTOCOLS</h6>
             <ul class="list-unstyled mb-0 small text-dim">
                 <li class="mb-3 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     Balance proportions to maintain sensory equilibrium.
                 </li>
                 <li class="mb-3 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     Insert detailed sensory notes for precise recall.
                 </li>
                 <li class="mb-0 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     Add compounds sequentially to monitor balance shift.
                 </li>
             </ul>

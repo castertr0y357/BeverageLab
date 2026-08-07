@@ -45,13 +45,13 @@ class BeverageLabViewsTest(TestCase):
 
     def test_unauthenticated_user_redirect(self) -> None:
         # LaboratoryAccessMiddleware redirects unauthenticated requests
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('dashboard'))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
 
     def test_authenticated_user_home(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('dashboard'))
         self.assertEqual(response.status_code, 200)
 
     def test_ingredient_list_view(self) -> None:
@@ -514,7 +514,7 @@ class BeverageLabViewsTest(TestCase):
 
     def test_home_page_renders_empty_mode_message_element(self) -> None:
         self.client.login(username="lab_tech", password="secure_password_123")
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('lab_view', args=['soda', 'manual']))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="emptyModeMessage"')
         self.assertContains(response, 'id="stepHeader"')

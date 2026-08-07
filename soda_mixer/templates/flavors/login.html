@@ -12,7 +12,7 @@
         <div class="glass-surface p-5 glow-experimental animate__animated animate__fadeIn">
             <div class="text-center mb-5">
                 <div class="d-inline-block p-3 mb-3 glass-card border-lab-cyan">
-                    <i class="bi bi-shield-lock-fill fs-1 text-gradient-lab"></i>
+                    <i class="bi bi-shield-lock-fill fs-1 text-lab-accent"></i>
                 </div>
                 <h2 class="text-white fw-bold tracking-wider uppercase mb-1">Laboratory Access</h2>
                 <p class="text-dim extra-small ls-1 uppercase">Authentication Protocol Required</p>
@@ -94,7 +94,7 @@ async function handleAccessGrant(e) {
             
             // Redirect after a brief visual confirmation
             setTimeout(() => {
-                window.location.href = "{% url 'home' %}";
+                window.location.href = "{% url 'dashboard' %}";
             }, 800);
         } else {
             feedbackMsg.innerText = data.message || 'Identity verification failed.';

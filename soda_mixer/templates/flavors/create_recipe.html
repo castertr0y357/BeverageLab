@@ -14,11 +14,11 @@
     <div class="col-lg-8">
         <div class="glass-surface p-4 mb-4 border-lab">
             <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-gradient-lab">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-lab-accent">
                     <i class="bi bi-flask fs-3"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0 text-white">FORMULA <span class="text-gradient-lab">SYNTHESIS</span></h3>
+                    <h3 class="mb-0 text-white">FORMULA <span class="text-lab-accent">SYNTHESIS</span></h3>
                     <p class="text-dim mb-0">Define the molecular structure and extraction protocols.</p>
                 </div>
             </div>
@@ -48,7 +48,7 @@
 
                 <!-- Coffee Specific Parameters -->
                 <div id="coffeeParams" class="glass-card p-4 mb-4 border-white border-opacity-10 bg-white bg-opacity-5" style="display: none;">
-                    <h6 class="readout-label mb-4 text-gradient-lab">EXTRACTION PROTOCOLS</h6>
+                    <h6 class="readout-label mb-4 text-lab-accent">EXTRACTION PROTOCOLS</h6>
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="readout-label mb-2">BREW METHOD</label>
@@ -89,7 +89,7 @@
                 </div>
                     
                 <div class="pb-3 mb-4 border-bottom border-white border-opacity-10">
-                    <h5 class="text-gradient-lab mb-0">Materiel Inventory</h5>
+                    <h5 class="text-lab-accent mb-0">Materiel Inventory</h5>
                 </div>
                 
                 <div class="row g-3 mb-4" id="availableIngredients" style="display: none;">
@@ -106,7 +106,7 @@
                             <span class="badge border border-white border-opacity-10 text-dim mb-2" style="font-size: 0.5rem;">{{ ingredient.get_ingredient_type_display }}</span>
                             <span class="badge-fizz bg-{{ ingredient.category }}">{{ ingredient.category }}</span>
                             <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
-                                <span class="text-gradient-lab font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
+                                <span class="text-lab-accent font-monospace">B: {{ ingredient.base_suitability|floatformat:1 }}</span>
                                 <span class="text-experimental font-monospace">A: {{ ingredient.accent_suitability|floatformat:1 }}</span>
                             </div>
                         </div>
@@ -118,7 +118,7 @@
 
                 <div id="partitionedBasesContainer" class="w-100 mb-4">
                     <div id="recommendedBasesGroup" class="mb-4">
-                        <h6 class="readout-label mb-3 text-gradient-lab" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
+                        <h6 class="readout-label mb-3 text-lab-accent" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
                         <div class="row g-3" id="recommendedBasesList"></div>
                     </div>
                     <div id="unorthodoxBasesGroup" class="mb-4">
@@ -128,7 +128,7 @@
                 </div>
                     
                 <div class="pb-3 mb-4 border-bottom border-white border-opacity-10 mt-5">
-                    <h5 class="text-gradient-lab mb-0">Molecular Composition</h5>
+                    <h5 class="text-lab-accent mb-0">Molecular Composition</h5>
                 </div>
                 
                 <div id="selectedIngredientsList">
@@ -149,22 +149,22 @@
             <h6 class="readout-label mb-3">SYNTHESIS PROTOCOLS</h6>
             <ul class="list-unstyled mb-0 small text-dim" id="protocolsList">
                 <li class="mb-3 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     Balance 2-3 compounds for optimal sensory output.
                 </li>
                 <li class="mb-3 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     Offset high-potency levels with milder agents.
                 </li>
                 <li class="mb-3 d-flex gap-2">
-                    <i class="bi bi-shield-check text-gradient-lab"></i>
+                    <i class="bi bi-shield-check text-lab-accent"></i>
                     <span id="unitProtocol">Standard dosage: 0.5ml - 3.0ml per unit.</span>
                 </li>
             </ul>
         </div>
         
         <div class="glass-card p-4 border-white border-opacity-10 bg-primary bg-opacity-5">
-            <h6 class="readout-label mb-3 text-gradient-lab">ANALYSIS PIPELINE</h6>
+            <h6 class="readout-label mb-3 text-lab-accent">ANALYSIS PIPELINE</h6>
             <ol class="small text-dim ps-3 mb-0">
                 <li class="mb-2">Select baseline drink type.</li>
                 <li class="mb-2">Identify primary component specs.</li>

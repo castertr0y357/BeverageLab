@@ -50,7 +50,7 @@
                     <div class="col-md-6">
                         <div class="readout-card p-3 border-lab">
                             <div class="readout-label" style="font-size: 0.65rem; letter-spacing: 1.5px;">BASE SUITABILITY</div>
-                            <div class="fw-bold fs-4 text-gradient-lab">{{ ingredient.base_suitability|floatformat:1 }}/5.0</div>
+                            <div class="fw-bold fs-4 text-lab-accent">{{ ingredient.base_suitability|floatformat:1 }}/5.0</div>
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -123,7 +123,7 @@
     <div class="col-lg-6">
         <div class="glass-surface p-4 h-100">
             <div class="d-flex align-items-center gap-2 mb-4">
-                <i class="bi bi-diagram-3 text-gradient-lab"></i>
+                <i class="bi bi-diagram-3 text-lab-accent"></i>
                 <h5 class="mb-0">Molecular Affinity</h5>
             </div>
             
@@ -149,9 +149,9 @@
             <div class="mt-5 p-4 glass-card border-white border-opacity-5 bg-primary bg-opacity-5">
                 <h6 class="readout-label mb-3">Lab Protocols</h6>
                 <ul class="list-unstyled mb-0 small text-dim">
-                    <li class="mb-2 d-flex gap-2"><i class="bi bi-shield-check text-gradient-lab"></i> Ensure clean equipment for pure extraction.</li>
-                    <li class="mb-2 d-flex gap-2"><i class="bi bi-shield-check text-gradient-lab"></i> Monitor temperature variance closely.</li>
-                    <li class="mb-0 d-flex gap-2"><i class="bi bi-shield-check text-gradient-lab"></i> Document all sensory anomalies.</li>
+                    <li class="mb-2 d-flex gap-2"><i class="bi bi-shield-check text-lab-accent"></i> Ensure clean equipment for pure extraction.</li>
+                    <li class="mb-2 d-flex gap-2"><i class="bi bi-shield-check text-lab-accent"></i> Monitor temperature variance closely.</li>
+                    <li class="mb-0 d-flex gap-2"><i class="bi bi-shield-check text-lab-accent"></i> Document all sensory anomalies.</li>
                 </ul>
             </div>
         </div>
@@ -160,7 +160,7 @@
 
 <div class="row mt-5 mb-5">
     <div class="col-12 text-center">
-        <a href="{% url 'home' %}" class="btn btn-primary btn-lg px-5 py-3">
+        <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg px-5 py-3">
             <i class="bi bi-flask"></i> Begin Synthesis with {{ ingredient.name }}
         </a>
     </div>

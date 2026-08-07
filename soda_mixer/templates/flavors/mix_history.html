@@ -7,10 +7,10 @@
 <div class="glass-surface p-4 mb-4 border-lab">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <h2 class="mb-0 text-white">HISTORICAL <span class="text-gradient-lab">ARCHIVES</span></h2>
+            <h2 class="mb-0 text-white">HISTORICAL <span class="text-lab-accent">ARCHIVES</span></h2>
             <p class="text-dim mb-0">Chronological log of all experimental synthesis and extraction events.</p>
         </div>
-        <a href="{% url 'home' %}" class="btn btn-accent px-4 py-2 fw-black shadow-lg">
+        <a href="{% url 'dashboard' %}" class="btn btn-accent px-4 py-2 fw-black shadow-lg">
             <i class="bi bi-plus-circle me-2"></i> Initiate New Protocol
         </a>
     </div>
@@ -105,7 +105,7 @@
         <i class="bi bi-clock-history display-4 text-dim mb-4 d-block opacity-25"></i>
         <h4 class="text-white mb-2">Historical Ledger is Empty</h4>
         <p class="text-dim mb-4">No chronological records detected. Initiate an experimental synthesis to populate the archives.</p>
-        <a href="{% url 'home' %}" class="btn btn-accent px-5 py-2 fw-black">
+        <a href="{% url 'dashboard' %}" class="btn btn-accent px-5 py-2 fw-black">
             <i class="bi bi-flask me-1"></i> Initiate Synthesis Protocol
         </a>
     </div>
@@ -117,7 +117,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-surface border-white border-opacity-10">
             <div class="modal-header border-white border-opacity-5">
-                <h5 class="modal-title readout-label"><i class="bi bi-journal-plus text-gradient-lab me-2"></i> Promote to Formula</h5>
+                <h5 class="modal-title readout-label"><i class="bi bi-journal-plus text-lab-accent me-2"></i> Promote to Formula</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">

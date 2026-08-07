@@ -9,6 +9,9 @@ let currentLabMode = 'SODA';
     let latestSodaChemistryData = null;
     let latestCryoChemistryData = null;
     let sodaSweetnessStyle = localStorage.getItem('soda_sweetness_style') || 'CRAFT';
+let currentCreationMethod = null;
+let quickDrinksSource = null;
+let vibeDrinkSource = null;
     let currentStepKey = '';
     let stepExcludingIds = [];
     let stepExcludingNames = [];
@@ -629,10 +632,10 @@ function getChemistryAlignedIngredient(ing, idx) {
         const sizeBtns = document.getElementById('coffeeSizeBtns');
         if (shotMode) {
             sizeBtns.innerHTML = `
-                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
-                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
-                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size3oz" onclick="setCoffeeSize(3)">Triple (3oz)</button>
-                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size4oz" onclick="setCoffeeSize(4)">Quad (4oz)</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">1 Shot</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">2 Shots</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size3oz" onclick="setCoffeeSize(3)">3 Shots</button>
+                <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="size4oz" onclick="setCoffeeSize(4)">4 Shots</button>
             `;
             // Force coffee base type to espresso for shots
             coffeeBaseType = 'espresso';
@@ -886,7 +889,10 @@ function getChemistryAlignedIngredient(ing, idx) {
 // 5. EVENT LISTENERS & INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
-        allIngredientsHtml = document.getElementById('availableIngredients').innerHTML;
+        const availIng = document.getElementById('availableIngredients');
+        if (availIng) {
+            allIngredientsHtml = availIng.innerHTML;
+        }
         const simRes = document.getElementById('similarRecipes');
         if (simRes) {
             originalRecipesHtml = simRes.innerHTML;
@@ -895,70 +901,26 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize from localStorage
         const savedMode = localStorage.getItem('lab_mode') || 'SODA';
         const savedRecMode = localStorage.getItem('recommendation_mode') || 'standard';
-
-        const savedCoffeeStyle = localStorage.getItem('coffee_style') || 'hot';
-        const savedCoffeeSizeOz = parseFloat(localStorage.getItem('coffee_size_oz') || '12');
-        const savedCoffeeBaseType = localStorage.getItem('coffee_base_type') || 'espresso';
-        const savedCoffeeBaseAmount = savedCoffeeBaseType === 'espresso'
-            ? parseInt(localStorage.getItem('coffee_base_shots') || '2')
-            : parseInt(localStorage.getItem('coffee_base_brew_oz') || '8');
-
-        setLabMode(savedMode, true); 
-        setRecommendationMode(savedRecMode);
-
-
-        // Apply saved coffee controls (run after setLabMode so DOM is ready)
-        coffeeStyle = savedCoffeeStyle;
-        coffeeSizeOz = savedCoffeeSizeOz;
-        coffeeBaseType = savedCoffeeBaseType;
-        
-        // Sync hidden fields
-        const cStyleField = document.getElementById('coffeeStyleField');
-        const cBaseField = document.getElementById('coffeeBaseTypeField');
-        const cSizeField = document.getElementById('drinkSizeOzField');
-        if (cStyleField) cStyleField.value = savedCoffeeStyle;
-        if (cBaseField) cBaseField.value = savedCoffeeBaseType;
-        if (cSizeField) cSizeField.value = savedCoffeeSizeOz;
-        
-        // Apply saved selections via setters
-        setCoffeeStyle(savedCoffeeStyle);
-        if (savedCoffeeStyle === 'espresso_shot') {
-            const validSize = [1, 2, 3, 4].includes(savedCoffeeSizeOz) ? savedCoffeeSizeOz : 2;
-            setCoffeeSize(validSize);
-        } else {
-            const validSize = [8, 12, 16, 20].includes(savedCoffeeSizeOz) ? savedCoffeeSizeOz : 12;
-            setCoffeeSize(validSize);
-        }
-        setCoffeeBaseType(savedCoffeeBaseType);
+        try { setLabMode(savedMode, true); } catch(e) {}
+        try { setRecommendationMode(savedRecMode); } catch(e) {}
     });
 
     function setRecommendationMode(mode) {
         recommendationMode = mode;
         localStorage.setItem('recommendation_mode', mode);
-        
-        const stdBtn = document.getElementById('toggleStandard');
-        const expBtn = document.getElementById('toggleExperimental');
-        
-        if (mode === 'experimental') {
-            stdBtn.classList.remove('active-lab-mode');
-            stdBtn.classList.add('text-dim');
-            expBtn.classList.add('active-lab-mode');
-            expBtn.classList.remove('text-dim');
-        } else {
-            expBtn.classList.remove('active-lab-mode');
-            expBtn.classList.add('text-dim');
-            stdBtn.classList.add('active-lab-mode');
-            stdBtn.classList.remove('text-dim');
-        }
-        
-        setLabMode(currentLabMode); // Refresh filtering
-        
-        if (selectedIngredients.length > 0) {
-            fetchRecommendations();
-        }
+        try {
+            const stdBtn = document.getElementById('toggleStandard');
+            const expBtn = document.getElementById('toggleExperimental');
+            if (mode === 'experimental') {
+                if (stdBtn) { stdBtn.classList.remove('active-lab-mode'); stdBtn.classList.add('text-dim'); }
+                if (expBtn) { expBtn.classList.add('active-lab-mode'); expBtn.classList.remove('text-dim'); }
+            } else {
+                if (expBtn) { expBtn.classList.remove('active-lab-mode'); expBtn.classList.add('text-dim'); }
+                if (stdBtn) { stdBtn.classList.add('active-lab-mode'); stdBtn.classList.remove('text-dim'); }
+            }
+        } catch(e) {}
+        try { setLabMode(currentLabMode); } catch(e) {}
     }
-
-
 
     function setLabMode(mode, isInit = false) {
         cancelInFlightLLMCalls();
@@ -968,7 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Save to storage
         localStorage.setItem('lab_mode', mode);
-        
+
         // Toggle Global Theme Class
         document.documentElement.classList.remove('theme-coffee', 'theme-slushie');
         if (mode === 'COFFEE') {
@@ -978,10 +940,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Update Buttons
-        document.getElementById('modeSoda').classList.toggle('active', mode === 'SODA');
-        document.getElementById('modeCoffee').classList.toggle('active', mode === 'COFFEE');
-        document.getElementById('modeSlushie').classList.toggle('active', mode === 'SLUSHIE');
-        
+        const modeSoda = document.getElementById('modeSoda');
+        if (modeSoda) modeSoda.classList.toggle('active', mode === 'SODA');
+        const modeCoffee = document.getElementById('modeCoffee');
+        if (modeCoffee) modeCoffee.classList.toggle('active', mode === 'COFFEE');
+        const modeSlushie = document.getElementById('modeSlushie');
+        if (modeSlushie) modeSlushie.classList.toggle('active', mode === 'SLUSHIE');
+
         // Update Filtered Ingredients
         const cards = document.querySelectorAll('#availableIngredients .ingredient-card');
         cards.forEach(card => {
@@ -1031,7 +996,8 @@ document.addEventListener('DOMContentLoaded', function() {
             noRecordsMsg.style.display = visibleCount === 0 ? 'block' : 'none';
         }
         
-        resetMixer();
+        setCreationMethod(document.getElementById('labModeField')?.value || null);
+        try { resetMixer(); } catch(e) {}
     }
 
     function getBadgeColor(category) {
@@ -1379,13 +1345,21 @@ function cancelInFlightLLMCalls() {
         }
     }
 
+    let activeSynthesisEventSource = null;
+
     async function triggerFlavorSynthesis() {
         const reportContainer = document.getElementById('synthesisReportContainer');
         const reportBody = document.getElementById('synthesisReportBody');
+        
+        if (synthesisController) {
+            synthesisController.abort();
+        }
+        synthesisController = new AbortController();
+
         console.log('[Synthesis] triggerFlavorSynthesis called. Mode:', currentLabMode, 'Ingredients:', selectedIngredients.length);
         
         reportContainer.style.display = 'block';
-        reportBody.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div><span class="ms-2 small text-dim">Compiling synthesis report...</span></div>';
+        reportBody.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div><span class="ms-2 small text-dim">Compiling synthesis report...</span></div>';
 
         try {
             if (currentLabMode === 'COFFEE') {
@@ -1415,6 +1389,7 @@ function cancelInFlightLLMCalls() {
                 const chemistryPromise = fetch('/api/coffee/chemistry/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+                    signal: synthesisController.signal,
                     body: JSON.stringify({
                         drink_category: drinkCategory,
                         cup_size_oz: coffeeSizeOz,
@@ -1548,7 +1523,7 @@ function cancelInFlightLLMCalls() {
                     if (data.preparation_steps && data.preparation_steps.length > 0) {
                         prepStepsHtml = `
                             <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
-                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS (SOLUBILITY)</h6>
+                                <h6 class="readout-label text-lab-accent mb-2">PREPARATION STEPS (SOLUBILITY)</h6>
                                 <ol class="small text-white opacity-90 ps-3 mb-0">
                                     ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
                                 </ol>
@@ -1566,7 +1541,7 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="row g-3 mb-3">
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">CHEMISTRY METRICS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">CHEMISTRY METRICS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Body Intensity</span> <span class="fw-bold">${data.aggregate_base_metrics.calculated_body}/5.0</span></div>
                                             <div class="d-flex justify-content-between"><span>Acidity Score</span> <span class="fw-bold">${data.aggregate_base_metrics.calculated_acidity}/5.0</span></div>
@@ -1578,7 +1553,7 @@ function cancelInFlightLLMCalls() {
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">VOLUMETRIC BUDGETS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Drink Category</span> <span class="fw-bold">${drinkCategory}</span></div>
                                             <div class="d-flex justify-content-between"><span>Target Cup Size</span> <span class="fw-bold">${coffeeSizeOz} oz</span></div>
@@ -1589,7 +1564,7 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3 mb-3">
-                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTION RATIOS</h6>
+                                    <h6 class="readout-label text-lab-accent mb-2">CALCULATED EXTRACTION RATIOS</h6>
                                     <div class="small">
                                         <div class="mb-2">
                                             <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">COFFEE BASE MIX</span>
@@ -1607,11 +1582,11 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">BARISTA RECOMMENDATIONS</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">BARISTA RECOMMENDATIONS</h6>
                                     <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
                                         <span id="aiBaristaNotesText"></span>
                                         <div id="aiBaristaNotesSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Consulting mixologist...</span>
                                         </div>
                                     </div>
@@ -1620,11 +1595,11 @@ function cancelInFlightLLMCalls() {
                                 ${prepStepsHtml}
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">OVERALL PROFILE DESCRIPTION</h6>
                                     <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
                                         <span id="aiProfileText"></span>
                                         <div id="aiProfileSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Synthesizing profile...</span>
                                         </div>
                                     </div>
@@ -1633,17 +1608,18 @@ function cancelInFlightLLMCalls() {
                         </div>
                     `;
                     
-                    // Native SSE consumption (replaces HTMX)
-                    const eventSource = new EventSource(sseUrl);
+                    // Native SSE consumption
+                    if (activeSynthesisEventSource) activeSynthesisEventSource.close();
+                    activeSynthesisEventSource = new EventSource(sseUrl);
                     
-                    eventSource.addEventListener('message', function(e) {
+                    activeSynthesisEventSource.addEventListener('message', function(e) {
                         const textSpan = reportBody.querySelector('#aiProfileText');
                         if (textSpan) {
                             textSpan.innerHTML += e.data;
                         }
                     });
                     
-                    eventSource.addEventListener('mixologist_notes', function(e) {
+                    activeSynthesisEventSource.addEventListener('mixologist_notes', function(e) {
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
                         const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
@@ -1652,18 +1628,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
-                    eventSource.addEventListener('remove_spinner', function(e) {
+                    activeSynthesisEventSource.addEventListener('remove_spinner', function(e) {
                         const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
                         if (profileSpinner) profileSpinner.remove();
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     });
                     
-                    eventSource.onerror = function(e) {
+                    activeSynthesisEventSource.onerror = function(e) {
                         const spinner = reportBody.querySelector('#aiProfileSpinner');
                         if (spinner) spinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     };
 
                     // Scroll to report
@@ -1682,6 +1660,7 @@ function cancelInFlightLLMCalls() {
                 const chemistryPromise = fetch('/api/soda/chemistry/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+                    signal: synthesisController.signal,
                     body: JSON.stringify({
                         sweetness_style: sodaSweetnessStyle,
                         bottle_scale: bottleScale,
@@ -1745,7 +1724,7 @@ function cancelInFlightLLMCalls() {
                     if (data.preparation_steps && data.preparation_steps.length > 0) {
                         prepStepsHtml = `
                             <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
-                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS</h6>
+                                <h6 class="readout-label text-lab-accent mb-2">PREPARATION STEPS</h6>
                                 <ol class="small text-white opacity-90 ps-3 mb-0">
                                     ${data.preparation_steps.map(step => `<li class="mb-1">${step}</li>`).join('')}
                                 </ol>
@@ -1768,7 +1747,7 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="row g-3 mb-3">
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">CHEMISTRY METRICS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">CHEMISTRY METRICS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Sweetness Rating</span> <span class="fw-bold">${data.extraction_analysis.sweetness}/5.0</span></div>
                                             <div class="d-flex justify-content-between"><span>Acidity Score</span> <span class="fw-bold">${data.extraction_analysis.acidity}/5.0</span></div>
@@ -1776,7 +1755,7 @@ function cancelInFlightLLMCalls() {
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">VOLUMETRIC BUDGETS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Sweetness Style</span> <span class="fw-bold">${data.drink_metrics.sweetness_style}</span></div>
                                             <div class="d-flex justify-content-between"><span>Batch Scale</span> <span class="fw-bold">${targetLabel}</span></div>
@@ -1787,7 +1766,7 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3 mb-3">
-                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTS</h6>
+                                    <h6 class="readout-label text-lab-accent mb-2">CALCULATED EXTRACTS</h6>
                                     <div class="small">
                                         <div class="mb-2">
                                             <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">WATER BASE</span>
@@ -1801,11 +1780,11 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">MIXOLOGIST NOTES</h6>
                                     <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
                                         <span id="aiBaristaNotesText"></span>
                                         <div id="aiBaristaNotesSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Consulting mixologist...</span>
                                         </div>
                                     </div>
@@ -1814,11 +1793,11 @@ function cancelInFlightLLMCalls() {
                                 ${prepStepsHtml}
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">OVERALL PROFILE DESCRIPTION</h6>
                                     <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
                                         <span id="aiProfileText"></span>
                                         <div id="aiProfileSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Synthesizing profile...</span>
                                         </div>
                                     </div>
@@ -1826,18 +1805,19 @@ function cancelInFlightLLMCalls() {
                             </div>
                         </div>
                     `;
+
+                    // Native SSE consumption
+                    if (activeSynthesisEventSource) activeSynthesisEventSource.close();
+                    activeSynthesisEventSource = new EventSource(sseUrl);
                     
-                    // Native SSE consumption (replaces HTMX)
-                    const eventSource = new EventSource(sseUrl);
-                    
-                    eventSource.addEventListener('message', function(e) {
+                    activeSynthesisEventSource.addEventListener('message', function(e) {
                         const textSpan = reportBody.querySelector('#aiProfileText');
                         if (textSpan) {
                             textSpan.innerHTML += e.data;
                         }
                     });
                     
-                    eventSource.addEventListener('mixologist_notes', function(e) {
+                    activeSynthesisEventSource.addEventListener('mixologist_notes', function(e) {
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
                         const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
@@ -1846,18 +1826,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
-                    eventSource.addEventListener('remove_spinner', function(e) {
+                    activeSynthesisEventSource.addEventListener('remove_spinner', function(e) {
                         const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
                         if (profileSpinner) profileSpinner.remove();
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     });
                     
-                    eventSource.onerror = function(e) {
+                    activeSynthesisEventSource.onerror = function(e) {
                         const spinner = reportBody.querySelector('#aiProfileSpinner');
                         if (spinner) spinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     };
 
                     // Scroll to report
@@ -1872,10 +1854,15 @@ function cancelInFlightLLMCalls() {
                     return ingCopy;
                 });
 
+                if (synthesisController) synthesisController.abort();
+                synthesisController = new AbortController();
+
                 const chemistryPromise = fetch('/api/cryo/chemistry/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+                    signal: synthesisController.signal,
                     body: JSON.stringify({
+                        sweetness_style: sodaSweetnessStyle,
                         bottle_scale: bottleScale,
                         ingredients: mappedIngredients
                     })
@@ -1943,7 +1930,7 @@ function cancelInFlightLLMCalls() {
                         });
                         prepStepsHtml = `
                             <div class="border-top border-white border-opacity-10 pt-3 mb-3 animate-fade-in">
-                                <h6 class="readout-label text-gradient-lab mb-2">PREPARATION STEPS (SOLUBILITY & FREEZING)</h6>
+                                <h6 class="readout-label text-lab-accent mb-2">PREPARATION STEPS (SOLUBILITY & FREEZING)</h6>
                                 <ol class="small text-white opacity-90 ps-3 mb-0">
                                     ${updatedSteps.map(step => `<li class="mb-1">${step}</li>`).join('')}
                                 </ol>
@@ -1967,7 +1954,7 @@ function cancelInFlightLLMCalls() {
 
                                 <div class="row g-3 mb-3">
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">FREEZING PHYSICS METRICS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">FREEZING PHYSICS METRICS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Sugar Density (Brix)</span> <span class="fw-bold">${data.drink_metrics.achieved_brix}% Brix</span></div>
                                             <div class="d-flex justify-content-between"><span>Perceived Sweetness</span> <span class="fw-bold">${data.extraction_analysis.sweetness}/5.0</span></div>
@@ -1976,7 +1963,7 @@ function cancelInFlightLLMCalls() {
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6 class="readout-label text-gradient-lab mb-2">VOLUMETRIC BUDGETS</h6>
+                                        <h6 class="readout-label text-lab-accent mb-2">VOLUMETRIC BUDGETS</h6>
                                         <div class="d-flex flex-column gap-1 small">
                                             <div class="d-flex justify-content-between"><span>Batch Scale Target</span> <span class="fw-bold">${targetLabel}</span></div>
                                             <div class="d-flex justify-content-between"><span>Total Liquid Inputs</span> <span class="fw-bold">${data.drink_metrics.target_volume_ml} ml</span></div>
@@ -1987,7 +1974,7 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3 mb-3">
-                                    <h6 class="readout-label text-gradient-lab mb-2">CALCULATED EXTRACTS</h6>
+                                    <h6 class="readout-label text-lab-accent mb-2">CALCULATED EXTRACTS</h6>
                                     <div class="small">
                                         <div class="mb-2">
                                             <span class="text-dim d-block mb-1" style="font-size: 0.65rem;">DYNAMIC VOLUME FILLER</span>
@@ -2001,11 +1988,11 @@ function cancelInFlightLLMCalls() {
                                 </div>
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">MIXOLOGIST NOTES</h6>
                                     <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
                                         <span id="aiBaristaNotesText"></span>
                                         <div id="aiBaristaNotesSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Consulting mixologist...</span>
                                         </div>
                                     </div>
@@ -2014,11 +2001,11 @@ function cancelInFlightLLMCalls() {
                                 ${prepStepsHtml}
 
                                 <div class="border-top border-white border-opacity-10 pt-3">
-                                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                                    <h6 class="readout-label text-lab-accent mb-1">OVERALL PROFILE DESCRIPTION</h6>
                                     <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
                                         <span id="aiProfileText"></span>
                                         <div id="aiProfileSpinner" class="mt-2">
-                                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                             <span class="ms-2 text-dim small">Synthesizing profile...</span>
                                         </div>
                                     </div>
@@ -2027,17 +2014,18 @@ function cancelInFlightLLMCalls() {
                         </div>
                     `;
                     
-                    // Native SSE consumption (replaces HTMX)
-                    const eventSource = new EventSource(sseUrl);
+                    // Native SSE consumption
+                    if (activeSynthesisEventSource) activeSynthesisEventSource.close();
+                    activeSynthesisEventSource = new EventSource(sseUrl);
                     
-                    eventSource.addEventListener('message', function(e) {
+                    activeSynthesisEventSource.addEventListener('message', function(e) {
                         const textSpan = reportBody.querySelector('#aiProfileText');
                         if (textSpan) {
                             textSpan.innerHTML += e.data;
                         }
                     });
                     
-                    eventSource.addEventListener('mixologist_notes', function(e) {
+                    activeSynthesisEventSource.addEventListener('mixologist_notes', function(e) {
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
                         const notesSpan = reportBody.querySelector('#aiBaristaNotesText');
@@ -2046,18 +2034,20 @@ function cancelInFlightLLMCalls() {
                         }
                     });
                     
-                    eventSource.addEventListener('remove_spinner', function(e) {
+                    activeSynthesisEventSource.addEventListener('remove_spinner', function(e) {
                         const profileSpinner = reportBody.querySelector('#aiProfileSpinner');
                         if (profileSpinner) profileSpinner.remove();
                         const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                         if (notesSpinner) notesSpinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     });
                     
-                    eventSource.onerror = function(e) {
+                    activeSynthesisEventSource.onerror = function(e) {
                         const spinner = reportBody.querySelector('#aiProfileSpinner');
                         if (spinner) spinner.remove();
-                        eventSource.close();
+                        e.target.close();
+                        if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                     };
 
                     // Scroll to report
@@ -2074,28 +2064,29 @@ function cancelInFlightLLMCalls() {
 
                 reportBody.innerHTML = `
                     <div class="border-top border-white border-opacity-10 pt-3 mb-3">
-                        <h6 class="readout-label text-gradient-lab mb-1">MIXOLOGIST NOTES</h6>
+                        <h6 class="readout-label text-lab-accent mb-1">MIXOLOGIST NOTES</h6>
                         <div class="mb-0 small text-white opacity-90 mb-3" style="white-space: pre-line;" id="aiBaristaNotesContainer">
                             <span id="aiBaristaNotesText"></span>
                             <div id="aiBaristaNotesSpinner" class="mt-2">
-                                <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                                <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                                 <span class="ms-2 text-dim small">Consulting mixologist...</span>
                             </div>
                         </div>
                     </div>
-                    <h6 class="readout-label text-gradient-lab mb-1">OVERALL PROFILE DESCRIPTION</h6>
+                    <h6 class="readout-label text-lab-accent mb-1">OVERALL PROFILE DESCRIPTION</h6>
                     <div class="mb-0 small text-white opacity-90" style="white-space: pre-line;" id="aiProfileContainer">
                         <span id="aiProfileText"></span>
                         <div id="aiProfileSpinner" class="mt-2">
-                            <div class="spinner-border spinner-border-sm text-gradient-lab" role="status"></div>
+                            <div class="spinner-border spinner-border-sm text-lab-accent" role="status"></div>
                             <span class="ms-2 text-dim small">Synthesizing profile...</span>
                         </div>
                     </div>
                 `;
 
-                
-                // Native SSE consumption (replaces HTMX)
+                // Native SSE consumption
+                if (activeSynthesisEventSource) activeSynthesisEventSource.close();
                 const eventSource = new EventSource(sseUrl);
+                activeSynthesisEventSource = eventSource;
                 
                 eventSource.addEventListener('message', function(e) {
                     const textSpan = reportBody.querySelector('#aiProfileText');
@@ -2118,19 +2109,25 @@ function cancelInFlightLLMCalls() {
                     if (profileSpinner) profileSpinner.remove();
                     const notesSpinner = reportBody.querySelector('#aiBaristaNotesSpinner');
                     if (notesSpinner) notesSpinner.remove();
-                    eventSource.close();
+                    e.target.close();
+                    if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                 });
                 
                 eventSource.onerror = function(e) {
                     const spinner = reportBody.querySelector('#aiProfileSpinner');
                     if (spinner) spinner.remove();
-                    eventSource.close();
+                    e.target.close();
+                    if (activeSynthesisEventSource === e.target) activeSynthesisEventSource = null;
                 };
 
                 // Scroll to report
                 reportContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
             }
         } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log("[Synthesis] Aborted previous synthesis task.");
+                return;
+            }
             console.error('[Synthesis] FATAL ERROR in triggerFlavorSynthesis:', err);
             reportBody.innerHTML = `<div class="text-danger small">Connectivity Error: Could not reach the synthesis substrate.</div>
                                    <button class="btn btn-xs btn-outline-warning mt-2 w-100" onclick="triggerFlavorSynthesis()">Retry Synthesis</button>`;
@@ -2208,7 +2205,7 @@ function cancelInFlightLLMCalls() {
                     <span class="fw-bold fs-5 mb-2">Water</span>
                     <span class="badge-fizz bg-neutral">neutral</span>
                     <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2" style="font-size: 0.65rem;">
-                        <span class="text-gradient-lab font-monospace">B: 5.0</span>
+                        <span class="text-lab-accent font-monospace">B: 5.0</span>
                         <span class="text-experimental font-monospace">A: 1.0</span>
                     </div>
                 </div>
@@ -2289,13 +2286,13 @@ function cancelInFlightLLMCalls() {
         
         // Update titles
         if (isWaterBaseStep2) {
-            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-gradient-lab me-2"></i>RECOMMENDED SYRUP BASES';
+            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-lab-accent me-2"></i>RECOMMENDED SYRUP BASES';
             unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY SYRUPS';
         } else if (isExperimental) {
             recommendedTitle.innerHTML = '<i class="bi bi-flask text-experimental me-2"></i>RECOMMENDED UNORTHODOX SUBSTRATES';
             unorthodoxTitle.innerHTML = '<i class="bi bi-shield text-dim me-2"></i>STANDARD / SAFE BASES';
         } else {
-            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-gradient-lab me-2"></i>RECOMMENDED BASES';
+            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-lab-accent me-2"></i>RECOMMENDED BASES';
             unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY ACCENTS';
         }
 
@@ -2354,12 +2351,17 @@ function cancelInFlightLLMCalls() {
             }
             setCoffeeBaseType(savedBase);
             
-            document.getElementById('stepContainer').style.display = 'block';
+            if (currentCreationMethod === 'manual') {
+                document.getElementById('stepContainer').style.display = 'block';
+                document.getElementById('partitionedBasesContainer').style.display = 'block';
+            } else {
+                document.getElementById('stepContainer').style.display = 'none';
+                document.getElementById('partitionedBasesContainer').style.display = 'none';
+            }
             document.getElementById('stepTitle').textContent = 'Step 1: Select Base Component';
             document.getElementById('synthesisReportContainer').style.display = 'none';
             updateSelectedArea();
             document.getElementById('recommendationContainer').innerHTML = '';
-            document.getElementById('partitionedBasesContainer').style.display = 'block';
             partitionBases();
         }
 
@@ -2378,8 +2380,8 @@ function cancelInFlightLLMCalls() {
                     debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
-                        resetMixer();
-                    }
+                        try { resetMixer(); } catch(e) {}
+    }
                 });
             } else if (currentLabMode === 'SODA') {
                 updateSodaChemistryWizard().then(() => {
@@ -2387,8 +2389,8 @@ function cancelInFlightLLMCalls() {
                     debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
-                        resetMixer();
-                    }
+                        try { resetMixer(); } catch(e) {}
+    }
                 });
             } else if (currentLabMode === 'SLUSHIE') {
                 updateCryoChemistryWizard().then(() => {
@@ -2396,16 +2398,16 @@ function cancelInFlightLLMCalls() {
                     debouncedFetchRecommendations();
                     
                     if (selectedIngredients.length === 0) {
-                        resetMixer();
-                    }
+                        try { resetMixer(); } catch(e) {}
+    }
                 });
             } else {
                 updateSelectedArea();
                 debouncedFetchRecommendations();
                 
                 if (selectedIngredients.length === 0) {
-                    resetMixer();
-                }
+                    try { resetMixer(); } catch(e) {}
+    }
             }
         }
 
@@ -2507,7 +2509,7 @@ function cancelInFlightLLMCalls() {
                 return;
             }
 
-            container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-gradient-lab" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
+            container.innerHTML = '<div id="recommendationProgress" class="col-12 text-center py-4"><div class="spinner-border text-lab-accent" role="status"></div><p id="recommendationProgressText" class="mt-2 text-dim" style="transition: opacity 0.2s ease-in-out; opacity: 1;">Computing molecular affinity...</p></div>';
             library.style.display = 'none'; // Hide library when focused on recommendations
 
             const isAiEngine = true;
@@ -2687,7 +2689,7 @@ function cancelInFlightLLMCalls() {
 
                 
                 if (suggestions.length === 0 && !data.seal_recommended) {
-                    container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-muted">No ideal matches in lab inventory. <button type="button" class="btn btn-link px-0 text-gradient-lab" onclick="skipOptimization()">Seal current mix</button>.</p></div>';
+                    container.innerHTML = '<div class="col-12 text-center py-4"><p class="text-muted">No ideal matches in lab inventory. <button type="button" class="btn btn-link px-0 text-lab-accent" onclick="skipOptimization()">Seal current mix</button>.</p></div>';
                     return;
                 }
 
@@ -2705,7 +2707,7 @@ function cancelInFlightLLMCalls() {
                         const isExperimentalMode = recommendationMode === 'experimental';
                         
                         let cardClass = 'border-success border-opacity-25';
-                        let textClass = 'text-gradient-lab';
+                        let textClass = 'text-lab-accent';
                         let iconHtml = '';
                         
                         if (rec.favorite) {
@@ -2736,7 +2738,7 @@ function cancelInFlightLLMCalls() {
                                         <span class="badge-fizz bg-${badgeClass}">${rec.category || ''}</span>
                                     </div>
                                     <div class="d-flex justify-content-between w-100 mt-2 px-1 border-top border-white border-opacity-5 pt-2 mb-2" style="font-size: 0.65rem;">
-                                        <span class="text-gradient-lab font-monospace">B: ${rec.base_suitability.toFixed(1)}</span>
+                                        <span class="text-lab-accent font-monospace">B: ${rec.base_suitability.toFixed(1)}</span>
                                         <span class="text-experimental font-monospace">A: ${rec.accent_suitability.toFixed(1)}</span>
                                     </div>
                                     <div class="mt-auto">
@@ -3097,11 +3099,11 @@ function updateSelectedArea(isDone = false) {
                 <div class="col-auto animate-fade-in">
                     <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
-                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">${fillerName} <i class="bi bi-droplets text-info ms-1"></i></div>
-                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(1)}ml / ${formatImperialVolume(finalWater)}</div>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">${fillerName} <i class="bi bi-droplets text-lab-accent ms-1"></i></div>
+                        <div class="text-lab-accent fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(1)}ml / ${formatImperialVolume(finalWater)}</div>
                         <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                             <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
-                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">FILL LINE</span></div>
+                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-lab-accent fw-bold">FILL LINE</span></div>
                                 <div class="d-flex justify-content-between"><span>TARGET</span> <span>${targetLabel}</span></div>
                             </div>
                             ${warningHtml}
@@ -3139,11 +3141,11 @@ function updateSelectedArea(isDone = false) {
                 <div class="col-auto animate-fade-in">
                     <div class="glass-card p-2 text-center px-4 border-info border-opacity-20 ${isOverflow ? 'border-danger' : ''}" style="min-width: 150px; position: relative;">
                         <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">VOLUME FILLER</span>
-                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">Carbonated Water <i class="bi bi-droplets text-info ms-1"></i></div>
-                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
+                        <div class="fw-bold mb-1" style="font-size: 0.9rem;">Carbonated Water <i class="bi bi-droplets text-lab-accent ms-1"></i></div>
+                        <div class="text-lab-accent fw-black mb-2" style="font-size: 0.75rem;">${finalWater.toFixed(0)}ml / ${formatImperialVolume(finalWater)}</div>
                         <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                             <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
-                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-info fw-bold">CARBONATION</span></div>
+                                <div class="d-flex justify-content-between"><span>ROLE</span> <span class="text-lab-accent fw-bold">CARBONATION</span></div>
                                 <div class="d-flex justify-content-between"><span>TARGET</span> <span>${targetLabel}</span></div>
                             </div>
                             ${warningHtml}
@@ -3375,7 +3377,7 @@ function updateSelectedArea(isDone = false) {
                         ${anchorTogglerHtml}
                         <div class="fw-bold mb-1" style="font-size: 0.9rem;">${mainName} ${balanceIndicator}</div>
                         ${renameWarningHtml}
-                        <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${dualLabel}</div>
+                        <div class="text-lab-accent fw-black mb-2" style="font-size: 0.75rem;">${dualLabel}</div>
                         ${sliderHtml}
                         
                         <!-- 🧪 Synthesized Profile Display -->
@@ -3411,11 +3413,11 @@ function updateSelectedArea(isDone = false) {
                     <div class="col-auto">
                         <div class="glass-card p-2 text-center px-4 border-info border-opacity-20" style="min-width: 150px; position: relative;">
                             <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">BASE MODIFIER</span>
-                            <div class="fw-bold mb-1" style="font-size: 0.9rem;">Ice <i class="bi bi-snow text-info ms-1"></i></div>
-                            <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${iceOz}oz</div>
+                            <div class="fw-bold mb-1" style="font-size: 0.9rem;">Ice <i class="bi bi-snow text-lab-accent ms-1"></i></div>
+                            <div class="text-lab-accent fw-black mb-2" style="font-size: 0.75rem;">${iceOz}oz</div>
                             <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                                 <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
-                                    <div class="d-flex justify-content-between"><span>TEMP</span> <span class="text-info fw-bold">COLD</span></div>
+                                    <div class="d-flex justify-content-between"><span>TEMP</span> <span class="text-lab-accent fw-bold">COLD</span></div>
                                     <div class="d-flex justify-content-between"><span>VOLUME</span> <span>~${iceMl}ml</span></div>
                                 </div>
                             </div>
@@ -3432,8 +3434,8 @@ function updateSelectedArea(isDone = false) {
                     <div class="col-auto">
                         <div class="glass-card p-2 text-center px-4 border-info border-opacity-20" style="min-width: 150px; position: relative;">
                             <span class="readout-label d-block mb-1" style="font-size: 0.55rem;">BASE MODIFIER</span>
-                            <div class="fw-bold mb-1" style="font-size: 0.9rem;">Hot Water <i class="bi bi-droplets text-info ms-1"></i></div>
-                            <div class="text-gradient-lab fw-black mb-2" style="font-size: 0.75rem;">${hotWaterOz}oz</div>
+                            <div class="fw-bold mb-1" style="font-size: 0.9rem;">Hot Water <i class="bi bi-droplets text-lab-accent ms-1"></i></div>
+                            <div class="text-lab-accent fw-black mb-2" style="font-size: 0.75rem;">${hotWaterOz}oz</div>
                             <div class="mt-1 pt-1 border-top border-white border-opacity-10">
                                 <div class="d-flex flex-column gap-1" style="font-size: 0.55rem; color: var(--text-dim);">
                                     <div class="d-flex justify-content-between"><span>TEMP</span> <span class="text-danger fw-bold">HOT</span></div>
@@ -3856,4 +3858,326 @@ function updateSelectedArea(isDone = false) {
             mixerForm.submit(); // Submit anyway on network error to allow recovery via view logic
         });
     }
+
+    function setCreationMethod(method) {
+        currentCreationMethod = method;
+        
+        // Stop any running SSEs
+        if (quickDrinksSource) { quickDrinksSource.close(); quickDrinksSource = null; }
+        if (vibeDrinkSource) { vibeDrinkSource.close(); vibeDrinkSource = null; }
+
+        ['methodQuick', 'methodVibe', 'methodManual'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const targetId = method ? 'method' + method.charAt(0).toUpperCase() + method.slice(1) : null;
+                if (id === targetId) {
+                    el.classList.remove('text-dim');
+                    el.classList.add('active-lab-mode');
+                } else {
+                    el.classList.add('text-dim');
+                    el.classList.remove('active-lab-mode');
+                }
+            }
+        });
+        
+                const idleContainer = document.getElementById('methodIdleContainer');
+        if (idleContainer) idleContainer.style.display = 'none';
+        
+        const quickContainer = document.getElementById('aiQuickContainer');
+        if (quickContainer) quickContainer.style.display = 'none';
+        
+        const vibeContainer = document.getElementById('aiVibeContainer');
+        if (vibeContainer) vibeContainer.style.display = 'none';
+        
+        const stepContainer = document.getElementById('stepContainer');
+        if (stepContainer) stepContainer.style.display = 'none';
+        
+        if (!method) {
+            if (idleContainer) idleContainer.style.display = 'block';
+        } else if (method === 'quick') {
+            if (quickContainer) quickContainer.style.display = 'block';
+            const list = document.getElementById('quickDrinksList');
+            if (list && list.children.length === 0) {
+                generateQuickRecommendations();
+            }
+        } else if (method === 'vibe') {
+            if (vibeContainer) vibeContainer.style.display = 'block';
+            const vibeResult = document.getElementById('vibeDrinkResult');
+            if (vibeResult) vibeResult.innerHTML = '';
+            const vibePrompt = document.getElementById('vibePromptInput');
+            if (vibePrompt) vibePrompt.value = '';
+        } else if (method === 'manual') {
+            if (stepContainer) stepContainer.style.display = 'block';
+        }
+        try { resetMixer(); } catch(e) {}
+    }
+
+    function generateQuickRecommendations() {
+        console.log('[DEBUG] generateQuickRecommendations started');
+        const btn = document.getElementById('btnGenerateQuick');
+        const list = document.getElementById('quickDrinksList');
+        console.log('[DEBUG] btn:', !!btn, 'list:', !!list);
+        
+        btn.style.display = 'none'; // Hide button while generating
+        
+        // Show manual mode style loading graphic
+        list.innerHTML = `
+            <div id="quickDrinksProgress" class="col-12 text-center py-5 opacity-75">
+                <i class="bi bi-diagram-3 text-lab-accent display-4 mb-3 d-block scanner-beam"></i>
+                <p id="quickDrinksProgressText" class="mb-0 small fw-bold text-dim animate-pulse">COMPUTING MOLECULAR AFFINITY...</p>
+            </div>
+        `;
+        
+        console.log('[DEBUG] currentLabMode is:', currentLabMode);
+        if (quickDrinksSource) {
+            console.log('[DEBUG] Closing existing quickDrinksSource');
+            quickDrinksSource.close();
+        }
+        
+        const params = new URLSearchParams({ lab_mode: currentLabMode });
+        const url = `/api/ai/quick-recommendations/?${params.toString()}`;
+        console.log('[DEBUG] Creating EventSource with URL:', url);
+        
+        try {
+            quickDrinksSource = new EventSource(url);
+            console.log('[DEBUG] EventSource created');
+            
+            quickDrinksSource.onopen = function(e) {
+                console.log('[DEBUG] EventSource OPEN', e);
+            };
+            
+            quickDrinksSource.onerror = function(e) {
+                console.error('[DEBUG] EventSource ERROR', e);
+            };
+        } catch(e) {
+            console.error('[DEBUG] EventSource exception:', e);
+        }
+        
+        let currentCard = null;
+        let currentIngredients = null;
+        
+        quickDrinksSource.addEventListener('recipe', (e) => {
+            console.log('[DEBUG] Received recipe event');
+            const recipe = JSON.parse(e.data);
+            const index = recipe.index;
+            
+            const currentCard = document.createElement('div');
+            currentCard.className = 'glass-card p-3 mb-3 animate-fade-in border-white border-opacity-10';
+            
+            let badgesHtml = '';
+            const mappedIds = [];
+            if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+                recipe.ingredients.forEach(ing => {
+                    badgesHtml += `<span class="badge bg-dark border border-white border-opacity-10 text-white fw-normal">${ing.name} - ${ing.amount}</span>`;
+                    
+                    let matchedId = null;
+                    const allCards = document.querySelectorAll('.select-ingredient-btn');
+                    const cleanName = ing.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                    console.log(`[QuickDrinks Match] LLM Output: "${ing.name}" -> Cleaned: "${cleanName}"`);
+                    for (let c of allCards) {
+                        if (c.dataset.name) {
+                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                            if (cardCleanName === cleanName) {
+                                matchedId = c.dataset.id;
+                                console.log(`[QuickDrinks Match] Found match! Card data-name: "${c.dataset.name}" -> ID: ${matchedId}`);
+                                break;
+                            }
+                        }
+                    }
+                    if (!matchedId) {
+                        console.warn(`[QuickDrinks Match] WARNING: No card found for "${cleanName}"`);
+                    }
+                    if (matchedId) {
+                        mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                    } else {
+                        mappedIds.push({name: ing.name, amount: ing.amount});
+                    }
+                });
+            }
+            
+            currentCard.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="fw-bold text-lab-accent mb-0" id="drink-name-${index}">${recipe.name}</h5>
+                    <button type="button" class="btn btn-sm btn-outline-experimental px-3" onclick="selectGeneratedDrink(this)" id="drink-select-${index}">
+                        <i class="bi bi-check2-circle me-1"></i> SELECT
+                    </button>
+                </div>
+                <p class="text-white opacity-90 small mb-2" id="drink-desc-${index}">${recipe.description || ''}</p>
+                <div class="small">
+                    <strong class="text-dim">Ingredients:</strong>
+                    <div id="drink-ingredients-${index}" class="d-flex flex-wrap gap-1 mt-1">
+                        ${badgesHtml}
+                    </div>
+                </div>
+                <div id="drink-data-${index}" style="display: none;">${JSON.stringify(mappedIds)}</div>
+            `;
+            
+            const ph = document.getElementById(`quickDrinksProgress`);
+            if (ph) {
+                list.replaceChild(currentCard, ph);
+            } else {
+                list.appendChild(currentCard);
+            }
+        });
+        
+        quickDrinksSource.addEventListener('close', () => {
+            btn.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> GENERATE MORE';
+            quickDrinksSource.close();
+            quickDrinksSource = null;
+            
+            const ph = document.getElementById(`quickDrinksProgress`);
+            if (ph) ph.remove();
+        });
+        
+        quickDrinksSource.addEventListener('error', (e) => {
+            const data = JSON.parse(e.data);
+            console.error("Backend Generator Error:", data.error);
+            list.innerHTML = `<div class="alert alert-danger border-danger border-opacity-25 bg-dark">
+                <i class="bi bi-exclamation-triangle me-2"></i> ${data.error}
+            </div>`;
+        });
+        
+        quickDrinksSource.onerror = (err) => {
+            console.error("SSE Error:", err);
+            btn.style.display = 'block';
+            btn.disabled = false;
+            btn.innerHTML = 'Error - Try Again';
+            quickDrinksSource.close();
+            quickDrinksSource = null;
+            
+            const ph = document.getElementById(`quickDrinksProgress`);
+            if (ph) ph.remove();
+        };
+    }
+
+    function generateVibeDrink() {
+        const btn = document.getElementById('btnGenerateVibe');
+        const input = document.getElementById('vibePromptInput');
+        const prompt = input.value.trim();
+        const list = document.getElementById('vibeDrinkResult');
+        
+        if (!prompt) {
+            alert('Please enter a description or vibe.');
+            return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        list.innerHTML = '';
+        
+        if (vibeDrinkSource) { vibeDrinkSource.close(); }
+        
+        const params = new URLSearchParams({ lab_mode: currentLabMode, prompt: prompt });
+        vibeDrinkSource = new EventSource(`/api/ai/vibe-creation/?${params.toString()}`);
+        
+        let currentCard = null;
+        let currentIngredients = null;
+        
+        vibeDrinkSource.addEventListener('recipe', (e) => {
+            const recipe = JSON.parse(e.data);
+            
+            let badgesHtml = '';
+            const mappedIds = [];
+            if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+                recipe.ingredients.forEach(ing => {
+                    badgesHtml += `<span class="badge bg-dark border border-white border-opacity-10 text-white fw-normal">${ing.name} - ${ing.amount}</span>`;
+                    
+                    let matchedId = null;
+                    const allCards = document.querySelectorAll('.select-ingredient-btn');
+                    const cleanName = ing.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                    for (let c of allCards) {
+                        if (c.dataset.name) {
+                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                            if (cardCleanName === cleanName) {
+                                matchedId = c.dataset.id;
+                                break;
+                            }
+                        }
+                    }
+                    if (matchedId) {
+                        mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                    } else {
+                        mappedIds.push({name: ing.name, amount: ing.amount});
+                    }
+                });
+            }
+            
+            currentCard = document.createElement('div');
+            currentCard.className = 'glass-card p-3 mb-3 animate-fade-in border-white border-opacity-10';
+            currentCard.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="fw-bold text-lab-accent mb-0" id="vibe-name">${recipe.name}</h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-warning px-3 me-2" onclick="tryAgainVibe('${prompt.replace(/'/g, "\\'")}')" id="vibe-retry">
+                            <i class="bi bi-arrow-clockwise me-1"></i> TRY AGAIN
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-experimental px-3" onclick="selectGeneratedDrink(this)" id="vibe-select">
+                            <i class="bi bi-check2-circle me-1"></i> SELECT
+                        </button>
+                    </div>
+                </div>
+                <p class="text-dim mb-3" id="vibe-desc">${recipe.description || ''}</p>
+                <div class="small">
+                    <strong class="text-dim">Ingredients:</strong>
+                    <div id="vibe-ingredients" class="d-flex flex-wrap gap-1 mt-1">
+                        ${badgesHtml}
+                    </div>
+                </div>
+                <div id="vibe-data" style="display: none;">${JSON.stringify(mappedIds)}</div>
+            `;
+            
+            list.appendChild(currentCard);
+        });
+        
+        vibeDrinkSource.addEventListener('error', (e) => {
+            console.error("SSE Event Error:", e);
+        });
+        
+        vibeDrinkSource.addEventListener('close', () => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-magic me-1"></i> SUBMIT';
+            vibeDrinkSource.close();
+            vibeDrinkSource = null;
+        });
+        
+        vibeDrinkSource.onerror = (err) => {
+            console.error("SSE Error:", err);
+            btn.disabled = false;
+            btn.innerHTML = 'Error - Try Again';
+            vibeDrinkSource.close();
+            vibeDrinkSource = null;
+        };
+    }
+
+    function tryAgainVibe(prompt) {
+        document.getElementById('vibePromptInput').value = prompt;
+        generateVibeDrink();
+    }
+
+    function selectGeneratedDrink(btnElement) {
+        const card = btnElement.closest('.glass-card');
+        const dataStorage = card.querySelector('div[id^="drink-data-"], div[id="vibe-data"]');
+        if (!dataStorage) return;
+        
+        const ingredientsData = JSON.parse(dataStorage.textContent);
+        
+        const nameEl = card.querySelector('h5[id^="drink-name-"], h5[id="vibe-name"]');
+        const drinkName = nameEl ? nameEl.textContent.trim() : '';
+
+        const payload = {
+            drink_type: currentLabMode,
+            ingredients: ingredientsData,
+            name: drinkName
+        };
+
+        localStorage.setItem('synopsis_data', JSON.stringify(payload));
+        window.location.href = '/lab/synopsis/';
+    }
+
+
+
+
+
 

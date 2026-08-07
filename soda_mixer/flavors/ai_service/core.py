@@ -24,7 +24,10 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
             from ..models import Ingredient
             ingredients = Ingredient.objects.filter(is_in_inventory=True)
             if drink_type:
-                ingredients = ingredients.filter(compatible_systems__icontains=drink_type.upper())
+                sys_val = drink_type.upper()
+                if sys_val == 'CRYO':
+                    sys_val = 'SLUSHIE'
+                ingredients = ingredients.filter(compatible_systems__icontains=sys_val)
             ingredients = ingredients.order_by('name', 'brand')
             
             registry = []

@@ -57,6 +57,8 @@ def ai_chat_api(request: HttpRequest) -> HttpResponse:
         
         # Get active system/drink type to filter inventory context
         drink_type = data.get('drink_type')
+        if drink_type and drink_type.upper() == 'CRYO':
+            drink_type = 'SLUSHIE'
         if not drink_type and current_ingredients:
             first_ing = Ingredient.objects.filter(Q(name__iexact=current_ingredients[0]) | Q(brand__iexact=current_ingredients[0])).first()
             if first_ing and first_ing.compatible_systems:
@@ -84,10 +86,13 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
         ingredients = data.get('ingredients', [])
         mode = data.get('mode', 'standard')
         exclude = data.get('exclude', [])
+        exclude_types = data.get('exclude_types', [])
         drink_type = data.get('drink_type', 'SODA').upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
         force_type = data.get('force_type')
         
-        logger.warning(f"AISuggestion - Info - Suggestion request. Ingredients: {ingredients}, drink_type: {drink_type}, force_type: {force_type}")
+        logger.warning(f"AISuggestion - Info - Suggestion request. Ingredients: {ingredients}, drink_type: {drink_type}, force_type: {force_type}, exclude_types: {exclude_types}")
         
         if not ingredients:
             ingredients = ["NONE - Initial Synthesis"]
@@ -116,6 +121,17 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     candidate_pool = candidate_pool.filter(mixology_function__in=['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
                 else:
                     candidate_pool = candidate_pool.filter(ingredient_type=force_type)
+            
+            if exclude_types:
+                for et in exclude_types:
+                    et = et.upper()
+                    if et == 'COFFEE_BEAN':
+                        candidate_pool = candidate_pool.exclude(physical_state='SOLID_EXTRACTABLE')
+                    elif et == 'DAIRY':
+                        candidate_pool = candidate_pool.exclude(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+                    else:
+                        candidate_pool = candidate_pool.exclude(ingredient_type=et)
+
             if mode != 'experimental':
                 candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
 
@@ -166,6 +182,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                         drink_type=drink_type,
                         inventory=inventory_context, 
                         exclude=actual_exclude,
+                        exclude_types=exclude_types,
                         retry_note=retry_note,
                         force_type=force_type
                     )
@@ -193,6 +210,20 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 if not is_match:
                                     logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' which does not match force_type '{force_type}'")
                                     continue
+                                    
+                                if exclude_types:
+                                    is_excluded = False
+                                    for et in exclude_types:
+                                        et = et.upper()
+                                        if et == 'COFFEE_BEAN' and target_obj.physical_state == 'SOLID_EXTRACTABLE':
+                                            is_excluded = True
+                                        elif et == 'DAIRY' and target_obj.mixology_function == 'VOLUME_BASE' and target_obj.physical_state == 'LIQUID':
+                                            is_excluded = True
+                                        elif target_obj.ingredient_type == et:
+                                            is_excluded = True
+                                    if is_excluded:
+                                        logger.warning(f"AISuggestion - Warning - LLM suggested '{target_obj.name}' which is excluded by type")
+                                        continue
                                 
                                 intensity_delta = 0
                                 active_ingredients = []
@@ -251,8 +282,8 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                     icon_html = '<i class="bi bi-flask me-1"></i>'
                                 else:
                                     card_class = 'border-neural glow-neural'
-                                    text_class = 'text-neural'
-                                    icon_html = '<i class="bi bi-cpu me-1"></i>'
+                                    text_class = 'text-lab-accent'
+                                    icon_html = ''
 
                                 html_str = render_to_string('flavors/_recommendation_card.html', {
                                     'card_type': 'ingredient',
@@ -442,3 +473,68 @@ def ai_synthesize_api(request: HttpRequest) -> HttpResponse:
         response['Cache-Control'] = 'no-cache'
         response['X-Accel-Buffering'] = 'no'
         return response
+
+def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
+    try:
+        drink_type = request.GET.get('lab_mode', request.GET.get('drink_type', 'SODA')).upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
+        
+        mode = request.GET.get('mode', 'standard')
+        
+        def sse_generator():
+            try:
+                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type if mode == 'standard' else None)
+                stream = AIAssistant.stream_quick_recommendations(inventory_context, drink_type=drink_type, mode=mode)
+                
+                for index, recipe in enumerate(stream):
+                    recipe['index'] = index
+                    yield f"event: recipe\ndata: {json.dumps(recipe)}\n\n"
+                
+                yield "event: close\ndata: {}\n\n"
+            except Exception as e:
+                logger.error(f"ai_quick_recommendations_api - Generator Error: {e}", exc_info=True)
+                yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            
+        response = StreamingHttpResponse(sse_generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+    except Exception as e:
+        logger.error(f"ai_quick_recommendations_api - Error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+def ai_vibe_creation_api(request: HttpRequest) -> HttpResponse:
+    try:
+        drink_type = request.GET.get('lab_mode', request.GET.get('drink_type', 'SODA')).upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
+        vibe_prompt = request.GET.get('prompt', request.GET.get('vibe_prompt', ''))
+        logger.info(f"Vibe creation request: GET={request.GET}, vibe_prompt={vibe_prompt}")
+        
+        mode = request.GET.get('mode', 'standard')
+        
+        if not vibe_prompt:
+             return JsonResponse({'error': 'No vibe prompt provided.'}, status=400)
+             
+        def sse_generator():
+            try:
+                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type if mode == 'standard' else None)
+                stream = AIAssistant.stream_vibe_drink(vibe_prompt, inventory_context, drink_type=drink_type, mode=mode)
+                
+                for index, recipe in enumerate(stream):
+                    recipe['index'] = index
+                    yield f"event: recipe\ndata: {json.dumps(recipe)}\n\n"
+                
+                yield "event: close\ndata: {}\n\n"
+            except Exception as e:
+                logger.error(f"ai_vibe_creation_api - Generator Error: {e}", exc_info=True)
+                yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            
+        response = StreamingHttpResponse(sse_generator(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+    except Exception as e:
+        logger.error(f"ai_vibe_creation_api - Error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)

@@ -78,7 +78,7 @@ class AIGenerationMixin:
             return cls._extract_json(response)
 
     @classmethod
-    def suggest_autonomous_stream(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Generator[Dict[str, Any], None, None]:
+    def suggest_autonomous_stream(cls, ingredients: List[str], mode: str = 'standard', drink_type: str = 'SODA', inventory: Optional[str] = None, exclude: Optional[List[str]] = None, exclude_types: Optional[List[str]] = None, retry_note: Optional[str] = None, force_type: Optional[str] = None) -> Generator[Dict[str, Any], None, None]:
             """
             Streaming version of suggest_autonomous. Yields individual parsed suggestion objects as they arrive, 
             and then yields a final 'complete' object containing the full structured response (rebalancing, reasoning).
@@ -129,6 +129,10 @@ class AIGenerationMixin:
             if force_type:
                 force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
                 force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+                
+            if exclude_types:
+                exclude_display = ", ".join(exclude_types)
+                force_rule += f"\nMANDATORY RULE: You must NEVER suggest any ingredients of type: {exclude_display}."
                 
             exclude_str = f"Exclude these previously suggested items: {', '.join(exclude)}." if exclude else "None"
             
@@ -391,3 +395,116 @@ Constraints:
         if not response:
             return "Mystery Mix"
         return response.strip(' "\'')
+
+    @classmethod
+    def stream_quick_recommendations(cls, inventory: str, drink_type: str = 'SODA', mode: str = 'creative') -> Generator[Dict[str, Any], None, None]:
+        """Stream 5 distinct recipes based on active inventory."""
+        drink_type = drink_type.upper()
+        
+        import random
+        seed = random.randint(10000, 99999)
+        
+        prompt = f"""[QUICK DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
+        
+Task: Act as a master mixologist. Create exactly 5 distinct, highly creative, and appealing {drink_type} recipes using ONLY the ingredients available in the provided Inventory Registry. If the inventory has fewer than 10 total ingredients, you may generate fewer recipes (minimum 3).
+
+CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Do not rely on the same 5 combinations. Push the boundaries of mixology.
+
+OUTPUT FORMAT:
+Output your response as a JSON array of objects.
+Each JSON object must have the following structure:
+{{
+    "name": "Recipe Name",
+    "description": "A short, vivid menu description of the drink and its vibe (20-30 words).",
+    "ingredients": [
+        {{ "name": "Exact Ingredient Name from Inventory", "amount": 100.0 }}
+    ]
+}}
+
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
+2. For amounts: For SODA/SLUSHIE, use ml (typically summing around 100-160ml for the flavor base). For COFFEE, base coffee beans use grams (default 18.0g), liquids use ml (e.g., milk 50.0ml, syrup 15.0ml).
+3. If {drink_type} is COFFEE, ensure you include exactly ONE base coffee bean ingredient and ONE dairy/milk ingredient.
+
+Inventory Registry: See context.
+"""
+        stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type, mode=mode)
+        
+        buffer = ""
+        yielded_indices = set()
+        
+        for event in stream:
+            if event.startswith('data: '):
+                try:
+                    data_str = event[6:].strip()
+                    if not data_str or data_str == '[DONE]': continue
+                    data_json = json.loads(data_str)
+                    chunk = data_json.get('chunk', '')
+                    buffer += chunk
+                    
+                    # Regex to find complete JSON objects inside the array
+                    # This finds things that look like {"name": ..., "ingredients": [...]}
+                    # We can do a simple parse of all objects in the buffer so far.
+                    
+                    # To safely parse partial JSON arrays, we can use a regex to find all objects
+                    all_objects = re.findall(r'\{\s*"name"\s*:.*?"ingredients"\s*:.*?\]\s*\}', buffer, re.DOTALL)
+                    for i, obj_str in enumerate(all_objects):
+                        if i not in yielded_indices:
+                            try:
+                                obj = json.loads(obj_str)
+                                if 'name' in obj and 'ingredients' in obj:
+                                    yield obj
+                                    yielded_indices.add(i)
+                            except json.JSONDecodeError:
+                                pass
+                except json.JSONDecodeError:
+                    pass
+
+    @classmethod
+    def stream_vibe_drink(cls, vibe_prompt: str, inventory: str, drink_type: str = 'SODA', mode: str = 'creative') -> Generator[Dict[str, Any], None, None]:
+        """Stream a single recipe based on a vibe prompt."""
+        drink_type = drink_type.upper()
+        
+        prompt = f"""[VIBE DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
+        
+Task: Act as a master mixologist. Create a single, highly creative {drink_type} recipe that captures the essence of the following vibe/feeling: "{vibe_prompt}".
+You must use ONLY the ingredients available in the provided Inventory Registry.
+
+OUTPUT FORMAT:
+Output exactly ONE JSON object with the following structure:
+{{
+    "name": "Creative Recipe Name",
+    "description": "A vivid explanation (30-40 words) of how this drink captures the requested vibe.",
+    "ingredients": [
+        {{ "name": "Exact Ingredient Name from Inventory", "amount": 100.0 }}
+    ]
+}}
+
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
+2. For amounts: For SODA/SLUSHIE, use ml. For COFFEE, base coffee beans use grams, liquids use ml.
+"""
+        stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type, mode=mode)
+        
+        buffer = ""
+        for event in stream:
+            if event.startswith('data: '):
+                try:
+                    data_str = event[6:].strip()
+                    if not data_str or data_str == '[DONE]': continue
+                    data_json = json.loads(data_str)
+                    chunk = data_json.get('chunk', '')
+                    buffer += chunk
+                    
+                    # Wait until we have a complete JSON object
+                    try:
+                        match = re.search(r'\{\s*"name"\s*:.*?"ingredients"\s*:.*?\]\s*\}', buffer, re.DOTALL)
+                        if match:
+                            obj = json.loads(match.group(0))
+                            if 'name' in obj and 'ingredients' in obj:
+                                yield obj
+                                buffer = "" # Clear buffer once we yield
+                    except json.JSONDecodeError:
+                        pass
+                except json.JSONDecodeError:
+                    pass

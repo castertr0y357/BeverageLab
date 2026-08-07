@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Beverage Laboratory{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Global Feedback Substrate -->
+    {% if messages %}
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-md-8">
+            {% for message in messages %}
+            <div class="alert bg-{{ message.tags|default:'info' }} bg-opacity-10 border border-{{ message.tags|default:'info' }} border-opacity-20 text-{{ message.tags|default:'info' }} small py-2 alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi bi-info-circle me-2"></i> {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.5rem;"></button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row text-center mb-5 mt-4">
+        <div class="col-12">
+            <h1 class="display-4 fw-black text-lab-accent mb-3">SELECT LABORATORY</h1>
+            <p class="text-dim fs-5">Initiate a specialized molecular synthesis environment.</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center g-4">
+        <!-- Soda Lab -->
+        <div class="col-md-4">
+            <a href="{% url 'lab_dispatcher' 'soda' %}" class="text-decoration-none">
+                <div class="glass-card p-5 text-center h-100 hover-lift transition-all" style="border: 1px solid hsla(82, 90%, 60%, 0.2);">
+                    <div class="p-4 rounded-circle d-inline-block mb-4" style="background-color: hsla(82, 90%, 60%, 0.1);">
+                        <i class="bi bi-water fs-1" style="color: var(--fizz-lime);"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2" style="background: linear-gradient(135deg, white 30%, var(--fizz-lime)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Soda Lab</h3>
+                    <p class="text-dim small mb-0">Craft custom carbonated beverages and complex syrups.</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Coffee Lab -->
+        <div class="col-md-4">
+            <a href="{% url 'lab_dispatcher' 'coffee' %}" class="text-decoration-none">
+                <div class="glass-card p-5 text-center h-100 hover-lift transition-all" style="border: 1px solid hsla(38, 90%, 60%, 0.2);">
+                    <div class="p-4 rounded-circle d-inline-block mb-4" style="background-color: hsla(38, 90%, 60%, 0.1);">
+                        <i class="bi bi-cup-hot fs-1" style="color: var(--fizz-amber);"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2" style="background: linear-gradient(135deg, white 30%, var(--fizz-amber)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Coffee Lab</h3>
+                    <p class="text-dim small mb-0">Formulate precise espresso and cold brew variations.</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Cryo Lab -->
+        <div class="col-md-4">
+            <a href="{% url 'lab_dispatcher' 'cryo' %}" class="text-decoration-none">
+                <div class="glass-card p-5 text-center h-100 hover-lift transition-all" style="border: 1px solid hsla(200, 95%, 65%, 0.2);">
+                    <div class="p-4 rounded-circle d-inline-block mb-4" style="background-color: hsla(200, 95%, 65%, 0.1);">
+                        <i class="bi bi-snow fs-1" style="color: hsl(200, 95%, 65%);"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2" style="background: linear-gradient(135deg, white 30%, hsl(200, 95%, 65%)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Cryo Lab</h3>
+                    <p class="text-dim small mb-0">Engineer frozen slushies and icy suspensions.</p>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="row mt-5">
+        <div class="col-12 text-center text-dim small">
+            <i class="bi bi-activity text-lab-accent me-1"></i> Kitchen Velocity: {{ velocity }} mixes in the last 7 days
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+</style>
+{% endblock %}

@@ -1,4 +1,18 @@
 let currentScale = 1.0;
+let currentSweetnessStyle = 'AUTO';
+
+function setSodaSweetness(style) {
+    currentSweetnessStyle = style;
+    document.getElementById('sweetnessCrisp')?.classList.remove('active-lab-mode');
+    document.getElementById('sweetnessCraft')?.classList.remove('active-lab-mode');
+    document.getElementById('sweetnessFountain')?.classList.remove('active-lab-mode');
+    
+    if (style === 'CRISP') document.getElementById('sweetnessCrisp')?.classList.add('active-lab-mode');
+    if (style === 'CRAFT') document.getElementById('sweetnessCraft')?.classList.add('active-lab-mode');
+    if (style === 'FOUNTAIN') document.getElementById('sweetnessFountain')?.classList.add('active-lab-mode');
+    
+    fetchSodaChemistry();
+}
 
     function formatImperialVolume(ml) {
         const oz = ml * 0.033814;
@@ -27,13 +41,13 @@ let currentScale = 1.0;
         return oz.toFixed(2) + 'oz';
     }
 
-    let savedSizeOz = parseFloat("window.RECIPE_DRINK_SIZE_OZ") || ("window.RECIPE_DRINK_TYPE" === 'SLUSHIE' ? 32.0 : 33.8);
-    let drinkType = "window.RECIPE_DRINK_TYPE";
+    let savedSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ) || (window.RECIPE_DRINK_TYPE === 'CRYO' ? 32.0 : 33.8);
+    let drinkType = window.RECIPE_DRINK_TYPE;
 
     // Coffee-specific state initialization
-    let coffeeStyle = "window.RECIPE_COFFEE_STYLE";
-    let coffeeSizeOz = parseFloat("(window.RECIPE_DRINK_SIZE_OZ || '12')");
-    let coffeeBaseType = "window.RECIPE_COFFEE_BASE_TYPE";
+    let coffeeStyle = window.RECIPE_COFFEE_STYLE;
+    let coffeeSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ || '12');
+    let coffeeBaseType = window.RECIPE_COFFEE_BASE_TYPE;
     let coffeeBaseAmount = 2;
     let coffeeEspressoHotMode = localStorage.getItem('coffee_espresso_hot_mode') || 'shots';
 
@@ -83,10 +97,10 @@ let currentScale = 1.0;
         if (sizeBtns) {
             if (shotMode) {
                 sizeBtns.innerHTML = `
-                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">Single (1oz)</button>
-                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">Double (2oz)</button>
-                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size3oz" onclick="setCoffeeSize(3)">Triple (3oz)</button>
-                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size4oz" onclick="setCoffeeSize(4)">Quad (4oz)</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size1oz" onclick="setCoffeeSize(1)">1 Shot</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size2oz" onclick="setCoffeeSize(2)">2 Shots</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size3oz" onclick="setCoffeeSize(3)">3 Shots</button>
+                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="size4oz" onclick="setCoffeeSize(4)">4 Shots</button>
                 `;
                 // Force coffee base type to espresso for shots
                 coffeeBaseType = 'espresso';
@@ -204,7 +218,7 @@ let currentScale = 1.0;
             if (savedSizeOz === 12.0) savedScale = 0.355;
             else if (savedSizeOz === 16.9) savedScale = 0.5;
             else savedScale = 1.0;
-        } else if (drinkType === 'SLUSHIE') {
+        } else if (drinkType === 'CRYO') {
             savedScale = savedSizeOz / 32.0;
         }
 
@@ -229,7 +243,7 @@ let currentScale = 1.0;
             if (savedSizeOz === 12.0) savedScale = 0.355;
             else if (savedSizeOz === 16.9) savedScale = 0.5;
             else savedScale = 1.0;
-        } else if (drinkType === 'SLUSHIE') {
+        } else if (drinkType === 'CRYO') {
             savedScale = savedSizeOz / 32.0;
         }
         const activeScale = currentScale * savedScale;
@@ -255,7 +269,7 @@ let currentScale = 1.0;
             }
         }
 
-        // Pre-calculate non-filler total volume for Soda/Slushie modes
+        // Pre-calculate non-filler total volume for Soda/CRYO modes
         let nonFillerTotal = 0;
         amountDisplays.forEach((el, idx) => {
             if (idx !== firstRtdIndex) {
@@ -479,7 +493,7 @@ let currentScale = 1.0;
             fetchCoffeeChemistry();
         } else if (drinkType === 'SODA') {
             fetchSodaChemistry();
-        } else if (drinkType === 'SLUSHIE') {
+        } else if (drinkType === 'CRYO') {
             fetchCryoChemistry();
         }
     }
@@ -522,7 +536,7 @@ let currentScale = 1.0;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
                 body: JSON.stringify({
-                    sweetness_style: 'AUTO',
+                    sweetness_style: currentSweetnessStyle,
                     bottle_scale: activeScale,
                     ingredients: ingredients.map(ing => {
                         const copy = { ...ing };
@@ -533,31 +547,22 @@ let currentScale = 1.0;
                 })
             });
 
-            const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-                body: JSON.stringify({
-                    ingredients: ingredients.map(ing => {
-                        const copy = { ...ing };
-                        copy.ingredient_type = ing.ingredient_type || ing.type;
-                        copy.is_primary = ing.is_primary;
-                        return copy;
-                    }),
-                    drink_type: 'SODA'
-                })
-            });
-
-            const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+            const chemRes = await chemistryPromise;
             const data = await chemRes.json();
-            let aiProfileData = null;
-            try {
-                aiProfileData = await aiRes.json();
-            } catch (e) {
-                console.error("AI profile synthesis failed", e);
+            
+            if (data.drink_metrics && data.drink_metrics.sweetness_style) {
+                currentSweetnessStyle = data.drink_metrics.sweetness_style;
+                document.getElementById('sweetnessCrisp')?.classList.remove('active-lab-mode');
+                document.getElementById('sweetnessCraft')?.classList.remove('active-lab-mode');
+                document.getElementById('sweetnessFountain')?.classList.remove('active-lab-mode');
+                
+                if (currentSweetnessStyle === 'CRISP') document.getElementById('sweetnessCrisp')?.classList.add('active-lab-mode');
+                if (currentSweetnessStyle === 'CRAFT') document.getElementById('sweetnessCraft')?.classList.add('active-lab-mode');
+                if (currentSweetnessStyle === 'FOUNTAIN') document.getElementById('sweetnessFountain')?.classList.add('active-lab-mode');
             }
 
             let validationBadge = '';
-            if (data.recipe_validation) {
+            if (data.recipe_validation && !data.recipe_validation.toLowerCase().includes("pass")) {
                 let badgeClass = "bg-success bg-opacity-10 border-success text-success";
                 if (data.recipe_validation.toLowerCase().includes("warning")) {
                     badgeClass = "bg-warning bg-opacity-10 border-warning text-warning";
@@ -592,7 +597,7 @@ let currentScale = 1.0;
             chemistryContainer.innerHTML = `
                 ${validationBadge}
                 
-                <div class="row g-4 mb-4">
+                <div class="row g-4 mb-4 print-hide">
                     <div class="col-md-4">
                         <label class="readout-label mb-1">Calculated Sweetness</label>
                         <div class="fs-4 fw-bold text-white mb-2">${data.extraction_analysis.sweetness || 0}/5.0</div>
@@ -616,43 +621,13 @@ let currentScale = 1.0;
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">SWEETNESS STYLE</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.sweetness_style}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">BATCH SCALE</span>
-                            <div class="fw-bold fs-5 text-white">${targetLabel}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">CARBONATED WATER</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.water_volume_ml} ml</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">TOTAL SYRUP VOLUME</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.total_syrup_volume_ml} ml / ${data.drink_metrics.maximum_syrup_limit_ml} ml</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-2 border-top border-white border-opacity-5">
+                <div class="pt-2 border-top border-white border-opacity-5 print-hide">
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">MIXOLOGIST RECOMMENDATION</span>
                     <p class="mb-0 small text-dim italic mb-3">"${data.barista_notes}"</p>
                 </div>
 
                 ${prepStepsHtml}
 
-                <div class="pt-2 border-top border-white border-opacity-5">
-                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">OVERALL PROFILE DESCRIPTION</span>
-                    <p class="mb-0 small text-white opacity-90 italic" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
                 </div>
             `;
 
@@ -685,7 +660,7 @@ let currentScale = 1.0;
     }
 
     async function fetchCryoChemistry() {
-        if (drinkType !== 'SLUSHIE') return;
+        if (drinkType !== 'CRYO') return;
         
         const chemistryContainer = document.getElementById('cryoChemistryAnalysis');
         if (!chemistryContainer) return;
@@ -729,30 +704,10 @@ let currentScale = 1.0;
                 })
             });
 
-            const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-                body: JSON.stringify({
-                    ingredients: ingredients.map(ing => {
-                        const copy = { ...ing };
-                        copy.ingredient_type = ing.ingredient_type || ing.type;
-                        return copy;
-                    }),
-                    drink_type: 'SLUSHIE'
-                })
-            });
-
-            const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+            const chemRes = await chemistryPromise;
             const data = await chemRes.json();
-            let aiProfileData = null;
-            try {
-                aiProfileData = await aiRes.json();
-            } catch (e) {
-                console.error("AI profile synthesis failed", e);
-            }
-
             let validationBadge = '';
-            if (data.recipe_validation) {
+            if (data.recipe_validation && !data.recipe_validation.toLowerCase().includes("pass")) {
                 let badgeClass = "bg-success bg-opacity-10 border-success text-success";
                 if (data.recipe_validation.toLowerCase().includes("warning")) {
                     badgeClass = "bg-warning bg-opacity-10 border-warning text-warning";
@@ -788,7 +743,7 @@ let currentScale = 1.0;
             chemistryContainer.innerHTML = `
                 ${validationBadge}
                 
-                <div class="row g-4 mb-4">
+                <div class="row g-4 mb-4 print-hide">
                     <div class="col-md-4">
                         <label class="readout-label mb-1">Perceived Sweetness</label>
                         <div class="fs-4 fw-bold text-white mb-2">${data.extraction_analysis.sweetness || 0}/5.0</div>
@@ -812,43 +767,13 @@ let currentScale = 1.0;
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">SUGAR DENSITY (BRIX)</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.achieved_brix}% Brix</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">BATCH SCALE</span>
-                            <div class="fw-bold fs-5 text-white">${targetLabel}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">TOTAL LIQUID INPUTS</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.target_volume_ml} ml</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="readout-card p-2">
-                            <span class="readout-label d-block text-dim" style="font-size: 0.6rem;">VOLUME FILLER VALUE</span>
-                            <div class="fw-bold fs-5 text-white">${data.drink_metrics.filler_volume_ml} ml</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="pt-2 border-top border-white border-opacity-5">
+                <div class="pt-2 border-top border-white border-opacity-5 print-hide">
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">MIXOLOGIST RECOMMENDATION</span>
                     <p class="mb-0 small text-dim italic mb-3">"${data.mixologist_notes}"</p>
                 </div>
 
                 ${prepStepsHtml}
 
-                <div class="pt-2 border-top border-white border-opacity-5">
-                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">OVERALL PROFILE DESCRIPTION</span>
-                    <p class="mb-0 small text-white opacity-90 italic" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
                 </div>
             `;
 
@@ -858,7 +783,7 @@ let currentScale = 1.0;
             if (data.ingredients && data.ingredients.filler) {
                 const fillerVal = data.ingredients.filler.volume_ml;
                 if (fillerNameEl) {
-                    fillerNameEl.innerHTML = `${data.ingredients.filler.name} <i class="bi bi-droplets text-info ms-1"></i>`;
+                    fillerNameEl.innerHTML = `${data.ingredients.filler.name} <i class="bi bi-droplets text-lab-accent ms-1"></i>`;
                 }
                 if (fillerVolumeEl) {
                     fillerVolumeEl.innerHTML = `${Math.round(fillerVal)} ml / ${formatImperialVolume(fillerVal)}`;
@@ -943,28 +868,12 @@ let currentScale = 1.0;
                 })
             });
 
-            const aiProfilePromise = fetch('/api/ai/synthesize/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-                body: JSON.stringify({
-                    ingredients: mappedIngredients,
-                    drink_type: 'COFFEE'
-                })
-            });
-
-            const [chemRes, aiRes] = await Promise.all([chemistryPromise, aiProfilePromise]);
+            const chemRes = await chemistryPromise;
             const data = await chemRes.json();
             latestCoffeeChemistryData = data;
             updateAmounts();
-            let aiProfileData = null;
-            try {
-                aiProfileData = await aiRes.json();
-            } catch (e) {
-                console.error("AI profile synthesis failed", e);
-            }
-
             let validationBadge = '';
-            if (data.recipe_validation) {
+            if (data.recipe_validation && !data.recipe_validation.toLowerCase().includes("pass")) {
                 let badgeClass = "bg-success bg-opacity-10 border-success text-success";
                 if (data.recipe_validation.toLowerCase().includes("warning")) {
                     badgeClass = "bg-warning bg-opacity-10 border-warning text-warning";
@@ -997,7 +906,7 @@ let currentScale = 1.0;
             chemistryContainer.innerHTML = `
                 ${validationBadge}
                 
-                <div class="row g-4 mb-4">
+                <div class="row g-4 mb-4 print-hide">
                     <div class="col-md-4">
                         <label class="readout-label mb-1">Calculated Body</label>
                         <div class="fs-4 fw-bold text-white mb-2">${metrics.calculated_body || 0}/5.0</div>
@@ -1041,16 +950,13 @@ let currentScale = 1.0;
                     <div class="d-flex flex-wrap">${notesHtml || '<span class="text-dim">None</span>'}</div>
                 </div>
 
-                <div class="pt-2 border-top border-white border-opacity-5">
+                <div class="pt-2 border-top border-white border-opacity-5 print-hide">
                     <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">BARISTA RECOMMENDATION</span>
                     <p class="mb-0 small text-dim italic mb-3">"${data.barista_notes}"</p>
                 </div>
 
                 ${prepStepsHtml}
 
-                <div class="pt-2 border-top border-white border-opacity-5">
-                    <span class="readout-label d-block text-dim mb-1" style="font-size: 0.65rem;">OVERALL PROFILE DESCRIPTION</span>
-                    <p class="mb-0 small text-white opacity-90 italic" style="white-space: pre-line;">${aiProfileData && aiProfileData.status === 'success' ? aiProfileData.summary : 'AI profile description unavailable.'}</p>
                 </div>
             `;
         } catch (err) {
@@ -1067,7 +973,7 @@ let currentScale = 1.0;
             } else {
                 setBottleScale(1.0, 'scale1L');
             }
-        } else if (drinkType === 'SLUSHIE') {
+        } else if (drinkType === 'CRYO') {
             if (savedSizeOz === 16.0) {
                 setBottleScale(0.5, 'scale16oz');
             } else if (savedSizeOz === 48.0) {

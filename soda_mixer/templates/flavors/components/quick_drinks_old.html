@@ -1,0 +1,22 @@
+<div class="d-flex justify-content-center mb-4 mt-0" id="modeToggleContainer">
+    <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
+        <button type="button" id="toggleStandard" class="btn rounded-pill px-4 py-2 fs-6 active-lab-mode fw-bold" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
+            <i class="bi bi-shield-check"></i> Standard Mode
+        </button>
+        <button type="button" id="toggleExperimental" class="btn rounded-pill px-4 py-2 fs-6 text-dim fw-bold" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
+            <i class="bi bi-flask"></i> Experimental Mode
+        </button>
+    </div>
+</div>
+
+<div id="aiQuickContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 w-100">
+        <h5 class="fw-bold mb-0 text-lab-accent">Quick Recommendations</h5>
+        <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" style="display: none;" onclick="generateQuickRecommendations()" id="btnGenerateQuick">
+            <i class="bi bi-lightning-charge me-1"></i> GENERATE MORE
+        </button>
+    </div>
+    <div id="quickDrinksList" class="d-flex flex-column gap-3">
+        <!-- Streamed cards will appear here -->
+    </div>
+</div>

@@ -26,16 +26,23 @@
     --text-muted: hsl(225, 20%, 90%);
     --text-dim: hsl(225, 15%, 70%);
     
-    --lab-accent-rgb: 164, 230, 76; /* Default Lime RGB for opacity usage */
+    --lab-accent-rgb: 230, 230, 230; /* Default Neutral RGB for opacity usage */
 
-    /* Defaults - Soda Theme */
+    /* Defaults - Neutral Theme */
+    --lab-accent: hsl(0, 0%, 98%);
+    --lab-accent-secondary: hsl(225, 15%, 70%);
+    --lab-accent-glow: hsla(0, 0%, 98%, 0.3);
+    --lab-gradient: linear-gradient(135deg, hsl(0, 0%, 98%), hsl(225, 15%, 70%));
+}
+
+/* Theme Overrides */
+.theme-soda {
     --lab-accent: var(--fizz-lime);
     --lab-accent-secondary: var(--fizz-cyan);
     --lab-accent-glow: hsla(82, 90%, 60%, 0.4);
     --lab-gradient: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan));
+    --lab-accent-rgb: 164, 230, 76;
 }
-
-/* Theme Overrides */
 .theme-coffee {
     --lab-accent: var(--fizz-amber);
     --lab-accent-secondary: var(--fizz-mocha);
@@ -43,7 +50,7 @@
     --lab-gradient: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha));
 }
 
-.theme-slushie {
+.theme-cryo {
     --lab-accent: hsl(200, 95%, 65%);
     --lab-accent-secondary: hsl(185, 80%, 45%);
     --lab-accent-glow: hsla(200, 95%, 65%, 0.4);
@@ -117,6 +124,10 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-text-fill-color: transparent;
 }
 
+.text-lab-accent {
+    color: var(--lab-accent) !important;
+}
+
 /* Mode Selectors & Buttons */
 .btn-accent {
     background: var(--lab-gradient);
@@ -137,6 +148,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-accent:active { transform: scale(0.98); }
+
+.btn-outline-lab {
+    color: var(--lab-accent) !important;
+    border-color: var(--lab-accent) !important;
+    background-color: transparent;
+}
+
+.btn-outline-lab:hover {
+    color: var(--bg-deep) !important;
+    background-color: var(--lab-accent) !important;
+}
 
 .glow-pulse {
     animation: glowPulse 2s infinite ease-in-out;
@@ -178,10 +200,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .active-lab-mode {
-    background: hsla(0, 0%, 100%, 0.15) !important;
-    color: var(--text-primary) !important;
-    font-weight: 700;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+    background: var(--lab-gradient) !important;
+    color: var(--bg-deep) !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 15px var(--lab-accent-glow) !important;
+    border-color: transparent !important;
 }
 
 /* Mixer Components */
@@ -248,8 +271,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-outline-experimental {
-    color: var(--experimental);
-    border: 1px solid var(--experimental);
+    color: var(--lab-accent);
+    border: 1px solid var(--lab-accent);
     background: transparent;
     border-radius: 8px;
     font-weight: 600;
@@ -257,9 +280,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-outline-experimental:hover,
 .btn-outline-experimental:focus {
-    background: var(--experimental);
-    color: white;
-    box-shadow: 0 0 14px var(--experimental-glow);
+    background: var(--lab-accent);
+    color: var(--bg-deep);
+    box-shadow: 0 0 14px var(--lab-accent-glow);
 }
 
 /* Solid accent button — used for primary lab actions */

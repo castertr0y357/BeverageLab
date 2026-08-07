@@ -1,0 +1,25 @@
+<div class="d-flex justify-content-center mb-4 mt-0" id="modeToggleContainer">
+    <div class="glass-surface p-1 rounded-pill d-flex gap-1 shadow-sm" style="border: 1px solid rgba(255,255,255,0.05);">
+        <button type="button" id="toggleStandard" class="btn rounded-pill px-4 py-2 fs-6 active-lab-mode fw-bold" onclick="setRecommendationMode('standard')" title="Compatibility Logic: Restrict to base lab reagents.">
+            <i class="bi bi-shield-check"></i> Standard Mode
+        </button>
+        <button type="button" id="toggleExperimental" class="btn rounded-pill px-4 py-2 fs-6 text-dim fw-bold" onclick="setRecommendationMode('experimental')" title="Compatibility Logic: Allow cross-lab reagents.">
+            <i class="bi bi-flask"></i> Experimental Mode
+        </button>
+    </div>
+</div>
+
+<div id="aiVibeContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5">
+    <div class="glass-surface p-4 mb-4">
+        <h5 class="fw-bold mb-3 text-lab-accent">Vibe Creation</h5>
+        <div class="input-group mb-3">
+            <input type="text" id="vibePromptInput" class="form-control bg-dark border-white border-opacity-10 text-white" placeholder="Describe a flavor, feeling, or vibe (e.g. 'A spicy tropical sunset')" onkeydown="if(event.key === 'Enter') { event.preventDefault(); document.getElementById('btnGenerateVibe').click(); }">
+            <button class="btn btn-outline-experimental border-white border-opacity-10 px-4" type="button" onclick="generateVibeDrink()" id="btnGenerateVibe">
+                <i class="bi bi-magic me-1"></i> SUBMIT
+            </button>
+        </div>
+    </div>
+    <div id="vibeDrinkResult" class="d-flex flex-column gap-3">
+        <!-- Streamed result card will appear here -->
+    </div>
+</div>
