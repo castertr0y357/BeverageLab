@@ -54,6 +54,9 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
     @classmethod
     def _mock_chat(cls, user_prompt: str, context: Optional[str] = None) -> str:
             """Return realistic JSON/text payloads in MOCK_MODE."""
+            if "[RAW STRING REQUEST]" in user_prompt:
+                return "Mock AI Generated Name"
+
             if "[STRUCTURED DATA REQUEST]" in user_prompt:
                 if "COFFEE" in user_prompt:
                     return json.dumps({

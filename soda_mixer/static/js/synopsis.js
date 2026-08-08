@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('synopsisScaleContainer').style.display = 'block';
         } else if (synthesisData.drink_type === 'coffee' || synthesisData.drink_type === 'COFFEE') {
             document.getElementById('synopsisCoffeeContainer').style.display = 'block';
-        } else if (synthesisData.drink_type === 'cryo' || synthesisData.drink_type === 'CRYO') {
+        } else if (synthesisData.drink_type === 'cryo' || synthesisData.drink_type === 'CRYO' || synthesisData.drink_type === 'slushie' || synthesisData.drink_type === 'SLUSHIE') {
             document.getElementById('synopsisCryoContainer').style.display = 'block';
         }
 
@@ -75,9 +75,39 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         document.getElementById('synthesisReportBody').innerHTML = "<div class='text-warning'>No compound data found in local storage or session. Please return to the laboratory.</div>";
     }
+
+    // Name field validation for Archive Synthesis button
+    const nameField = document.getElementById('recipeNameField');
+    const saveBtn = document.getElementById('saveMixBtn');
+    
+    if (nameField && saveBtn) {
+        const checkName = () => {
+            if (nameField.value.trim().length > 0) {
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '1';
+                saveBtn.style.pointerEvents = 'auto';
+            } else {
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.5';
+                saveBtn.style.pointerEvents = 'none';
+            }
+        };
+        
+        nameField.addEventListener('input', checkName);
+        
+        // Use MutationObserver or setInterval to handle AI populating the name field
+        // since setting .value programmatically doesn't always trigger 'input'
+        setInterval(checkName, 500);
+        checkName();
+    }
 });
 
 function autoArchiveSynopsis(data) {
+    if (data.source_mix_id) {
+        console.log("Loaded from existing archive, skipping auto-archive.");
+        return;
+    }
+
     // Generate a hash based on ingredients to avoid double-saving if the page is refreshed
     const hash = data.drink_type + '_' + (data.ingredients || []).map(i => i.id + '_' + i.amount).join('-');
     const storageKey = 'synopsis_archived_' + btoa(hash).substring(0, 32);
@@ -226,6 +256,12 @@ function populateSynopsis(data, chemistryData = null) {
     if (data.drink_type) {
         document.getElementById('drinkTypeField').value = data.drink_type;
     }
+    if (data.source_mix_id) {
+        let mixIdField = document.getElementById('sourceMixIdField');
+        if (mixIdField) {
+            mixIdField.value = data.source_mix_id;
+        }
+    }
     
     // Default form inputs
     const formInputsContainer = document.createElement('div');
@@ -236,7 +272,7 @@ function populateSynopsis(data, chemistryData = null) {
         let hasChemistry = !!chemistryData && !!chemistryData.ingredients;
         let isSoda = data.drink_type === 'SODA' || data.drink_type === 'soda';
         let isCoffee = data.drink_type === 'COFFEE' || data.drink_type === 'coffee';
-        let isCryo = data.drink_type === 'CRYO' || data.drink_type === 'cryo';
+        let isCryo = data.drink_type === 'CRYO' || data.drink_type === 'cryo' || data.drink_type === 'SLUSHIE' || data.drink_type === 'slushie';
         
         let basesToRender = [];
         if (hasChemistry) {
@@ -476,6 +512,10 @@ function triggerFlavorSynthesis(data) {
             ingredient_type: ing.type || ing.ingredient_type || 'SODA_SYRUP',
             physical_state: ing.physical_state,
             mixology_function: ing.mixology_function,
+            intensity: ing.intensity,
+            sweetness: ing.sweetness,
+            acidity: ing.acidity,
+            bitterness: ing.bitterness,
             is_primary: ing.isPrimary || false,
             amount: ing.amount || 20 // Default amount just in case
         };
@@ -507,9 +547,9 @@ function triggerFlavorSynthesis(data) {
         payload.coffee_style = synopsisCoffeeStyle;
         payload.drink_size_oz = synopsisCoffeeSize;
         payload.coffee_base_type = synopsisCoffeeBase;
-    } else if (data.drink_type === 'CRYO' || data.drink_type === 'cryo') {
+    } else if (data.drink_type === 'CRYO' || data.drink_type === 'cryo' || data.drink_type === 'SLUSHIE' || data.drink_type === 'slushie') {
         fetchUrl = '/api/cryo/chemistry/';
-        payload.batch_scale = synopsisCryoScale;
+        payload.bottle_scale = synopsisCryoScale / 32.0;
     } else {
         // default to SODA
         fetchUrl = '/api/soda/chemistry/';

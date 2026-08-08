@@ -41,6 +41,7 @@
                 <input type="hidden" name="drink_size_oz" id="drinkSizeOzField" value="{{ drink_size_oz|default:'' }}">
                 <input type="hidden" name="description" id="recipeDescriptionField">
                 <input type="hidden" name="lab_mode" id="labModeField" value="synopsis">
+                <input type="hidden" name="source_mix_id" id="sourceMixIdField">
 
                 <!-- Scale and Sweetness Controls (Hidden initially, shown by JS if Soda) -->
                 <div id="synopsisScaleContainer" class="glass-card p-3 mb-4 border-white border-opacity-10" style="display: none;">
@@ -164,5 +165,5 @@
     // Data can be passed through context if POST, otherwise js grabs from localStorage
     window.SYNOPSIS_PREFILL = {{ prefill_json|default:'null'|safe }};
 </script>
-<script src="{% static 'js/synopsis.js' %}?v=20"></script>
+<script src="{% static 'js/synopsis.js' %}?v=24"></script>
 {% endblock %}

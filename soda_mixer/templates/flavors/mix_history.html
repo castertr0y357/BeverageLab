@@ -76,12 +76,14 @@
                 {% endif %}
                 <div class="d-flex gap-2">
                     {% if not mix.promoted_recipe %}
-                    <button class="btn btn-primary btn-sm px-3 promote-btn" 
-                            data-mix-id="{{ mix.uuid }}" 
-                            data-ingredients="[{% for mi in mix.mix_ingredients.all %}{{ mi.ingredient.id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
-                            style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
-                        <i class="bi bi-journal-plus me-1"></i> Index
-                    </button>
+                    <form action="{% url 'synopsis_view' %}" method="POST" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="recipe_data" value='{"drink_type": "{{ mix.drink_type }}", "source_mix_id": "{{ mix.uuid }}", "ingredients": [{% for mi in mix.mix_ingredients.all %}{"id": {{ mi.ingredient.id }}, "name": "{{ mi.ingredient.name|escapejs }}", "amount": {{ mi.amount }}, "type": "{{ mi.ingredient.ingredient_type|default_if_none:''|escapejs }}", "category": "{{ mi.ingredient.category|default_if_none:''|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]}'>
+                        <button type="submit" class="btn btn-sm px-3 {% if mix.drink_type == 'SODA' %}text-dark fw-bold{% elif mix.drink_type == 'COFFEE' %}text-dark fw-bold{% elif mix.drink_type == 'SLUSHIE' %}text-dark fw-bold{% else %}btn-primary{% endif %}" 
+                                style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px; {% if mix.drink_type == 'SODA' %}background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important; box-shadow: 0 0 8px rgba(164, 230, 76, 0.3); border: 1px solid var(--glass-border);{% elif mix.drink_type == 'COFFEE' %}background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important; box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); border: 1px solid var(--glass-border);{% elif mix.drink_type == 'SLUSHIE' %}background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; box-shadow: 0 0 8px rgba(14, 165, 233, 0.3); border: 1px solid var(--glass-border);{% endif %}">
+                            <i class="bi bi-journal-plus me-1"></i> Index
+                        </button>
+                    </form>
                     {% else %}
                     <a href="{% url 'recipe_detail' mix.promoted_recipe.uuid %}" class="btn btn-sm btn-outline-success border-white border-opacity-10 text-white px-3" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 8px;">
                         Inspect
@@ -106,227 +108,19 @@
 </div>
 {% endif %}
 
-<!-- Promote Modal -->
-<div class="modal fade" id="promoteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-surface border-white border-opacity-10">
-            <div class="modal-header border-white border-opacity-5">
-                <h5 class="modal-title readout-label"><i class="bi bi-journal-plus text-lab-accent me-2"></i> Promote to Formula</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <input type="hidden" id="promoteMixId">
-                <div class="mb-4">
-                    <label class="readout-label mb-2">RECIPE IDENTITY <span class="text-danger">*</span></label>
-                    <div class="input-group">
-                        <input type="text" class="form-control bg-dark border-white border-opacity-10 text-white" id="promoteRecipeName" placeholder="Enter name..." required>
-                        <button class="btn btn-outline-secondary border-white border-opacity-10" type="button" id="suggestNameBtn" onclick="suggestName()">
-                            <i class="bi bi-magic"></i>
-                        </button>
-                    </div>
-                </div>
 
-                <div class="mb-4">
-                    <label class="readout-label mb-2">FIELD OBSERVATIONS</label>
-                    <textarea class="form-control bg-dark border-white border-opacity-10 text-white" id="promoteDescription" rows="2" placeholder="Sensory data..."></textarea>
-                </div>
-
-                <div class="mb-0">
-                    <label class="readout-label mb-3">CLASSIFICATIONS</label>
-                    <div id="suggestedCategoriesArea" class="mb-3 d-flex flex-wrap gap-2"></div>
-                    
-                    <div id="categoryCheckboxes" class="d-flex flex-wrap gap-3 mb-4 p-3 rounded glass-card border-white border-opacity-5">
-                        {% for cat in all_categories %}
-                        <div class="form-check">
-                            <input class="form-check-input promote-category-check" type="checkbox"
-                                   id="promoteCat{{ cat.id }}" value="{{ cat.id }}">
-                            <label class="form-check-label" for="promoteCat{{ cat.id }}">
-                                <span class="badge {{ cat.color }} small" style="font-size: 0.65rem;">{{ cat.name }}</span>
-                            </label>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control bg-dark border-white border-opacity-10 text-white" id="newCategoryName" placeholder="New tag...">
-                        <select class="form-select bg-dark border-white border-opacity-10 text-white" id="newCategoryColor" style="max-width: 100px;">
-                            <option value="bg-primary">Blue</option>
-                            <option value="bg-success">Green</option>
-                            <option value="bg-danger">Red</option>
-                            <option value="bg-warning text-dark">Yellow</option>
-                            <option value="bg-info text-dark">Cyan</option>
-                            <option value="bg-secondary" selected>Grey</option>
-                            <option value="bg-pink">Pink</option>
-                        </select>
-                        <button class="btn btn-outline-secondary border-white border-opacity-10" type="button" onclick="createAndAddCategory()">+</button>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-white border-opacity-5">
-                <button type="button" class="btn btn-link text-dim text-decoration-none" data-bs-dismiss="modal">Abort</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitPromotion()">
-                    <i class="bi bi-save me-1"></i> Index Formula
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let promoteIngredients = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.promote-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const mixId = this.getAttribute('data-mix-id');
-            const ingredients = JSON.parse(this.getAttribute('data-ingredients'));
-            openPromoteModal(mixId, ingredients);
-        });
-    });
-});
-
-function openPromoteModal(mixId, ingredientIds) {
-    promoteIngredients = ingredientIds;
-    document.getElementById('promoteMixId').value = mixId;
-    document.getElementById('promoteRecipeName').value = '';
-    document.getElementById('promoteDescription').value = '';
-    document.querySelectorAll('.promote-category-check').forEach(el => el.checked = false);
-    document.getElementById('suggestedCategoriesArea').innerHTML = '';
-
-    // Load suggestions
-    fetch('/api/category-suggestions/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ingredient_ids: ingredientIds})
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.suggested && data.suggested.length > 0) {
-            const area = document.getElementById('suggestedCategoriesArea');
-            area.innerHTML = `
-                <div class="readout-label text-dim small w-100 mb-1">AUTO-TAGS:</div>` +
-                data.suggested.map(s =>
-                    `<button type="button" class="btn btn-sm btn-outline-secondary me-1 suggested-cat-btn hover-lime border-white border-opacity-10 small" data-name="${s}" onclick="quickAddCategory('${s}')" style="font-size: 0.65rem;">${s}</button>`
-                ).join('');
-        }
-    });
-
-    const modal = new bootstrap.Modal(document.getElementById('promoteModal'));
-    modal.show();
-}
-
-function suggestName() {
-    const btn = document.getElementById('suggestNameBtn');
-    const originalContent = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    fetch('/api/generate-name/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({ingredient_ids: promoteIngredients})
-    })
-    .then(r => r.json())
-    .then(data => {
-        document.getElementById('promoteRecipeName').value = data.name;
-        btn.innerHTML = originalContent;
-    });
-}
-
-function quickAddCategory(name) {
-    fetch('/api/categories/create/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({name: name, color: 'bg-secondary'})
-    })
-    .then(r => r.json())
-    .then(data => {
-        let existing = document.getElementById(`promoteCat${data.id}`);
-        if (existing) {
-            existing.checked = true;
-        } else {
-            const wrap = document.getElementById('categoryCheckboxes');
-            wrap.insertAdjacentHTML('beforeend', `
-                <div class="form-check" id="catWrap${data.id}">
-                    <input class="form-check-input promote-category-check" type="checkbox"
-                           id="promoteCat${data.id}" value="${data.id}" checked>
-                    <label class="form-check-label" for="promoteCat${data.id}">
-                        <span class="badge ${data.color} small" style="font-size: 0.65rem;">${data.name}</span>
-                    </label>
-                </div>
-            `);
-        }
-        document.querySelectorAll('.suggested-cat-btn').forEach(btn => {
-            if (btn.dataset.name === name) btn.classList.add('active', 'btn-secondary');
-        });
-    });
-}
-
-function createAndAddCategory() {
-    const name = document.getElementById('newCategoryName').value.trim();
-    const color = document.getElementById('newCategoryColor').value;
-    if (!name) return;
-
-    fetch('/api/categories/create/', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({name, color})
-    })
-    .then(r => r.json())
-    .then(data => {
-        const wrap = document.getElementById('categoryCheckboxes');
-        const existing = document.getElementById(`promoteCat${data.id}`);
-        if (!existing) {
-            wrap.insertAdjacentHTML('beforeend', `
-                <div class="form-check">
-                    <input class="form-check-input promote-category-check" type="checkbox"
-                           id="promoteCat${data.id}" value="${data.id}" checked>
-                    <label class="form-check-label" for="promoteCat${data.id}">
-                        <span class="badge ${data.color} small" style="font-size: 0.65rem;">${data.name}</span>
-                    </label>
-                </div>
-            `);
-        } else {
-            existing.checked = true;
-        }
-        document.getElementById('newCategoryName').value = '';
-    });
-}
-
-function submitPromotion() {
-    const mixId = document.getElementById('promoteMixId').value;
-    const name = document.getElementById('promoteRecipeName').value.trim();
-    const description = document.getElementById('promoteDescription').value.trim();
-
-    if (!name) {
-        document.getElementById('promoteRecipeName').focus();
-        return;
-    }
-
-    const categoryIds = [...document.querySelectorAll('.promote-category-check:checked')]
-        .map(el => parseInt(el.value));
-
-    fetch(`/api/history/${mixId}/promote/`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({name, description, category_ids: categoryIds})
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.recipe_id) {
-            window.location.href = `/recipes/${data.recipe_id}/`;
-        } else {
-            alert(data.error || 'Promotion failed.');
-        }
-    });
-}
 
 function decommissionProtocol(mixId, btn) {
     if (!confirm("Decommission this archival protocol? This action will permanently remove the experimental log.")) {
         return;
     }
 
-    const card = btn.closest('.col-12');
+    const card = btn.closest('[class*="col-"]');
     fetch(`/api/history/${mixId}/delete/`, {
         method: 'POST',
         headers: {

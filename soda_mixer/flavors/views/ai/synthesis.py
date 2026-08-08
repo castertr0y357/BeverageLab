@@ -132,8 +132,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                     else:
                         candidate_pool = candidate_pool.exclude(ingredient_type=et)
 
-            if mode != 'experimental':
-                candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
+            candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
 
             # Merge active ingredients into exclusions to prevent duplicate suggestions
             active_names = [name.strip().lower() for name in ingredients if name and name != "NONE - Initial Synthesis"]
@@ -484,7 +483,7 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
         
         def sse_generator():
             try:
-                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type if mode == 'standard' else None)
+                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
                 stream = AIAssistant.stream_quick_recommendations(inventory_context, drink_type=drink_type, mode=mode)
                 
                 for index, recipe in enumerate(stream):
@@ -519,7 +518,7 @@ def ai_vibe_creation_api(request: HttpRequest) -> HttpResponse:
              
         def sse_generator():
             try:
-                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type if mode == 'standard' else None)
+                inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
                 stream = AIAssistant.stream_vibe_drink(vibe_prompt, inventory_context, drink_type=drink_type, mode=mode)
                 
                 for index, recipe in enumerate(stream):

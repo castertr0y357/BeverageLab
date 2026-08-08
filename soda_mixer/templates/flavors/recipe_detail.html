@@ -38,9 +38,6 @@
                         <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill print-hide" style="background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important; box-shadow: 0 0 10px rgba(14, 165, 233, 0.4); border: 1px solid var(--glass-border); text-transform: uppercase;">Cryo Lab</span>
                         {% endif %}
                     </h2>
-                    {% if recipe.description %}
-                    <p class="text-dim mt-2 lead" style="font-size: 1.1rem; line-height: 1.6;">{{ recipe.description }}</p>
-                    {% endif %}
                 </div>
                 <div class="print-hide d-flex gap-2">
                     <button class="btn btn-primary btn-sm text-dark fw-bold btn-mealie-export" id="mealieBtn" 
@@ -90,13 +87,6 @@
                                 <div class="btn-group w-100" id="coffeeBaseBtns">
                                     <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6 active-lab-mode" id="baseEspresso" onclick="setCoffeeBaseType('espresso')">Espresso</button>
                                     <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="baseStandardBrew" onclick="setCoffeeBaseType('standard_brew')">Std Brew</button>
-                                </div>
-                            </div>
-                            <div class="col-md-12 mt-3 animate-fade-in" id="espressoHotModeContainer" style="display: none;">
-                                <label class="readout-label d-block mb-2 text-lab-accent fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">HOT ESPRESSO STYLE</label>
-                                <div class="btn-group w-100" id="espressoHotModeBtns">
-                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6 active-lab-mode" id="hotModeShots" onclick="setEspressoHotMode('shots')">Espresso</button>
-                                    <button type="button" class="btn btn-sm btn-glass-toggle py-2 fs-6" id="hotModeWater" onclick="setEspressoHotMode('water')">Americano</button>
                                 </div>
                             </div>
                         </div>
@@ -238,22 +228,7 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if recipe.drink_type == 'SLUSHIE' and not recipe.has_ready_to_drink %}
-                <div class="col-md-6">
-                    <div class="glass-card p-3 border-info border-opacity-25 bg-dark bg-opacity-25 h-100">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="fw-bold fs-5 text-white" id="cryoFillerName">Volume Filler <i class="bi bi-droplets text-lab-accent ms-1"></i></div>
-                            <span class="badge-fizz bg-info text-dark" id="cryoFillerBadge">Freezing Filler</span>
-                        </div>
-                        <div class="d-flex justify-content-center align-items-center mt-auto">
-                            <div class="readout-card p-2 border-info border-opacity-50 flex-grow-1 text-center">
-                                <div class="readout-label text-center" style="font-size: 0.6rem;">VOLUME</div>
-                                <div class="fw-bold fs-5 text-white" id="cryoFillerDetailVolume"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
+
                 {% for ri in recipe.recipe_ingredients.all %}
                 <div class="col-md-6">
                     <div class="glass-card p-3 border-white border-opacity-10 bg-dark bg-opacity-25 h-100 {% if recipe.drink_type == 'SODA' and ri.is_primary %}border-warning{% endif %}"
@@ -346,6 +321,13 @@
                 <div class="col-12"><p class="text-dim">No base components identified in formula.</p></div>
                 {% endfor %}
             </div>
+
+            {% if recipe.description %}
+            <div class="glass-card mb-4 p-4 border-white border-opacity-10 print-hide">
+                <h5 class="text-lab-accent mb-3">AI Mixologist Analysis</h5>
+                <p class="text-dim mb-0" style="font-size: 1.05rem; line-height: 1.6; white-space: pre-wrap;">{{ recipe.description }}</p>
+            </div>
+            {% endif %}
 
             <div class="glass-card mb-4 p-4 border-white border-opacity-10">
                 {% if recipe.drink_type == 'COFFEE' %}
@@ -491,5 +473,5 @@
     window.RECIPE_COFFEE_STYLE = '{{ recipe.coffee_style|default:"hot" }}';
     window.RECIPE_COFFEE_BASE_TYPE = '{{ recipe.coffee_base_type|default:"espresso" }}';
 </script>
-<script src="{% static 'js/recipe_detail.js' %}?v=15"></script>
+<script src="{% static 'js/recipe_detail.js' %}?v=17"></script>
 {% endblock %}

@@ -41,15 +41,16 @@ function setSodaSweetness(style) {
         return oz.toFixed(2) + 'oz';
     }
 
-    let savedSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ) || (window.RECIPE_DRINK_TYPE === 'CRYO' ? 32.0 : 33.8);
+    let savedSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ) || (window.RECIPE_DRINK_TYPE === 'CRYO' || window.RECIPE_DRINK_TYPE === 'SLUSHIE' ? 32.0 : 33.8);
     let drinkType = window.RECIPE_DRINK_TYPE;
+    if (drinkType === 'SLUSHIE') drinkType = 'CRYO';
 
     // Coffee-specific state initialization
     let coffeeStyle = window.RECIPE_COFFEE_STYLE;
     let coffeeSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ || '12');
     let coffeeBaseType = window.RECIPE_COFFEE_BASE_TYPE;
     let coffeeBaseAmount = 2;
-    let coffeeEspressoHotMode = localStorage.getItem('coffee_espresso_hot_mode') || 'shots';
+    let coffeeEspressoHotMode = 'shots'; // Forced to shots, Americano mode removed
 
     function setEspressoHotMode(mode) {
         coffeeEspressoHotMode = mode;

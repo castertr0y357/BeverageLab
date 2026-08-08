@@ -31,7 +31,18 @@ def lab_view(request: HttpRequest, lab_type: str, mode: str) -> HttpResponse:
     for ing in ingredients:
         ing.show_brand = ing.name.lower() in multibrand_names
         
-    ingredient_dicts = [{'id': ing.id, 'name': ing.name, 'category': ing.category} for ing in ingredients]
+    ingredient_dicts = [{
+        'id': ing.id, 
+        'name': ing.name, 
+        'category': ing.category,
+        'ingredient_type': ing.ingredient_type,
+        'physical_state': ing.physical_state,
+        'mixology_function': ing.mixology_function,
+        'intensity': ing.intensity,
+        'sweetness': ing.sweetness,
+        'acidity': ing.acidity,
+        'bitterness': ing.bitterness
+    } for ing in ingredients]
     
     context = {
         'lab_type': lab_type.upper(),

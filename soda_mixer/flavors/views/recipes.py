@@ -26,6 +26,8 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
         description = request.POST.get('description', '').strip()
         category_ids = request.POST.getlist('categories')
         drink_type = request.POST.get('drink_type', 'SODA').upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
 
         ingredient_ids: List[str] = []
         for key, value in request.POST.items():
@@ -78,6 +80,15 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
             except (ValueError, ValidationError, IntegrityError) as e:
                 logger.error(f"RecipeCreation - Error - Failed to attach ingredient {ingredient_id} to recipe {recipe.id}: {e}")
 
+        source_mix_id = request.POST.get('source_mix_id')
+        if source_mix_id:
+            try:
+                mix = MixHistory.objects.get(uuid=source_mix_id)
+                mix.delete()
+                logger.info(f"RecipeCreation - Info - Deleted source mix {source_mix_id} from archives")
+            except MixHistory.DoesNotExist:
+                pass
+
         logger.info(f"RecipeCreation - Info - Successfully created recipe {recipe.name} (ID: {recipe.id})")
         return redirect('recipe_detail', uuid=recipe.uuid)
 
@@ -99,7 +110,10 @@ def edit_recipe(request: HttpRequest, uuid: str) -> HttpResponse:
 
         recipe.name = name
         recipe.description = description
-        recipe.drink_type = request.POST.get('drink_type', recipe.drink_type)
+        drink_type = request.POST.get('drink_type', recipe.drink_type)
+        if drink_type.upper() == 'CRYO':
+            drink_type = 'SLUSHIE'
+        recipe.drink_type = drink_type
         recipe.brew_method = request.POST.get('brew_method', recipe.brew_method)
         recipe.grind_size = request.POST.get('grind_size', recipe.grind_size)
         

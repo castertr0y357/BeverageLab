@@ -379,7 +379,7 @@ class AIGenerationMixin:
             return "Mystery Mix"
         
         ingredients_str = ", ".join(ingredient_names)
-        prompt = f"""[STRUCTURED DATA REQUEST] — RAW STRING ONLY. [NO PREAMBLE].
+        prompt = f"""[RAW STRING REQUEST] — RAW STRING ONLY. [NO PREAMBLE].
         
 You are a highly creative master mixologist.
 Task: Generate a single, highly creative, memorable, and aesthetic name for a {drink_type} beverage.
@@ -404,9 +404,26 @@ Constraints:
         import random
         seed = random.randint(10000, 99999)
         
+        # Inject random inspiration words to force variety across requests
+        inspirations = [
+            "neon, cyberpunk, futuristic",
+            "rustic, garden, earthy",
+            "midnight, velvet, mysterious",
+            "sunburst, tropical, vibrant",
+            "nostalgic, childhood, sweet",
+            "aggressive, sour, intense",
+            "calm, zen, herbal",
+            "autumn, spiced, warm",
+            "ocean, breeze, crisp",
+            "desert, arid, complex"
+        ]
+        inspiration = random.choice(inspirations)
+        
         prompt = f"""[QUICK DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
         
 Task: Act as a master mixologist. Create exactly 5 distinct, highly creative, and appealing {drink_type} recipes using ONLY the ingredients available in the provided Inventory Registry. If the inventory has fewer than 10 total ingredients, you may generate fewer recipes (minimum 3).
+
+[RANDOM INSPIRATION SEED: "{inspiration}"] - Use this inspiration seed to dramatically influence the naming, descriptions, and ingredient combinations of these recipes. 
 
 CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Do not rely on the same 5 combinations. Push the boundaries of mixology.
 

@@ -46,6 +46,7 @@ function generateQuickRecommendations() {
             recipe.ingredients.forEach(ing => {
                 let matchedId = null;
                 let matchedCategory = null;
+                let matchedDbIng = null;
                 const dataScript = document.getElementById('ingredients-data');
                 if (dataScript) {
                     try {
@@ -58,6 +59,7 @@ function generateQuickRecommendations() {
                             if (dbCleanName === cleanName) {
                                 matchedId = dbIng.id;
                                 matchedCategory = dbIng.category;
+                                matchedDbIng = dbIng;
                                 console.log(`[Quick Drink] MATCH FOUND: DB Name="${dbIng.name}", ID=${matchedId}, Category=${matchedCategory}`);
                                 break;
                             }
@@ -83,8 +85,20 @@ function generateQuickRecommendations() {
                     </div>`;
                 }
                 
-                if (matchedId) {
-                    mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                if (matchedId && matchedDbIng) {
+                    mappedIds.push({
+                        id: matchedId, 
+                        name: ing.name, 
+                        amount: ing.amount,
+                        type: matchedDbIng.ingredient_type || matchedDbIng.type,
+                        physical_state: matchedDbIng.physical_state,
+                        mixology_function: matchedDbIng.mixology_function,
+                        category: matchedDbIng.category,
+                        intensity: matchedDbIng.intensity,
+                        sweetness: matchedDbIng.sweetness,
+                        acidity: matchedDbIng.acidity,
+                        bitterness: matchedDbIng.bitterness
+                    });
                 } else {
                     mappedIds.push({name: ing.name, amount: ing.amount});
                     console.warn(`[Drinks Match] WARNING: No card found for "${ing.name}"`);
@@ -156,8 +170,8 @@ function selectGeneratedDrink(btnElement) {
     const recipeData = {
         name: recipeName,
         drink_type: currentLabMode, // Use dynamic currentLabMode
-        coffee_style: "",
-        coffee_base_type: "",
+        coffee_style: (currentLabMode === "COFFEE" || currentLabMode === "coffee") ? "HOT" : "",
+        coffee_base_type: (currentLabMode === "COFFEE" || currentLabMode === "coffee") ? "ESPRESSO" : "",
         drink_size_oz: 12,
         ingredients: ingredientData
     };
