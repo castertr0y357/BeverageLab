@@ -196,3 +196,8 @@ function setRecommendationMode(mode) {
         }
     } catch(e) {}
 }
+
+window.tryAgainVibe = function(prompt) {
+    document.getElementById('vibePromptInput').value = prompt;
+    generateVibeDrink();
+};

@@ -930,25 +930,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const systemList = systems.split(',');
             console.log(`[setLabMode] Eval: ${card.getAttribute('data-name')} | type: ${type} | systems: ${systems} | mode: ${mode}`);
             
-            let isTypeMatch = false;
-            if (mode === 'SODA') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'ADDITIVE' || type === 'OTHER');
-            } else if (mode === 'COFFEE') {
-                isTypeMatch = (type === 'COFFEE_BEAN');
-            } else if (mode === 'CRYO') {
-                isTypeMatch = (type === 'SODA_SYRUP' || type === 'ADDITIVE' || type === 'OTHER');
-            }
-            
             const checkMode = mode;
             const isSystemMatch = systemList.map(s => s.trim().toUpperCase()).includes(checkMode.toUpperCase());
-            const isExperimental = (recommendationMode === 'experimental');
             
-            // In experimental mode, any ingredient should be considered for inclusion.
-            if (isExperimental) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = (isTypeMatch && isSystemMatch) ? 'block' : 'none';
-            }
+            card.style.display = isSystemMatch ? 'block' : 'none';
         });
         
         // Update UI Text removed for cleaner mixture-focused interface
@@ -1063,6 +1048,9 @@ function cancelInFlightLLMCalls() {
     }
 
     function selectIngredient(id, name, intensity, category, profile = null, silent = false, amount = null, sweetness = 0, acidity = 0, bitterness = 0, complexity = 0, type = null, isReadyToDrink = false, isDry = false, roastLevel = null, flavorNotes = '', isDecaf = false) {
+        if (name === 'Ice Melt Water') {
+            return;
+        }
         console.log("Integrating reagent:", name);
         
         if (isMixSealed) {
@@ -2197,7 +2185,7 @@ function cancelInFlightLLMCalls() {
             
             const checkMode = currentLabMode;
             const isSystemMatch = systemList.map(s => s.trim().toUpperCase()).includes(checkMode.toUpperCase());
-            let shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
+            let shouldShow = isExperimental ? isTypeMatch : (isTypeMatch && isSystemMatch);
             console.log(`  -> isTypeMatch: ${isTypeMatch}, isSystemMatch: ${isSystemMatch}, shouldShow: ${shouldShow}`);
             if (currentLabMode === 'CRYO') {
                 if (isWaterBaseStep2) {
@@ -2222,7 +2210,10 @@ function cancelInFlightLLMCalls() {
                 col.setAttribute('data-systems', systems);
                 col.innerHTML = card.innerHTML;
                 
-                if (isExperimental) {
+                if (currentLabMode === 'CRYO') {
+                    recommendedList.appendChild(col);
+                    recommendedCount++;
+                } else if (isExperimental) {
                     // Experimental Mode: promote low base suitability (unorthodox)
                     if (baseScore < 3.5) {
                         recommendedList.appendChild(col);
@@ -2249,9 +2240,13 @@ function cancelInFlightLLMCalls() {
         document.getElementById('unorthodoxBasesGroup').style.display = unorthodoxCount > 0 ? 'block' : 'none';
         
         // Update titles
-        if (isWaterBaseStep2) {
-            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-lab-accent me-2"></i>RECOMMENDED SYRUP BASES';
-            unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY SYRUPS';
+        if (currentLabMode === 'CRYO') {
+            if (isWaterBaseStep2) {
+                recommendedTitle.innerHTML = '<i class="bi bi-snow text-info me-2"></i>FLAVORINGS & SYRUPS';
+            } else {
+                recommendedTitle.innerHTML = '<i class="bi bi-droplet-half text-info me-2"></i>BASE FILLER';
+            }
+            unorthodoxTitle.innerHTML = '';
         } else if (isExperimental) {
             recommendedTitle.innerHTML = '<i class="bi bi-flask text-experimental me-2"></i>RECOMMENDED UNORTHODOX SUBSTRATES';
             unorthodoxTitle.innerHTML = '<i class="bi bi-shield text-dim me-2"></i>STANDARD / SAFE BASES';
@@ -2697,8 +2692,8 @@ function cancelInFlightLLMCalls() {
                             textClass = 'text-warning';
                             iconHtml = '<i class="bi bi-star-fill text-warning me-1" style="filter: drop-shadow(0 0 5px var(--fizz-amber));"></i>';
                         } else if (isExperimentalMode) {
-                            cardClass = 'border-experimental glow-experimental';
-                            textClass = 'text-experimental';
+                            cardClass = 'border-neural glow-neural';
+                            textClass = 'text-lab-accent';
                             iconHtml = '<i class="bi bi-flask me-1"></i>';
                         } else if (isAiEngine) {
                             cardClass = 'border-neural glow-neural';
@@ -3196,6 +3191,7 @@ function updateSelectedArea(isDone = false) {
         // 🧊 Inject virtual base modifiers (like Ice) for Coffee mode
         if (currentLabMode === 'COFFEE' && latestCoffeeChemistryData && latestCoffeeChemistryData.ingredients && latestCoffeeChemistryData.ingredients.base_modifiers) {
             latestCoffeeChemistryData.ingredients.base_modifiers.forEach(bm => {
+                if (bm.name === 'Ice Melt Water') return;
                 const volMl = bm.volume_oz * 29.5735;
                 html += `
                     <div class="col animate-fade-in">
@@ -3210,6 +3206,25 @@ function updateSelectedArea(isDone = false) {
                     </div>
                 `;
             });
+        }
+        
+        if (currentLabMode === 'COFFEE' && latestCoffeeChemistryData && latestCoffeeChemistryData.drink_metrics) {
+            const iceSpaceOz = latestCoffeeChemistryData.drink_metrics.ice_space_reserved_oz || 0;
+            if (iceSpaceOz > 0 && latestCoffeeChemistryData.drink_metrics.style === 'Iced') {
+                const volMl = iceSpaceOz * 29.5735;
+                html += `
+                    <div class="col animate-fade-in">
+                        <div class="glass-card p-3 text-center border-info border-opacity-20 h-100 d-flex flex-column justify-content-center align-items-center" style="position: relative;">
+                            <span class="readout-label d-block mb-1" style="font-size: 0.75rem;">BASE MODIFIER</span>
+                            <div class="fw-bold mb-1" style="font-size: 1.25rem;">Ice <i class="bi bi-snow text-lab-accent ms-1"></i></div>
+                            <div class="text-lab-accent fw-black mb-2" style="font-size: 1.0rem;">${Math.round(volMl)}ml / ${formatImperialVolume(volMl)}</div>
+                            <div class="mt-1 pt-1 border-top border-white border-opacity-10 w-100">
+                                <div class="badge bg-neutral mb-1">NEUTRAL</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         const roles = ['BASE', 'PAYLOAD', 'ACCENT', 'DEEP ACCENT', 'STABILIZER'];

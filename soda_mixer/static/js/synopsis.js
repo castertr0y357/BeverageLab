@@ -296,12 +296,22 @@ function populateSynopsis(data, chemistryData = null) {
 
                 if (chemistryData.ingredients.base_modifiers && chemistryData.ingredients.base_modifiers.length > 0) {
                     chemistryData.ingredients.base_modifiers.forEach(bm => {
+                        if (bm.name === 'Ice Melt Water') return;
                         basesToRender.push({
                             name: bm.name,
                             volume: bm.volume_oz * 29.5735,
                             role: 'BASE MODIFIER',
                             category: 'NEUTRAL'
                         });
+                    });
+                }
+
+                if (chemistryData.drink_metrics && chemistryData.drink_metrics.style === 'Iced' && chemistryData.drink_metrics.ice_space_reserved_oz > 0) {
+                    basesToRender.push({
+                        name: 'Ice',
+                        volume: chemistryData.drink_metrics.ice_space_reserved_oz * 29.5735,
+                        role: 'BASE MODIFIER',
+                        category: 'NEUTRAL'
                     });
                 }
 

@@ -255,8 +255,8 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                     text_class = 'text-warning'
                                     icon_html = '<i class="bi bi-star-fill text-warning me-1" style="filter: drop-shadow(0 0 5px var(--fizz-amber));"></i>'
                                 elif mode == 'experimental':
-                                    card_class = 'border-experimental glow-experimental'
-                                    text_class = 'text-experimental'
+                                    card_class = 'border-neural glow-neural'
+                                    text_class = 'text-lab-accent'
                                     icon_html = '<i class="bi bi-flask me-1"></i>'
                                 else:
                                     card_class = 'border-neural glow-neural'
