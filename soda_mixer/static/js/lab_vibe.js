@@ -54,9 +54,14 @@ function generateVibeDrink() {
                         }
                     }
                     if (matchedCategory) {
-                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1"><span class="me-1">${ing.name}</span><span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75" style="font-size: 0.55rem; padding: 0.15rem 0.3rem;">${matchedCategory.toUpperCase()}</span></span>`;
+                        badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex flex-column align-items-center gap-1" style="background: rgba(255,255,255,0.03); min-width: 80px;">
+                            <span style="font-size: 0.85rem;">${ing.name}</span>
+                            <span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75 w-100 text-center" style="font-size: 0.6rem; padding: 0.2rem 0.4rem; border-radius: 4px; letter-spacing: 0.5px;">${matchedCategory.toUpperCase()}</span>
+                        </div>`;
                     } else {
-                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1">${ing.name}</span>`;
+                        badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.03); min-width: 80px; font-size: 0.85rem;">
+                            <span>${ing.name}</span>
+                        </div>`;
                     }
                     
                     if (matchedId) {

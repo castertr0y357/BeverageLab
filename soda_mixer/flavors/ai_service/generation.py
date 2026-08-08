@@ -390,6 +390,8 @@ Constraints:
 - Maximum 3 words.
 - Do not use quotes around the name.
 - Do not add any extra text or explanation.
+- Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo).
+- Do NOT include any ingredient brand names.
 """
         response = cls.chat(prompt, drink_type=drink_type, mode='creative')
         if not response:
@@ -441,7 +443,9 @@ Each JSON object must have the following structure:
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
 2. For amounts: For SODA/SLUSHIE, use ml (typically summing around 100-160ml for the flavor base). For COFFEE, base coffee beans use grams (default 18.0g), liquids use ml (e.g., milk 50.0ml, syrup 15.0ml).
-3. If {drink_type} is COFFEE, ensure you include exactly ONE base coffee bean ingredient and ONE dairy/milk ingredient.
+3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
+4. Do NOT include any ingredient brand names in the recipe name.
+5. If the request gives a specific flavor goal, optimize amounts for balance. If {drink_type} is COFFEE, ensure you include exactly ONE base coffee bean ingredient and ONE dairy/milk ingredient.
 
 Inventory Registry: See context.
 """
@@ -500,6 +504,8 @@ Output exactly ONE JSON object with the following structure:
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
 2. For amounts: For SODA/SLUSHIE, use ml. For COFFEE, base coffee beans use grams, liquids use ml.
+3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
+4. Do NOT include any ingredient brand names in the recipe name.
 """
         stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type, mode=mode)
         
