@@ -138,3 +138,7 @@
 - [x] Implemented auto-archiving for synthesis protocols via Javascript sessionStorage on the synopsis page, allowing all creation modes to archive correctly. Removed redundant history save API calls from lab_manual.js.
 - [x] Fixed backend Coffee Chemistry test suite: corrected Americano hot water dilution assignments, prevented Short Milk drinks from destructively overwriting the target liquid budget, fixed total volume logic to subtract hot water, and corrected Melt-Tax naming output to 'Ice Melt Water'.
 - [x] Removed redundant 'Initiate Synthesis' buttons from the Archives (Mix History) and Laboratory Notebook (Recipe List) pages and their empty states.
+- [x] Replaced Ice Melt Water with Ice for Coffee mode in manual builder and synopsis.
+- [x] Stripped hardcoded Javascript type constraints in lab manual builder; UI filtering now strictly respects database system tags.
+- [x] Consolidated Cryo mode syrups into a single grid (removed base/accent partition).
+- [x] Fixed missing tryAgainVibe function in Vibe Creator.
