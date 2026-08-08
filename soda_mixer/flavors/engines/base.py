@@ -82,3 +82,62 @@ class BaseEngine:
             'acidity': round(acid, 1),
             'bitterness': round(bitter, 1)
         }
+
+class BaseChemistryEngine:
+    """Base chemistry engine that provides common utilities for processing ingredients."""
+    def __init__(self, ingredients_input: List[Dict[str, Any]]):
+        self.ingredients_input = ingredients_input
+        self.modifiers = []
+        self.bases = []
+        self.fillers = []
+
+    def parse_ingredients(self):
+        """Pre-process ingredients if needed."""
+        pass
+
+    def partition_roles(self):
+        """Partition ingredients into roles."""
+        pass
+
+    def calculate_metrics(self, output_items: List[Dict[str, Any]]) -> Dict[str, float]:
+        """Calculate weighted average sweetness, acidity, and bitterness scores."""
+        total_weights = 0.0
+        weighted_sweetness = 0.0
+        weighted_acidity = 0.0
+        weighted_bitterness = 0.0
+        
+        for item in output_items:
+            vol = item.get('volume_ml', item.get('volume_oz', 0.0))
+            if vol <= 0.0:
+                continue
+                
+            orig = next((i for i in self.ingredients_input if i.get('id') == item.get('id')), None)
+            if not orig and item.get('id') == 'virtual_water':
+                orig = {'sweetness': 1, 'acidity': 1, 'bitterness': 1}
+                
+            if orig:
+                sweet = float(orig.get('sweetness_score', orig.get('sweetness', 3.0)))
+                acid = float(orig.get('acidity_score', orig.get('acidity', 2.0)))
+                bitter = float(orig.get('bitterness_score', orig.get('bitterness', 1.0)))
+                
+                weighted_sweetness += sweet * vol
+                weighted_acidity += acid * vol
+                weighted_bitterness += bitter * vol
+                total_weights += vol
+                
+        if total_weights > 0.0:
+            return {
+                'sweetness': round(weighted_sweetness / total_weights, 2),
+                'acidity': round(weighted_acidity / total_weights, 2),
+                'bitterness': round(weighted_bitterness / total_weights, 2)
+            }
+        else:
+            return {
+                'sweetness': 3.0,
+                'acidity': 2.0,
+                'bitterness': 1.0
+            }
+
+    def process(self) -> Dict[str, Any]:
+        """Main method to be overridden by subclasses."""
+        raise NotImplementedError

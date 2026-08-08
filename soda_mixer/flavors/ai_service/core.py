@@ -19,16 +19,41 @@ from .generation import AIGenerationMixin
 
 class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMixin, AIGenerationMixin):
     @classmethod
-    def get_static_ingredients_context(cls, drink_type: Optional[str] = None) -> str:
+    def get_filtered_inventory(cls, drink_type: Optional[str] = None, force_type: Optional[str] = None, exclude_types: Optional[List[str]] = None):
+        """Fetch and filter the ingredient inventory based on current lab mode constraints."""
+        from ..models import Ingredient
+        ingredients = Ingredient.objects.filter(is_in_inventory=True)
+        if drink_type:
+            ingredients = ingredients.filter(compatible_systems__icontains=drink_type.upper())
+        if force_type:
+            ft = force_type.upper()
+            if ft == 'COFFEE_BEAN':
+                ingredients = ingredients.filter(physical_state='SOLID_EXTRACTABLE')
+            elif ft == 'DAIRY':
+                ingredients = ingredients.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+            elif ft == 'SODA_SYRUP':
+                ingredients = ingredients.filter(physical_state='SYRUP', mixology_function='FLAVORING')
+            elif ft == 'ADDITIVE':
+                ingredients = ingredients.filter(mixology_function__in=['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
+            else:
+                ingredients = ingredients.filter(ingredient_type=force_type)
+        
+        if exclude_types:
+            for et in exclude_types:
+                et = et.upper()
+                if et == 'COFFEE_BEAN':
+                    ingredients = ingredients.exclude(physical_state='SOLID_EXTRACTABLE')
+                elif et == 'DAIRY':
+                    ingredients = ingredients.exclude(mixology_function='VOLUME_BASE', physical_state='LIQUID')
+                else:
+                    ingredients = ingredients.exclude(ingredient_type=et)
+                    
+        return ingredients
+
+    @classmethod
+    def get_static_ingredients_context(cls, drink_type: Optional[str] = None, force_type: Optional[str] = None, exclude_types: Optional[List[str]] = None) -> str:
             """Serialize active inventory ingredients into a stable, sorted, rich text format, filtered by mode."""
-            from ..models import Ingredient
-            ingredients = Ingredient.objects.filter(is_in_inventory=True)
-            if drink_type:
-                sys_val = drink_type.upper()
-                if sys_val == 'CRYO':
-                    sys_val = 'SLUSHIE'
-                ingredients = ingredients.filter(compatible_systems__icontains=sys_val)
-            ingredients = ingredients.order_by('name', 'brand')
+            ingredients = cls.get_filtered_inventory(drink_type, force_type, exclude_types).order_by('name', 'brand')
             
             registry = []
             for ing in ingredients:

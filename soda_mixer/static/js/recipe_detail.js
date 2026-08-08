@@ -41,9 +41,9 @@ function setSodaSweetness(style) {
         return oz.toFixed(2) + 'oz';
     }
 
-    let savedSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ) || (window.RECIPE_DRINK_TYPE === 'CRYO' || window.RECIPE_DRINK_TYPE === 'SLUSHIE' ? 32.0 : 33.8);
-    let drinkType = window.RECIPE_DRINK_TYPE;
-    if (drinkType === 'SLUSHIE') drinkType = 'CRYO';
+    let savedSizeOz = parseFloat(window.RECIPE_DRINK_SIZE_OZ) || (isCryoMode(window.RECIPE_DRINK_TYPE) ? 32.0 : 33.8);
+
+    let drinkType = window.RECIPE_DRINK_TYPE || 'SODA';
 
     // Coffee-specific state initialization
     let coffeeStyle = window.RECIPE_COFFEE_STYLE;

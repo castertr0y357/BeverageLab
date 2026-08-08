@@ -107,32 +107,11 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
 
             # Filter the candidate pool for this step
-            all_ingredients = Ingredient.objects.filter(is_in_inventory=True)
-            candidate_pool = all_ingredients
-            if force_type:
-                ft = force_type.upper()
-                if ft == 'COFFEE_BEAN':
-                    candidate_pool = candidate_pool.filter(physical_state='SOLID_EXTRACTABLE')
-                elif ft == 'DAIRY':
-                    candidate_pool = candidate_pool.filter(mixology_function='VOLUME_BASE', physical_state='LIQUID')
-                elif ft == 'SODA_SYRUP':
-                    candidate_pool = candidate_pool.filter(physical_state='SYRUP', mixology_function='FLAVORING')
-                elif ft == 'ADDITIVE':
-                    candidate_pool = candidate_pool.filter(mixology_function__in=['FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'])
-                else:
-                    candidate_pool = candidate_pool.filter(ingredient_type=force_type)
-            
-            if exclude_types:
-                for et in exclude_types:
-                    et = et.upper()
-                    if et == 'COFFEE_BEAN':
-                        candidate_pool = candidate_pool.exclude(physical_state='SOLID_EXTRACTABLE')
-                    elif et == 'DAIRY':
-                        candidate_pool = candidate_pool.exclude(mixology_function='VOLUME_BASE', physical_state='LIQUID')
-                    else:
-                        candidate_pool = candidate_pool.exclude(ingredient_type=et)
-
-            candidate_pool = candidate_pool.filter(compatible_systems__icontains=drink_type)
+            candidate_pool = AIAssistant.get_filtered_inventory(
+                drink_type=drink_type,
+                force_type=force_type,
+                exclude_types=exclude_types
+            )
 
             # Merge active ingredients into exclusions to prevent duplicate suggestions
             active_names = [name.strip().lower() for name in ingredients if name and name != "NONE - Initial Synthesis"]

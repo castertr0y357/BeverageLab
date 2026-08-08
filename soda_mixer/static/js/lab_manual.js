@@ -939,7 +939,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 isTypeMatch = (type === 'SODA_SYRUP' || type === 'ADDITIVE' || type === 'OTHER');
             }
             
-            const checkMode = mode === 'CRYO' ? 'SLUSHIE' : mode;
+            const checkMode = mode;
             const isSystemMatch = systemList.map(s => s.trim().toUpperCase()).includes(checkMode.toUpperCase());
             const isExperimental = (recommendationMode === 'experimental');
             
@@ -2195,7 +2195,7 @@ function cancelInFlightLLMCalls() {
                 }
             }
             
-            const checkMode = currentLabMode === 'CRYO' ? 'SLUSHIE' : currentLabMode;
+            const checkMode = currentLabMode;
             const isSystemMatch = systemList.map(s => s.trim().toUpperCase()).includes(checkMode.toUpperCase());
             let shouldShow = isExperimental ? true : (isTypeMatch && isSystemMatch);
             console.log(`  -> isTypeMatch: ${isTypeMatch}, isSystemMatch: ${isSystemMatch}, shouldShow: ${shouldShow}`);

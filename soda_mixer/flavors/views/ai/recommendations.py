@@ -45,10 +45,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
         drink_type = data.get('drink_type', 'SODA').upper()
         mode = data.get('mode', 'standard')
         
-        all_compatible = Ingredient.objects.filter(
-            is_in_inventory=True,
-            compatible_systems__contains=drink_type
-        )
+        all_compatible = AIAssistant.get_filtered_inventory(drink_type=drink_type)
         
         if all_compatible.count() < 3:
              return JsonResponse({'error': 'Insufficient reagents in inventory for a random synthesis.'}, status=400)

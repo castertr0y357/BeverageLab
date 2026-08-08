@@ -26,8 +26,6 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
         description = request.POST.get('description', '').strip()
         category_ids = request.POST.getlist('categories')
         drink_type = request.POST.get('drink_type', 'SODA').upper()
-        if drink_type == 'CRYO':
-            drink_type = 'SLUSHIE'
 
         ingredient_ids: List[str] = []
         for key, value in request.POST.items():
@@ -111,8 +109,6 @@ def edit_recipe(request: HttpRequest, uuid: str) -> HttpResponse:
         recipe.name = name
         recipe.description = description
         drink_type = request.POST.get('drink_type', recipe.drink_type)
-        if drink_type.upper() == 'CRYO':
-            drink_type = 'SLUSHIE'
         recipe.drink_type = drink_type
         recipe.brew_method = request.POST.get('brew_method', recipe.brew_method)
         recipe.grind_size = request.POST.get('grind_size', recipe.grind_size)
@@ -197,8 +193,6 @@ def add_recipe_api(request: HttpRequest) -> JsonResponse:
         description = data.get('description', '')
         ingredients = data.get('ingredients', [])
         drink_type = data.get('drink_type', 'SODA').upper()
-        if drink_type == 'CRYO':
-            drink_type = 'SLUSHIE'
 
         if not name:
             logger.warning("RecipeCreationAPI - Warning - Name field is empty during API recipe creation.")

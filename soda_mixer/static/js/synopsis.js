@@ -55,11 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (synthesisData.sodaSweetnessStyle) synopsisSweetnessStyle = synthesisData.sodaSweetnessStyle;
 
         // Show scale toggles if it's SODA
-        if (synthesisData.drink_type === 'soda' || synthesisData.drink_type === 'SODA') {
+        if (isSodaMode(synthesisData.drink_type)) {
             document.getElementById('synopsisScaleContainer').style.display = 'block';
-        } else if (synthesisData.drink_type === 'coffee' || synthesisData.drink_type === 'COFFEE') {
+        } else if (isCoffeeMode(synthesisData.drink_type)) {
             document.getElementById('synopsisCoffeeContainer').style.display = 'block';
-        } else if (synthesisData.drink_type === 'cryo' || synthesisData.drink_type === 'CRYO' || synthesisData.drink_type === 'slushie' || synthesisData.drink_type === 'SLUSHIE') {
+        } else if (isCryoMode(synthesisData.drink_type)) {
             document.getElementById('synopsisCryoContainer').style.display = 'block';
         }
 
@@ -270,9 +270,9 @@ function populateSynopsis(data, chemistryData = null) {
     if (data.ingredients && Array.isArray(data.ingredients)) {
         // If we have chemistry data, we render the big cards
         let hasChemistry = !!chemistryData && !!chemistryData.ingredients;
-        let isSoda = data.drink_type === 'SODA' || data.drink_type === 'soda';
-        let isCoffee = data.drink_type === 'COFFEE' || data.drink_type === 'coffee';
-        let isCryo = data.drink_type === 'CRYO' || data.drink_type === 'cryo' || data.drink_type === 'SLUSHIE' || data.drink_type === 'slushie';
+        let isSoda = isSodaMode(data.drink_type);
+        let isCoffee = isCoffeeMode(data.drink_type);
+        let isCryo = isCryoMode(data.drink_type);
         
         let basesToRender = [];
         if (hasChemistry) {
@@ -526,7 +526,7 @@ function triggerFlavorSynthesis(data) {
         ingredients: mappedIngredients
     };
 
-    if (data.drink_type === 'COFFEE' || data.drink_type === 'coffee') {
+    if (isCoffeeMode(data.drink_type)) {
         fetchUrl = '/api/coffee/chemistry/';
         
         let drinkCategory = 'Hot Coffee';
@@ -547,7 +547,7 @@ function triggerFlavorSynthesis(data) {
         payload.coffee_style = synopsisCoffeeStyle;
         payload.drink_size_oz = synopsisCoffeeSize;
         payload.coffee_base_type = synopsisCoffeeBase;
-    } else if (data.drink_type === 'CRYO' || data.drink_type === 'cryo' || data.drink_type === 'SLUSHIE' || data.drink_type === 'slushie') {
+    } else if (isCryoMode(data.drink_type)) {
         fetchUrl = '/api/cryo/chemistry/';
         payload.bottle_scale = synopsisCryoScale / 32.0;
     } else {
@@ -658,9 +658,9 @@ function renderChemistryReport(data, originalData) {
         return;
     }
     
-    let isSoda = originalData.drink_type === 'SODA' || originalData.drink_type === 'soda';
-    let isCoffee = originalData.drink_type === 'COFFEE' || originalData.drink_type === 'coffee';
-    let isCryo = originalData.drink_type === 'CRYO' || originalData.drink_type === 'cryo';
+    let isSoda = isSodaMode(originalData.drink_type);
+    let isCoffee = isCoffeeMode(originalData.drink_type);
+    let isCryo = isCryoMode(originalData.drink_type);
 
     let validationHtml = '';
     const validationMsg = data.recipe_validation || 'Pass';

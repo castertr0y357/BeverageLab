@@ -34,7 +34,7 @@ class Recipe(SoftDeleteModel):
     DRINK_TYPE_CHOICES = [
         ('SODA', 'Soda Synthesis'),
         ('COFFEE', 'Coffee Laboratory'),
-        ('SLUSHIE', 'Cryo-Slushie Lab'),
+        ('CRYO', 'Cryo-Slushie Lab'),
     ]
 
     BREW_METHOD_CHOICES = [
