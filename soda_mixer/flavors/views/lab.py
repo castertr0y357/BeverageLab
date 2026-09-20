@@ -51,6 +51,13 @@ def lab_view(request: HttpRequest, lab_type: str, mode: str) -> HttpResponse:
         'ingredients_json': json.dumps(ingredient_dicts),
     }
     
+    if mode.lower() == 'quick':
+        lab_system = 'SLUSHIE' if lab_type.upper() == 'CRYO' else lab_type.upper()
+        active_lab_ingredients = [ing for ing in ingredients if lab_system in ing.compatible_systems]
+        excluded_categories = {'Coffee', 'Dairy'}
+        available_categories = sorted(set(ing.category.title() for ing in active_lab_ingredients if ing.category and ing.category.title() not in excluded_categories))
+        context['available_categories'] = available_categories
+    
     # Render the specific lab mode template
     template_name = f'flavors/lab_{mode}.html'
     return render(request, template_name, context)

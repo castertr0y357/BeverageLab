@@ -76,7 +76,7 @@ def random_pairing_api(request: HttpRequest) -> JsonResponse:
                     if match and match not in [s['obj'] for s in selection]:
                         selection.append({
                             'obj': match,
-                            'amount': item.get('amount')
+                            'amount': item.get('parts', item.get('amount'))
                         })
         
         target_count = random.randint(2, 4) if drink_type != 'COFFEE' else random.randint(3, 5)

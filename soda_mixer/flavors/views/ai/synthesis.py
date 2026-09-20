@@ -143,7 +143,8 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
             
             import time
             from django.template.loader import render_to_string
-            inventory_items = list(Ingredient.objects.filter(is_in_inventory=True))
+            lab_system = 'SLUSHIE' if drink_type == 'CRYO' else drink_type
+            inventory_items = list(Ingredient.objects.filter(is_in_inventory=True, compatible_systems__icontains=lab_system))
             multibrand_names = get_multibrand_names_in_inventory()
             enriched = []
             final_data = None
@@ -220,7 +221,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                                 else:
                                     intensity_delta = 3
                                 
-                                amount = item.get('amount')
+                                amount = item.get('parts', item.get('amount'))
                                 if drink_type == 'COFFEE':
                                     amount = sanitize_coffee_amount(target_obj, amount)
 
@@ -279,7 +280,7 @@ def ai_suggest_api(request: HttpRequest) -> HttpResponse:
                             rebalancing_raw = final_data.get('rebalancing', {})
                             
                             if isinstance(rebalancing_raw, list):
-                                rebalancing = {item.get('name'): item.get('amount') for item in rebalancing_raw if item.get('name') is not None}
+                                rebalancing = {item.get('name'): item.get('parts', item.get('amount')) for item in rebalancing_raw if item.get('name') is not None}
                             else:
                                 rebalancing = rebalancing_raw
                             
@@ -459,11 +460,12 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
             drink_type = 'SLUSHIE'
         
         mode = request.GET.get('mode', 'standard')
+        profile = request.GET.get('profile', None)
         
         def sse_generator():
             try:
                 inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
-                stream = AIAssistant.stream_quick_recommendations(inventory_context, drink_type=drink_type, mode=mode)
+                stream = AIAssistant.stream_quick_recommendations(inventory_context, drink_type=drink_type, mode=mode, profile=profile)
                 
                 for index, recipe in enumerate(stream):
                     recipe['index'] = index

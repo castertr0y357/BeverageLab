@@ -42,9 +42,9 @@ class SodaChemistryEngineTest(TestCase):
                 'sweetness_style': 'CRAFT',
                 'bottle_scale': 1.0,
                 'ingredients': [
-                    {'name': 'Watermelon Syrup', 'type': 'SODA_SYRUP', 'intensity': 2, 'acidity': 2, 'bitterness': 1},
-                    {'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1},
-                    {'name': 'Ginger Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 3, 'bitterness': 2}
+                    {'name': 'Watermelon Syrup', 'type': 'SODA_SYRUP', 'intensity': 2, 'acidity': 2, 'bitterness': 1, 'amount': 6.0},
+                    {'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1, 'amount': 3.25},
+                    {'name': 'Ginger Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 3, 'bitterness': 2, 'amount': 0.75}
                 ]
             }),
             content_type='application/json'
@@ -80,8 +80,8 @@ class SodaChemistryEngineTest(TestCase):
                 'sweetness_style': 'CRISP',
                 'bottle_scale': 0.5,
                 'ingredients': [
-                    {'name': 'Peach Syrup', 'type': 'SODA_SYRUP', 'intensity': 2, 'acidity': 2, 'bitterness': 1},
-                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1}
+                    {'name': 'Peach Syrup', 'type': 'SODA_SYRUP', 'intensity': 2, 'acidity': 2, 'bitterness': 1, 'amount': 6.0},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1, 'amount': 4.0}
                 ]
             }),
             content_type='application/json'
@@ -151,10 +151,10 @@ class SodaChemistryEngineTest(TestCase):
                 'sweetness_style': 'CRAFT',
                 'bottle_scale': 1.0,
                 'ingredients': [
-                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'is_primary': True},
-                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1},
-                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1},
-                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1}
+                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'is_primary': True, 'amount': 6.0},
+                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1, 'amount': 2.5},
+                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1, 'amount': 0.75},
+                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'amount': 0.75}
                 ]
             }),
             content_type='application/json'
@@ -182,10 +182,10 @@ class SodaChemistryEngineTest(TestCase):
                 'sweetness_style': 'CRAFT',
                 'bottle_scale': 1.0,
                 'ingredients': [
-                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1},
-                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1},
-                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1},
-                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1}
+                    {'id': 1, 'name': 'Grapefruit Pink Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'amount': 6.0},
+                    {'id': 2, 'name': 'Coconut Syrup', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1, 'amount': 2.5},
+                    {'id': 3, 'name': 'Mint Syrup', 'type': 'SODA_SYRUP', 'intensity': 5, 'acidity': 1, 'bitterness': 1, 'amount': 0.75},
+                    {'id': 4, 'name': 'Lime Syrup', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 4, 'bitterness': 1, 'amount': 0.75}
                 ]
             }),
             content_type='application/json'

@@ -2108,12 +2108,9 @@ function cancelInFlightLLMCalls() {
 
     function partitionBases() {
         const recommendedList = document.getElementById('recommendedBasesList');
-        const unorthodoxList = document.getElementById('unorthodoxBasesList');
         const recommendedTitle = document.getElementById('recommendedBasesTitle');
-        const unorthodoxTitle = document.getElementById('unorthodoxBasesTitle');
         
         recommendedList.innerHTML = '';
-        unorthodoxList.innerHTML = '';
         
         const isExperimental = (recommendationMode === 'experimental');
         const isWaterBaseStep2 = (currentLabMode === 'CRYO' && selectedIngredients.length === 1 && selectedIngredients[0].id === 'virtual_water');
@@ -2185,7 +2182,7 @@ function cancelInFlightLLMCalls() {
             
             const checkMode = currentLabMode;
             const isSystemMatch = systemList.map(s => s.trim().toUpperCase()).includes(checkMode.toUpperCase());
-            let shouldShow = isExperimental ? isTypeMatch : (isTypeMatch && isSystemMatch);
+            let shouldShow = (isTypeMatch && isSystemMatch);
             console.log(`  -> isTypeMatch: ${isTypeMatch}, isSystemMatch: ${isSystemMatch}, shouldShow: ${shouldShow}`);
             if (currentLabMode === 'CRYO') {
                 if (isWaterBaseStep2) {
@@ -2210,53 +2207,29 @@ function cancelInFlightLLMCalls() {
                 col.setAttribute('data-systems', systems);
                 col.innerHTML = card.innerHTML;
                 
-                if (currentLabMode === 'CRYO') {
-                    recommendedList.appendChild(col);
-                    recommendedCount++;
-                } else if (isExperimental) {
-                    // Experimental Mode: promote low base suitability (unorthodox)
-                    if (baseScore < 3.5) {
-                        recommendedList.appendChild(col);
-                        recommendedCount++;
-                    } else {
-                        unorthodoxList.appendChild(col);
-                        unorthodoxCount++;
-                    }
-                } else {
-                    // Standard Mode: traditional/safe bases (base_suitability >= 3.5)
-                    if (baseScore >= 3.5) {
-                        recommendedList.appendChild(col);
-                        recommendedCount++;
-                    } else {
-                        unorthodoxList.appendChild(col);
-                        unorthodoxCount++;
-                    }
-                }
+                // All bases are added to the same consecutive list
+                recommendedList.appendChild(col);
+                recommendedCount++;
             }
         });
         
         // Show/hide groups based on count
         document.getElementById('recommendedBasesGroup').style.display = recommendedCount > 0 ? 'block' : 'none';
-        document.getElementById('unorthodoxBasesGroup').style.display = unorthodoxCount > 0 ? 'block' : 'none';
         
         // Update titles
         if (currentLabMode === 'CRYO') {
+            recommendedTitle.style.display = 'flex';
             if (isWaterBaseStep2) {
                 recommendedTitle.innerHTML = '<i class="bi bi-snow text-info me-2"></i>FLAVORINGS & SYRUPS';
             } else {
                 recommendedTitle.innerHTML = '<i class="bi bi-droplet-half text-info me-2"></i>BASE FILLER';
             }
-            unorthodoxTitle.innerHTML = '';
-        } else if (isExperimental) {
-            recommendedTitle.innerHTML = '<i class="bi bi-flask text-experimental me-2"></i>RECOMMENDED UNORTHODOX SUBSTRATES';
-            unorthodoxTitle.innerHTML = '<i class="bi bi-shield text-dim me-2"></i>STANDARD / SAFE BASES';
         } else {
-            recommendedTitle.innerHTML = '<i class="bi bi-shield-check text-lab-accent me-2"></i>RECOMMENDED BASES';
-            unorthodoxTitle.innerHTML = '<i class="bi bi-exclamation-triangle text-dim me-2"></i>NOT RECOMMENDED / HIGH-INTENSITY ACCENTS';
+            recommendedTitle.style.display = 'none';
         }
 
         // Handle empty mode message toggling
-        const totalCount = recommendedCount + unorthodoxCount;
+        const totalCount = recommendedCount;
         const emptyMsg = document.getElementById('emptyModeMessage');
         const stepHeader = document.getElementById('stepHeader');
         const partitionedBases = document.getElementById('partitionedBasesContainer');

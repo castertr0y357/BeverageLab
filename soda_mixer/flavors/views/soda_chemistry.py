@@ -156,59 +156,50 @@ class SodaChemistryEngine(BaseChemistryEngine):
         N_accent = len(rem_accents)
         N_blender = len(rem_blenders)
 
-        if total_ingredients_count == 1:
-            primary_share = 1.0
-            blender_share = 0.0
-            accent_share = 0.0
-        else:
-            primary_share = 0.60
-            if N_blender > 0 and N_accent > 0:
-                accent_share = 0.075
-                blender_share = (0.40 - N_accent * 0.075) / N_blender
-            elif N_blender > 0 and N_accent == 0:
-                accent_share = 0.0
-                blender_share = 0.40 / N_blender
-            else:
-                accent_share = 0.075
-                blender_share = 0.0
-                primary_share = 1.0 - N_accent * 0.075
+        total_parts = sum(float(ing.get('amount', 1.0)) for ing in flavor_modifiers)
+        if total_parts <= 0:
+            total_parts = 1.0  # Fallback to prevent division by zero
 
         modifiers_output = []
         total_calculated_volume = 0.0
 
-        p_vol = primary_share * syrup_budget_ml
+        p_amt = float(primary_base_ing.get('amount', 1.0))
+        p_share = p_amt / total_parts
+        p_vol = p_share * syrup_budget_ml
         modifiers_output.append({
             "id": primary_base_ing.get('id'),
             "name": primary_base_ing.get('name'),
             "volume_ml": round(p_vol, 1),
-            "percentage_of_syrup": round(primary_share * 100, 1),
+            "percentage_of_syrup": round(p_share * 100, 1),
             "role": "Primary Base"
         })
         total_calculated_volume += p_vol
 
-        if N_blender > 0:
-            b_vol = blender_share * syrup_budget_ml
-            for ing in rem_blenders:
-                modifiers_output.append({
-                    "id": ing.get('id'),
-                    "name": ing.get('name'),
-                    "volume_ml": round(b_vol, 1),
-                    "percentage_of_syrup": round(blender_share * 100, 1),
-                    "role": "Complementary Blender"
-                })
-                total_calculated_volume += b_vol
+        for ing in rem_blenders:
+            b_amt = float(ing.get('amount', 1.0))
+            b_share = b_amt / total_parts
+            b_vol = b_share * syrup_budget_ml
+            modifiers_output.append({
+                "id": ing.get('id'),
+                "name": ing.get('name'),
+                "volume_ml": round(b_vol, 1),
+                "percentage_of_syrup": round(b_share * 100, 1),
+                "role": "Complementary Blender"
+            })
+            total_calculated_volume += b_vol
 
-        if N_accent > 0:
-            a_vol = accent_share * syrup_budget_ml
-            for ing in rem_accents:
-                modifiers_output.append({
-                    "id": ing.get('id'),
-                    "name": ing.get('name'),
-                    "volume_ml": round(a_vol, 1),
-                    "percentage_of_syrup": round(accent_share * 100, 1),
-                    "role": "Aggressive Accent"
-                })
-                total_calculated_volume += a_vol
+        for ing in rem_accents:
+            a_amt = float(ing.get('amount', 1.0))
+            a_share = a_amt / total_parts
+            a_vol = a_share * syrup_budget_ml
+            modifiers_output.append({
+                "id": ing.get('id'),
+                "name": ing.get('name'),
+                "volume_ml": round(a_vol, 1),
+                "percentage_of_syrup": round(a_share * 100, 1),
+                "role": "Aggressive Accent"
+            })
+            total_calculated_volume += a_vol
 
         metrics = self.calculate_metrics(modifiers_output)
         

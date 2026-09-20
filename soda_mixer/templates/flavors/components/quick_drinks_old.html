@@ -9,12 +9,39 @@
     </div>
 </div>
 
-<div id="aiQuickContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5">
+<div id="quickProfilesContainer" class="mb-4">
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 justify-content-center">
+        {% for category in available_categories %}
+        <div class="col">
+            <div class="glass-card p-4 text-center cursor-pointer profile-card h-100 d-flex flex-column justify-content-center align-items-center"
+                 onclick="selectProfile('{{ category }}')"
+                 style="transition: all 0.2s ease; cursor: pointer; border: 1px solid rgba(255,255,255,0.08);">
+                <div class="bg-{{ category|lower|slugify }} rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm border border-white border-opacity-25" style="width: 60px; height: 60px;">
+                    <i class="bi bi-droplet-half fs-2" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)); color: rgba(255,255,255,0.95);"></i>
+                </div>
+                <h5 class="fw-bold mb-0 text-white" style="letter-spacing: 0.5px;">{{ category }}</h5>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center text-dim py-5">
+            <i class="bi bi-inbox fs-1 mb-3 d-block"></i>
+            <p>No active ingredients found in the inventory.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="aiQuickContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5" style="display: none;">
     <div class="d-flex justify-content-between align-items-center mb-4 w-100">
         <h5 class="fw-bold mb-0 text-lab-accent">Quick Recommendations</h5>
-        <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" style="display: none;" onclick="generateQuickRecommendations()" id="btnGenerateQuick">
-            <i class="bi bi-lightning-charge me-1"></i> GENERATE MORE
-        </button>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-2 fs-6 text-white" onclick="resetToProfiles()" id="btnSwitchCategories">
+                <i class="bi bi-arrow-left me-1"></i> CATEGORIES
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" style="display: none;" onclick="generateQuickRecommendations()" id="btnGenerateQuick">
+                <i class="bi bi-lightning-charge me-1"></i> GENERATE MORE
+            </button>
+        </div>
     </div>
     <div id="quickDrinksList" class="d-flex flex-column gap-3">
         <!-- Streamed cards will appear here -->

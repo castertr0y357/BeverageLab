@@ -105,15 +105,12 @@
         {% endfor %}
     </div>
 
-    <!-- Partitioned Sub-Containers for Base Selection -->
     <div id="partitionedBasesContainer" class="w-100">
-        <div id="recommendedBasesGroup" class="mb-4">
-            <h6 class="readout-label mb-3 text-lab-accent" id="recommendedBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">RECOMMENDED BASES</h6>
-            <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5" id="recommendedBasesList"></div>
-        </div>
-        <div id="unorthodoxBasesGroup" class="mb-4">
-            <h6 class="readout-label mb-3 text-dim" id="unorthodoxBasesTitle" style="font-size: 0.65rem; letter-spacing: 1.5px;">UNORTHODOX / ACCENT COMPONENTS</h6>
-            <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5" id="unorthodoxBasesList"></div>
+        <div id="recommendedBasesGroup" class="mb-4" style="display: none;">
+            <h6 class="text-muted text-uppercase small fw-bold mb-3 d-flex align-items-center" id="recommendedBasesTitle">
+                <i class="bi bi-box-seam text-muted me-2"></i>AVAILABLE BASES
+            </h6>
+            <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-5 justify-content-center" id="recommendedBasesList"></div>
         </div>
     </div>
 </div>

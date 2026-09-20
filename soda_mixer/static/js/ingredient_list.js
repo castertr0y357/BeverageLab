@@ -38,6 +38,7 @@
                 document.getElementById('editCpx').value = d.complexity;
                 document.getElementById('editBaseSuit').value = d.baseSuitability;
                 document.getElementById('editAccentSuit').value = d.accentSuitability;
+                document.getElementById('editSugarGrams').value = d.sugarGramsPer30ml || '';
                 document.getElementById('editDesc').value = d.description;
                 document.getElementById('editAINotes').value = d.aiNotes || '';
                 document.getElementById('editFavorite').checked = d.favorite === 'true';

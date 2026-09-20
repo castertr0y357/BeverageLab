@@ -22,26 +22,16 @@ class AIPromptsMixin:
     - Understand Sweetness, Acidity, Bitterness, Intensity, and Complexity as the core axes of a drink.
     
     Core Synthesis Mode Rules:
-    
-    1. SODA LAB MODE:
-       - Total syrup for a 1.0L batch must not exceed 160ml (proportional for other sizes: 80ml for 0.5L, crisp=105ml, craft=120ml, fountain=140ml).
-       - Recommend base flavor anchors (e.g. fruit syrups) and complementary accents.
-    
-    2. COFFEE LAB MODE (Espresso & Brew Extraction):
-       - The dry base coffee beans MUST be 18.0g (weight) representing a double-shot espresso.
-       - Liquid dairy and plant milks (type DAIRY) must be 50.0ml (volume).
-       - Minor additives, sweet syrups, and creamers (type ADDITIVE) must be 15.0ml (volume).
-       - Accents and others must be 15.0ml.
-       - Do NOT suggest grams for liquids, and do NOT use ml for coffee beans.
-       - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
-    
-    3. CRYO LAB (SLUSHIE) MODE:
-       - Total syrup for a 1.0L batch must not exceed 160ml.
-       - Recommend amounts based on Ninja Creami displacement limits (e.g., 80.0ml for base, 40.0ml for payloads, 20.0ml for accents).
+    IMPORTANT: For all modes, assign relative mathematical 'parts' to each ingredient to represent its proportion in the drink. Do not sum to 100. The parts represent relative ratios only.
+    1. SODA LAB MODE: Distribute relative parts for the total syrup flavor profile (e.g. 3 parts Base, 1 part Accent).
+    2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans (SOLID_EXTRACTABLE) must be 18.0 parts, all other modifiers should be distributed as relative parts (e.g. 50 parts dairy, 15 parts syrup).
+    3. CRYO LAB (SLUSHIE) MODE: Distribute relative parts for the total payload.
+    - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
     
     Output Specifications:
     - For general conversation, respond with concise, creative lab reports or conversational guidance (2-3 paragraphs).
     - For structured data requests, return ONLY a raw JSON object conforming to the specified JSON schema. Do not include markdown wraps (like ```json) or any conversational preamble.
+    - CRITICAL: When generating a full recipe, you MUST select your ingredients FIRST. Then, generate a name and description that strictly matches the selected ingredients.
     - Each suggestion "reason" must be a concise, scientific, mixology-focused explanation of MAX 12 words (e.g., "neutralizes bitter espresso phenols").
     - The overall "reasoning" must be a concise mixology synthesis analysis of MAX 2 sentences.
     
@@ -51,29 +41,29 @@ class AIPromptsMixin:
             {
                 "name": "Ingredient Name",
                 "reason": "Scientific flavor/chemistry explanation (max 12 words)",
-                "amount": 15.0
+                "parts": 15.0
             }
         ],
         "rebalancing": [
             {
                 "name": "Active Ingredient 1",
-                "amount": 18.0
+                "parts": 18.0
             },
             {
                 "name": "Active Ingredient 2",
-                "amount": 50.0
+                "parts": 50.0
             }
         ],
         "seal_recommended": false,
         "reasoning": "Scientific mixology analysis (max 2 sentences)."
     }"""
 
-    SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "amount": 25.0, "reason": "Acidity balances sweetness"}]'
+    SUGGESTION_EXAMPLE = '[{"name": "Lemon Syrup", "parts": 25.0, "reason": "Acidity balances sweetness"}]'
 
     SURPRISE_MIX_FORMAT = """{
         "design_intent": "Brief overall reasoning...",
         "selection": [
-            { "name": "Ingredient Name", "amount": 50.0, "role": "Specific role in mix" },
+            { "name": "Ingredient Name", "parts": 50.0, "role": "Specific role in mix" },
             ...
         ]
     }"""
@@ -111,9 +101,9 @@ class AIPromptsMixin:
                         "properties": {
                             "name": {"type": "string"},
                             "reason": {"type": "string"},
-                            "amount": {"type": "number"}
+                            "parts": {"type": "number"}
                         },
-                        "required": ["name", "reason", "amount"],
+                        "required": ["name", "reason", "parts"],
                         "additionalProperties": False
                     }
                 },
@@ -123,9 +113,9 @@ class AIPromptsMixin:
                         "type": "object",
                         "properties": {
                             "name": {"type": "string"},
-                            "amount": {"type": "number"}
+                            "parts": {"type": "number"}
                         },
-                        "required": ["name", "amount"],
+                        "required": ["name", "parts"],
                         "additionalProperties": False
                     }
                 },
@@ -153,9 +143,9 @@ class AIPromptsMixin:
                         "type": "object",
                         "properties": {
                             "name": {"type": "string"},
-                            "amount": {"type": "number"}
+                            "parts": {"type": "number"}
                         },
-                        "required": ["name", "amount"],
+                        "required": ["name", "parts"],
                         "additionalProperties": False
                     }
                 }
@@ -184,9 +174,9 @@ class AIPromptsMixin:
                         "properties": {
                             "name": {"type": "string"},
                             "role": {"type": "string"},
-                            "amount": {"type": "number"}
+                            "parts": {"type": "number"}
                         },
-                        "required": ["name", "role", "amount"],
+                        "required": ["name", "role", "parts"],
                         "additionalProperties": False
                     }
                 }
@@ -218,41 +208,41 @@ class AIPromptsMixin:
                 mode_rules = """
     Core Synthesis Mode Rules:
     SODA LAB MODE:
-    - Total syrup for a 1.0L batch must not exceed 160ml (proportional for other sizes: 80ml for 0.5L, crisp=105ml, craft=120ml, fountain=140ml).
     - Recommend base flavor anchors (e.g. fruit syrups) and complementary accents.
+    - IMPORTANT: All syrups, accents, and modifiers must be expressed as relative mathematical parts (e.g., 3 parts Base, 1 part Secondary, 0.5 parts Accent). Do not attempt to sum to 100. The parts represent relative ratios only. Use a hierarchical structure: Primary Base (dominant parts), Secondary Modifier (moderate parts), and Accents (minor parts).
     - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
     """
             elif drink_type == 'COFFEE':
                 mode_rules = """
     Core Synthesis Mode Rules:
     COFFEE LAB MODE (Espresso & Brew Extraction):
-    - The dry base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0g (weight) representing a double-shot espresso.
-    - Liquid dairy and plant milks (Function: VOLUME_BASE, State: LIQUID) must be 50.0ml (volume).
-    - Texturizers, creamers, and sauces (Function: TEXTURIZER, State: SAUCE or LIQUID) must be 15.0ml (volume).
-    - Accents, flavorings, sweeteners, and garnishes must be 15.0ml.
-    - Do NOT suggest grams for liquids/syrups/sauces, and do NOT use ml for coffee beans.
+    - The dry base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0 parts (representing 18.0g of weight for a double-shot espresso).
+    - If the active mixture already contains a brewed or liquid coffee, DO NOT suggest `SOLID_EXTRACTABLE` coffee beans.
+    - For all other ingredients (Liquid dairy, texturizers, creamers, sauces, flavorings, sweeteners, garnishes): Assign relative 'parts'. Use a hierarchical structure for the non-coffee liquid modifiers: Primary Base (e.g. 50-60 parts dairy), Secondary Modifier (e.g. 20-30 parts syrup), and Accents (10-15 parts).
     - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
     """
             elif drink_type == 'SLUSHIE':
                 mode_rules = """
     Core Synthesis Mode Rules:
     CRYO LAB (SLUSHIE) MODE:
-    - Total syrup for a 1.0L batch must not exceed 160ml.
-    - Recommend amounts based on Ninja Creami displacement limits (e.g., 80.0ml for base, 40.0ml for payloads, 20.0ml for accents).
+    - IMPORTANT: All ingredients must be expressed as relative mathematical parts. Do not attempt to sum to 100. The parts represent relative ratios only. Use a hierarchical structure: Primary Base (dominant parts), Secondary Modifier (moderate parts), and Accents (minor parts).
     - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
     """
             else:
                 mode_rules = """
     Core Synthesis Mode Rules:
-    1. SODA LAB MODE: Total syrup for a 1.0L batch must not exceed 160ml.
-    2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans (SOLID_EXTRACTABLE) must be 18.0g, volume bases like dairy/plant milk (VOLUME_BASE, LIQUID) must be 50.0ml, and other flavorings/sweeteners/texturizers must be 15.0ml.
-    3. CRYO LAB (SLUSHIE) MODE: Total syrup for a 1.0L batch must not exceed 160ml.
+    IMPORTANT: For all modes, assign relative mathematical 'parts' to each ingredient to represent its proportion in the drink. Do not sum to 100. The parts represent relative ratios only. Use a hierarchical structure: Primary Base (dominant parts), Secondary Modifier (moderate parts), and Accents (minor parts).
+    1. SODA LAB MODE: Distribute relative parts for the total syrup flavor profile.
+    2. COFFEE LAB MODE (Espresso & Brew Extraction): Coffee beans (SOLID_EXTRACTABLE) must be 18.0 parts, all other modifiers should be distributed as relative parts using the hierarchy.
+    3. CRYO LAB (SLUSHIE) MODE: Distribute relative parts for the total payload.
     - Limit suggested counts strictly based on compatibility rules: recommend between 10 and 15 options (or all available if there are fewer than 10). Prioritize ingredients with the '*FAVORITE*' tag when they fit the flavor profile.
     """
     
             quality_rules = """
     Flavor Clashing & Balance Rules:
-    - Reason about flavor aesthetics and avoid clashing combinations (e.g., do not pair delicate herbs or florals like lavender with extremely bitter dark roast coffee, and avoid combining highly acidic ingredients with dairy to prevent curdling/clashing taste).
+    - Reason about flavor aesthetics and avoid clashing combinations (e.g., do not pair delicate herbs or florals like lavender with extremely bitter dark roast coffee).
+    - CRITICAL CLASH RULE: Do NOT mix dairy or cream with citrus, acidic berries, or herbal flavors like cucumber to prevent curdling and clashing taste.
+    - MINIMUM FLAVOR THRESHOLD: Avoid microscopic parts; use sensible fractional ratios like 0.25 parts or 0.5 parts for tiny accents relative to a 3-part base.
     
     Composition-Wide Harmony:
     - Evaluate the entire active mixture as a single cohesive unit. Do not just recommend based on the base flavor; ensure the new recommendation complements, balances, or enhances all selected ingredients in the compound.
@@ -262,6 +252,7 @@ class AIPromptsMixin:
     Output Specifications:
     - For general conversation, respond with concise, creative lab reports or conversational guidance (2-3 paragraphs).
     - For structured data requests, return ONLY a raw JSON object conforming to the specified JSON schema. Do not include markdown wraps (like ```json) or any conversational preamble.
+    - CRITICAL: When generating a full recipe, you MUST select your ingredients FIRST. Then, generate a name and description that strictly matches the selected ingredients.
     - Each suggestion "reason" must be a concise, scientific, mixology-focused explanation of MAX 12 words (e.g., "neutralizes bitter espresso phenols").
     - The overall "reasoning" must be a concise mixology synthesis analysis of MAX 2 sentences.
     
@@ -271,17 +262,17 @@ class AIPromptsMixin:
             {
                 "name": "Ingredient Name",
                 "reason": "Scientific flavor/chemistry explanation (max 12 words)",
-                "amount": 15.0
+                "parts": 15.0
             }
         ],
         "rebalancing": [
             {
                 "name": "Active Ingredient 1",
-                "amount": 18.0
+                "parts": 18.0
             },
             {
                 "name": "Active Ingredient 2",
-                "amount": 50.0
+                "parts": 50.0
             }
         ],
         "seal_recommended": false,

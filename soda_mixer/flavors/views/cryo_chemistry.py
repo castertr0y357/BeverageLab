@@ -10,8 +10,11 @@ from ..engines.base import BaseChemistryEngine
 
 logger = logging.getLogger(__name__)
 
-def get_cryo_sugar_fraction(name: str, type_str: str, physical_state: str = "", mixology_function: str = "") -> float:
+def get_cryo_sugar_fraction(name: str, type_str: str, physical_state: str = "", mixology_function: str = "", sugar_grams_per_30ml: float = None) -> float:
     """Evaluate sugar mass contribution fraction by volume."""
+    if sugar_grams_per_30ml is not None:
+        return float(sugar_grams_per_30ml) / 30.0
+
     name_lower = name.lower()
     type_upper = type_str.upper()
     pstate = physical_state.upper()
@@ -125,13 +128,19 @@ class CryoChemistryEngine(BaseChemistryEngine):
         modifier_volumes = []
         is_solitary = (len(modifiers) == 1)
 
+        # Determine initial modifier budget for the solver's starting point
+        initial_budget_ml = 140.0 * self.bottle_scale
+        total_parts = sum(float(ing.get('amount', 1.0)) or 1.0 for ing in modifiers)
+        if total_parts <= 0:
+            total_parts = 1.0
+
         for ing in modifiers:
             name = ing.get('name', 'Syrup')
             itype = ing.get('ingredient_type', ing.get('type', 'SODA_SYRUP'))
             sweetness = int(ing.get('sweetness_score', ing.get('sweetness', 3)))
             
             is_user_overridden = ing.get('isUserOverridden', False) or ing.get('is_user_overridden', False)
-            amt = float(ing.get('amount', 0.0)) if is_user_overridden else 0.0
+            amt = float(ing.get('amount', 1.0))
             
             if is_solitary and not is_user_overridden:
                 filler_name = filler_ing.get('name', 'Water')
@@ -140,32 +149,31 @@ class CryoChemistryEngine(BaseChemistryEngine):
                     filler_name, 
                     filler_type, 
                     filler_ing.get('physical_state', ''), 
-                    filler_ing.get('mixology_function', '')
+                    filler_ing.get('mixology_function', ''),
+                    filler_ing.get('sugar_grams_per_30ml')
                 )
                 
                 sugar_frac = get_cryo_sugar_fraction(
                     name, 
                     itype, 
                     ing.get('physical_state', ''), 
-                    ing.get('mixology_function', '')
+                    ing.get('mixology_function', ''),
+                    ing.get('sugar_grams_per_30ml')
                 )
                 sugar_diff = sugar_frac - filler_sugar_frac
                 if abs(sugar_diff) > 0.001:
                     required_vol = (0.13 - filler_sugar_frac) * target_volume_ml / sugar_diff
                 else:
-                    required_vol = 80.0 * self.bottle_scale
+                    required_vol = initial_budget_ml
                 
                 if sweetness >= 4:
                     scaled_amt = required_vol / 1.05
                 else:
                     scaled_amt = required_vol
             else:
-                if not amt:
-                    idx = len(modifier_volumes)
-                    amt = 80.0 if idx == 0 else (40.0 if idx == 1 else 20.0)
-
-                # Scale by bottle_scale
-                scaled_amt = amt * self.bottle_scale
+                # Distribute initial budget proportionally by parts
+                amt = float(ing.get('amount', 1.0)) or 1.0
+                scaled_amt = (amt / total_parts) * initial_budget_ml
 
             # Apply Cryo-Sweetness Tax
             if sweetness >= 4:
@@ -175,7 +183,8 @@ class CryoChemistryEngine(BaseChemistryEngine):
                 name, 
                 itype, 
                 ing.get('physical_state', ''), 
-                ing.get('mixology_function', '')
+                ing.get('mixology_function', ''),
+                ing.get('sugar_grams_per_30ml')
             )
 
             modifier_volumes.append({
@@ -193,7 +202,8 @@ class CryoChemistryEngine(BaseChemistryEngine):
             filler_name, 
             filler_type, 
             filler_ing.get('physical_state', ''), 
-            filler_ing.get('mixology_function', '')
+            filler_ing.get('mixology_function', ''),
+            filler_ing.get('sugar_grams_per_30ml')
         )
         k = 1.0
 

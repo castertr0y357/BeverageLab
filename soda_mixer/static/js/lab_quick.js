@@ -1,5 +1,33 @@
 // Quick Drinks Generation and Selection Logic
 const currentLabMode = window.CURRENT_LAB || "soda";
+window.currentProfile = null;
+
+function selectProfile(profile) {
+    window.currentProfile = profile;
+    const profilesContainer = document.getElementById('quickProfilesContainer');
+    const aiContainer = document.getElementById('aiQuickContainer');
+    
+    if (profilesContainer) profilesContainer.style.display = 'none';
+    if (aiContainer) aiContainer.style.display = 'block';
+    
+    generateQuickRecommendations();
+}
+
+function resetToProfiles() {
+    window.currentProfile = null;
+    const profilesContainer = document.getElementById('quickProfilesContainer');
+    const aiContainer = document.getElementById('aiQuickContainer');
+    const list = document.getElementById('quickDrinksList');
+    
+    if (window.quickDrinksSource) {
+        window.quickDrinksSource.close();
+        window.quickDrinksSource = null;
+    }
+    
+    if (list) list.innerHTML = '';
+    if (aiContainer) aiContainer.style.display = 'none';
+    if (profilesContainer) profilesContainer.style.display = 'block';
+}
 
 function generateQuickRecommendations() {
     console.log("⚡ QUICK DRINKS SUBSTRATE LOADED");
@@ -26,6 +54,9 @@ function generateQuickRecommendations() {
     `;
 
     const params = new URLSearchParams({ lab_mode: currentLabMode, mode: window.recommendationMode || 'standard' });
+    if (window.currentProfile) {
+        params.append('profile', window.currentProfile);
+    }
     const url = `/api/ai/quick-recommendations/?${params.toString()}`;
     
     let quickDrinksSource = new EventSource(url);
@@ -200,10 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedRecMode = localStorage.getItem('recommendation_mode') || 'standard';
     try { setRecommendationMode(savedRecMode); } catch(e) {}
     
-    const list = document.getElementById('quickDrinksList');
-    if (list && list.children.length === 0) {
-        generateQuickRecommendations();
-    }
+    // Wait for user to select a profile instead of auto-generating
+    // const list = document.getElementById('quickDrinksList');
+    // if (list && list.children.length === 0) {
+    //     generateQuickRecommendations();
+    // }
 });
 
 function setRecommendationMode(mode) {
@@ -221,9 +253,10 @@ function setRecommendationMode(mode) {
         }
     } catch(e) {}
     
-    // Regenerate recommendations with new mode if the list is already populated
+    // Regenerate recommendations with new mode if the list is already populated and a profile is selected
     const list = document.getElementById('quickDrinksList');
-    if (list && list.children.length > 0) {
+    const aiContainer = document.getElementById('aiQuickContainer');
+    if (list && list.children.length > 0 && window.currentProfile && aiContainer && aiContainer.style.display !== 'none') {
         generateQuickRecommendations();
     }
 }

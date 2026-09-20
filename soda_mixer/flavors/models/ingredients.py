@@ -100,6 +100,12 @@ class Ingredient(SoftDeleteModel):
         validators=[MinValueValidator(1.0), MaxValueValidator(5.0)],
         default=3.0
     )
+    sugar_grams_per_30ml = models.FloatField(
+        help_text="Grams of sugar per 1oz (30ml) serving. Leave blank to use engine default approximations.",
+        validators=[MinValueValidator(0.0), MaxValueValidator(30.0)],
+        null=True,
+        blank=True
+    )
     
     # Coffee-specific fields
     ROAST_CHOICES = [

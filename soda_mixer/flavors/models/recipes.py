@@ -127,7 +127,7 @@ class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='recipe_ingredients')
     ingredient = models.ForeignKey(Ingredient, on_delete=models.SET_NULL, null=True, blank=True, related_name='ingredient_usage')
     amount = models.FloatField(
-        help_text="Amount (ml for Soda, grams for Coffee)",
+        help_text="Amount (relative parts)",
         default=1.0
     )
     notes = models.CharField(max_length=200, blank=True)

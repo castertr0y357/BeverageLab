@@ -248,57 +248,36 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
             else:
                 modifier_budget = min(requested_modifier_total, modifier_cap)
 
-        # Re-calculate exact modifier budget shares (60% dominant, 40% accent split)
+        # Proportional Modifier Distribution based on parts
         flavor_modifiers_output = []
         if modified_list:
-            if len(modified_list) == 1:
-                name = modified_list[0].get('name', 'Syrup')
+            total_mod_parts = sum(float(m.get('amount', 1.0)) for m in modified_list)
+            if total_mod_parts <= 0:
+                total_mod_parts = 1.0
+
+            dominant_idx = 0
+            max_amt = -1
+            for idx, m in enumerate(modified_list):
+                amt = float(m.get('amount', 1.0))
+                if amt > max_amt:
+                    max_amt = amt
+                    dominant_idx = idx
+
+            for idx, m in enumerate(modified_list):
+                name = m.get('name', 'Syrup')
+                amt = float(m.get('amount', 1.0))
+                mod_share = amt / total_mod_parts
+                vol = mod_share * modifier_budget
+                
+                role = "(Dominant)" if idx == dominant_idx else "(Accent)"
+                if len(modified_list) == 1:
+                    role = "(Dominant)"
+                
                 flavor_modifiers_output.append({
-                    "id": modified_list[0].get('id'),
-                    "name": f"{name} (Dominant)",
-                    "volume_oz": round(modifier_budget, 2)
+                    "id": m.get('id'),
+                    "name": f"{name} {role}",
+                    "volume_oz": round(vol, 2)
                 })
-            else:
-                group_dark_chocolaty = {'chocolate', 'dark', 'cocoa', 'nutty', 'roasted', 'smoky', 'caramel', 'sweet'}
-                is_dark_base = any(note in group_dark_chocolaty for note in combined_notes)
-                is_earthy_base = has_earthy_herbal
-
-                mod_scores = []
-                for idx, m in enumerate(modified_list):
-                    name = m.get('name', '').lower()
-                    is_caramelized = any(k in name for k in caramelized_keywords) or 'sugar' in name
-                    is_chocolaty_nutty = any(k in name for k in ['chocolate', 'cocoa', 'mocha', 'nutty', 'hazelnut', 'almond', 'macadamia'])
-                    
-                    score = 1
-                    if is_earthy_base and is_caramelized:
-                        score = 0
-                    elif is_dark_base and (is_caramelized or is_chocolaty_nutty):
-                        score = 2
-                    
-                    mod_scores.append((score, idx))
-
-                mod_scores.sort(key=lambda x: (x[0], -x[1]), reverse=True)
-                dominant_idx = mod_scores[0][1]
-
-                dominant_budget = modifier_budget * 0.60
-                accent_budget_total = modifier_budget * 0.40
-                accent_count = len(modified_list) - 1
-                accent_budget_each = accent_budget_total / accent_count if accent_count > 0 else 0.0
-
-                for idx, m in enumerate(modified_list):
-                    name = m.get('name', 'Syrup')
-                    if idx == dominant_idx:
-                        vol = dominant_budget
-                        role = "(Dominant)"
-                    else:
-                        vol = accent_budget_each
-                        role = "(Accent)"
-                    
-                    flavor_modifiers_output.append({
-                        "id": m.get('id'),
-                        "name": f"{name} {role}",
-                        "volume_oz": round(vol, 2)
-                    })
 
         # Viscosity Protection
         is_thin_warning = False

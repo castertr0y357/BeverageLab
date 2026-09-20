@@ -399,33 +399,36 @@ Constraints:
         return response.strip(' "\'')
 
     @classmethod
-    def stream_quick_recommendations(cls, inventory: str, drink_type: str = 'SODA', mode: str = 'creative') -> Generator[Dict[str, Any], None, None]:
+    def stream_quick_recommendations(cls, inventory: str, drink_type: str = 'SODA', mode: str = 'creative', profile: str = None) -> Generator[Dict[str, Any], None, None]:
         """Stream 5 distinct recipes based on active inventory."""
         drink_type = drink_type.upper()
         
         import random
         seed = random.randint(10000, 99999)
         
-        # Inject random inspiration words to force variety across requests
-        inspirations = [
-            "neon, cyberpunk, futuristic",
-            "rustic, garden, earthy",
-            "midnight, velvet, mysterious",
-            "sunburst, tropical, vibrant",
-            "nostalgic, childhood, sweet",
-            "aggressive, sour, intense",
-            "calm, zen, herbal",
-            "autumn, spiced, warm",
-            "ocean, breeze, crisp",
-            "desert, arid, complex"
-        ]
-        inspiration = random.choice(inspirations)
-        
+        if profile:
+            inspiration_prompt = f'[TARGET PROFILE: "{profile.upper()}"] - The PRIMARY base flavor of ALL recipes MUST strongly align with the "{profile}" profile. However, actively select secondary modifiers and accents from OTHER complementary categories to build complex, well-balanced drinks.'
+        else:
+            inspirations = [
+                "neon, cyberpunk, futuristic",
+                "rustic, garden, earthy",
+                "midnight, velvet, mysterious",
+                "sunburst, tropical, vibrant",
+                "nostalgic, childhood, sweet",
+                "aggressive, sour, intense",
+                "calm, zen, herbal",
+                "autumn, spiced, warm",
+                "ocean, breeze, crisp",
+                "desert, arid, complex"
+            ]
+            inspiration = random.choice(inspirations)
+            inspiration_prompt = f'[RANDOM INSPIRATION SEED: "{inspiration}"] - Use this inspiration seed to dramatically influence the naming, descriptions, and ingredient combinations of these recipes.'
+
         prompt = f"""[QUICK DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
         
 Task: Act as a master mixologist. Create exactly 5 distinct, highly creative, and appealing {drink_type} recipes using ONLY the ingredients available in the provided Inventory Registry. If the inventory has fewer than 10 total ingredients, you may generate fewer recipes (minimum 3).
 
-[RANDOM INSPIRATION SEED: "{inspiration}"] - Use this inspiration seed to dramatically influence the naming, descriptions, and ingredient combinations of these recipes. 
+{inspiration_prompt}
 
 CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Do not rely on the same 5 combinations. Push the boundaries of mixology.
 
@@ -436,13 +439,13 @@ Each JSON object must have the following structure:
     "name": "Recipe Name",
     "description": "A short, vivid menu description of the drink and its vibe (20-30 words).",
     "ingredients": [
-        {{ "name": "Exact Ingredient Name from Inventory", "amount": 100.0 }}
+        {{ "name": "Exact Ingredient Name from Inventory", "parts": 15.0 }}
     ]
 }}
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
-2. For amounts: For SODA/SLUSHIE, use ml (typically summing around 100-160ml for the flavor base). For COFFEE, base coffee beans use grams (default 18.0g), liquids use ml (e.g., milk 50.0ml, syrup 15.0ml).
+2. For parts: Assign relative 'parts' out of 100 for each ingredient. For COFFEE, base coffee beans must be 18.0 parts.
 3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
 4. Do NOT include any ingredient brand names in the recipe name.
 5. If the request gives a specific flavor goal, optimize amounts for balance. If {drink_type} is COFFEE, ensure you include exactly ONE base coffee bean ingredient and ONE dairy/milk ingredient.
@@ -474,6 +477,9 @@ Inventory Registry: See context.
                             try:
                                 obj = json.loads(obj_str)
                                 if 'name' in obj and 'ingredients' in obj:
+                                    for ing in obj.get('ingredients', []):
+                                        if 'parts' in ing and 'amount' not in ing:
+                                            ing['amount'] = ing['parts']
                                     yield obj
                                     yielded_indices.add(i)
                             except json.JSONDecodeError:
@@ -497,13 +503,13 @@ Output exactly ONE JSON object with the following structure:
     "name": "Creative Recipe Name",
     "description": "A vivid explanation (30-40 words) of how this drink captures the requested vibe.",
     "ingredients": [
-        {{ "name": "Exact Ingredient Name from Inventory", "amount": 100.0 }}
+        {{ "name": "Exact Ingredient Name from Inventory", "parts": 15.0 }}
     ]
 }}
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
-2. For amounts: For SODA/SLUSHIE, use ml. For COFFEE, base coffee beans use grams, liquids use ml.
+2. For parts: Assign relative 'parts' out of 100 for each ingredient. For COFFEE, base coffee beans must be 18.0 parts.
 3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
 4. Do NOT include any ingredient brand names in the recipe name.
 """
@@ -525,6 +531,9 @@ Rules:
                         if match:
                             obj = json.loads(match.group(0))
                             if 'name' in obj and 'ingredients' in obj:
+                                for ing in obj.get('ingredients', []):
+                                    if 'parts' in ing and 'amount' not in ing:
+                                        ing['amount'] = ing['parts']
                                 yield obj
                                 buffer = "" # Clear buffer once we yield
                     except json.JSONDecodeError:

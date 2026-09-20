@@ -50,3 +50,6 @@ backups/
 
 # Gunicorn sockets
 .gunicorn/
+
+# QA testing
+QA_recipes/

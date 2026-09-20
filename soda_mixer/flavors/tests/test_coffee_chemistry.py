@@ -913,8 +913,8 @@ class BeverageLabCoffeeChemistryTest(TestCase):
         strawberry_mod = next(m for m in mods if "Strawberry" in m['name'])
         self.assertIn("Dominant", caramel_mod['name'])
         self.assertIn("Accent", strawberry_mod['name'])
-        self.assertEqual(caramel_mod['volume_oz'], 0.72)
-        self.assertEqual(strawberry_mod['volume_oz'], 0.48)
+        self.assertEqual(caramel_mod['volume_oz'], 0.8)
+        self.assertEqual(strawberry_mod['volume_oz'], 0.4)
 
     def test_hot_coffee_espresso_water_dilution(self) -> None:
         response = self.client.post(

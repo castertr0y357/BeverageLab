@@ -34,6 +34,8 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
     complexity = request.POST.get('complexity', 3)
     base_suitability = request.POST.get('base_suitability', 3.0)
     accent_suitability = request.POST.get('accent_suitability', 3.0)
+    sugar_grams_str = request.POST.get('sugar_grams_per_30ml', '').strip()
+    sugar_grams_per_30ml = float(sugar_grams_str) if sugar_grams_str else None
     favorite = request.POST.get('favorite') == 'on'
     
     # Coffee fields
@@ -70,6 +72,7 @@ def add_ingredient(request: HttpRequest) -> HttpResponse:
                 'complexity': complexity,
                 'base_suitability': base_suitability,
                 'accent_suitability': accent_suitability,
+                'sugar_grams_per_30ml': sugar_grams_per_30ml,
                 'compatible_systems': compatible_systems,
                 'favorite': favorite,
                 'is_in_inventory': True,
@@ -157,6 +160,11 @@ def edit_ingredient(request: HttpRequest, uuid: str) -> HttpResponse:
         ingredient.complexity = int(request.POST.get('complexity', ingredient.complexity))
         ingredient.base_suitability = float(request.POST.get('base_suitability', ingredient.base_suitability))
         ingredient.accent_suitability = float(request.POST.get('accent_suitability', ingredient.accent_suitability))
+        sugar_grams_str = request.POST.get('sugar_grams_per_30ml', '').strip()
+        if sugar_grams_str:
+            ingredient.sugar_grams_per_30ml = float(sugar_grams_str)
+        elif 'sugar_grams_per_30ml' in request.POST:
+            ingredient.sugar_grams_per_30ml = None
     except ValueError as e:
         logger.warning(f"IngredientRegistry - Warning - Non-numeric stats provided for ingredient {uuid}: {e}")
         
