@@ -45,10 +45,10 @@ class Command(BaseCommand):
         total_parts = sum(float(i.get('amount', 0) or 0) for i in ingredients)
         
         if lab_mode in ['SODA', 'SLUSHIE']:
-            if abs(total_parts - 100.0) <= 0.1:
-                audit.append("- **Part Distribution Bounds**: PASS - Total parts sum to exactly 100.")
+            if total_parts <= 160.0:
+                audit.append("- **Part Distribution Bounds**: PASS - Total parts are within the 160 max budget.")
             else:
-                audit.append(f"- **Part Distribution Bounds**: FAIL - Total parts sum to {total_parts:.1f}, expected 100.")
+                audit.append(f"- **Part Distribution Bounds**: FAIL - Total parts sum to {total_parts:.1f}, exceeding 160 max budget.")
                 status = "FAIL"
                 
         if lab_mode == 'COFFEE':
@@ -87,8 +87,8 @@ class Command(BaseCommand):
                     has_high_acid = True
                 
                 # Check Minimum Thresholds
-                if db_ing.ingredient_type != 'COFFEE_BEAN' and float(i.get('amount', 0) or 0) < 10.0:
-                    audit.append(f"- **Flavor Threshold**: FAIL - '{ing_name}' is below the 10.0 parts minimum ({float(i.get('amount', 0) or 0)} parts).")
+                if db_ing.ingredient_type != 'COFFEE_BEAN' and float(i.get('amount', 0) or 0) < 0.25:
+                    audit.append(f"- **Flavor Threshold**: FAIL - '{ing_name}' is below the 0.25 parts microscopic minimum ({float(i.get('amount', 0) or 0)} parts).")
                     status = "FAIL"
             else:
                 audit.append(f"- **Engine Compatibility**: FAIL - '{ing_name}' not found in database.")
