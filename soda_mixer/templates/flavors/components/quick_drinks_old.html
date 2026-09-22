@@ -13,14 +13,14 @@
     <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 justify-content-center">
         {% for category in available_categories %}
         <div class="col">
-            <div class="glass-card p-4 text-center cursor-pointer profile-card h-100 d-flex flex-column justify-content-center align-items-center"
+            <button type="button" class="w-100 glass-card p-4 text-center cursor-pointer profile-card h-100 d-flex flex-column justify-content-center align-items-center bg-transparent"
                  onclick="selectProfile('{{ category }}')"
                  style="transition: all 0.2s ease; cursor: pointer; border: 1px solid rgba(255,255,255,0.08);">
                 <div class="bg-{{ category|lower|slugify }} rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm border border-white border-opacity-25" style="width: 60px; height: 60px;">
                     <i class="bi bi-droplet-half fs-2" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)); color: rgba(255,255,255,0.95);"></i>
                 </div>
                 <h5 class="fw-bold mb-0 text-white" style="letter-spacing: 0.5px;">{{ category }}</h5>
-            </div>
+            </button>
         </div>
         {% empty %}
         <div class="col-12 text-center text-dim py-5">
