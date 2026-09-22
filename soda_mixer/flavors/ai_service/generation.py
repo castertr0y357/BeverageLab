@@ -55,7 +55,7 @@ class AIGenerationMixin:
             force_rule = ""
             if force_type:
                 force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
-                force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+                force_rule = f"\nMANDATORY RULE: You must EXCLUSIVELY suggest new ingredients of type '{force_type}' (e.g., {force_display})."
                 
             exclude_str = f"Exclude these previously suggested items: {', '.join(exclude)}." if exclude else "None"
     
@@ -128,7 +128,7 @@ class AIGenerationMixin:
             force_rule = ""
             if force_type:
                 force_display = "Dairy or Plant Milks" if force_type == 'DAIRY' else ("Creamers or Milks/Additives" if force_type == 'ADDITIVE' else force_type)
-                force_rule = f"\nMANDATORY RULE: You must ONLY suggest new ingredients of type '{force_type}' (e.g., {force_display}). Do not suggest any other types of ingredients."
+                force_rule = f"\nMANDATORY RULE: You must EXCLUSIVELY suggest new ingredients of type '{force_type}' (e.g., {force_display})."
                 
             if exclude_types:
                 exclude_display = ", ".join(exclude_types)
@@ -208,10 +208,10 @@ class AIGenerationMixin:
                 rules = """Rules:
     1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
     2. Select a base (e.g. coffee bean) and complementary reagents.
-    3. Provide a suggested 'amount'. The base coffee beans MUST default to 18.0 (representing 18.0g weight in grams). Dairy/milks (type DAIRY) must default to 50.0 (representing 50.0ml volume in milliliters), and other minor additives/syrups/accents (type ADDITIVE) must default to 15.0 (representing 15.0ml volume in milliliters). Do NOT prescribe grams for liquids, and do NOT use 100.0 or 50.0 for coffee beans.
+    3. Provide a suggested 'amount'. The base coffee beans MUST default to 18.0 (representing 18.0g weight in grams). Dairy/milks (type DAIRY) must default to 50.0 (representing 50.0ml volume in milliliters), and other minor additives/syrups/accents (type ADDITIVE) must default to 15.0 (representing 15.0ml volume in milliliters). Exclusively prescribe milliliters for liquids, and strictly use 18.0 for coffee beans.
     4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
     5. For each ingredient, provide a specific 'role' (10 to 20 words detailing its flavor contribution).
-    6. MANDATORY: Include exactly one 'Dairy & Plant Milk' (type DAIRY) as the secondary ingredient (directly after the base coffee beans, at index 1 / position 2 of the list) with a default amount of 50.0. Minor additives (type ADDITIVE) like Heavy Cream must NOT be used as this secondary ingredient."""
+    6. MANDATORY: Include exactly one 'Dairy & Plant Milk' (type DAIRY) as the secondary ingredient (directly after the base coffee beans, at index 1 / position 2 of the list) with a default amount of 50.0. Exclusively use genuine dairy or milk bases for this secondary ingredient."""
                 example = """{
         "design_intent": "A rich milk-balanced double espresso (MOCK_MODE).",
         "selection": [
@@ -237,14 +237,14 @@ class AIGenerationMixin:
                 rules = """Rules:
     1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
     2. Select a base (e.g. sweet syrup) and complementary reagents.
-    3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 100ml base, 50ml payload, 25ml accents).
+    3. Provide a suggested 'amount' in milliliters (ml). Total syrup MUST NOT exceed 160ml (e.g., 80ml primary, 35ml secondary, 10ml accents).
     4. Provide a 'design_intent' (overall reasoning for the pairing, max 20 words).
     5. For each ingredient, provide a specific 'role' (10 to 20 words detailing its flavor contribution)."""
                 example = """{
         "design_intent": "A sharp carbonated citrus blend.",
         "selection": [
-            { "name": "Lemon Syrup", "amount": 100.0, "role": "Base sweetener" },
-            { "name": "Lime Syrup", "amount": 50.0, "role": "Tart balance" }
+            { "name": "Lemon Syrup", "amount": 80.0, "role": "Base sweetener" },
+            { "name": "Lime Syrup", "amount": 35.0, "role": "Tart balance" }
         ]
     }"""
     
@@ -311,7 +311,7 @@ class AIGenerationMixin:
     Paragraph 2 — THE TASTING EXPERIENCE: What will this drink taste like? Describe the opening notes, the body, and the finish sequentially.
     Paragraph 3 — OVERALL IMPRESSION: A concluding sentence on the final aesthetic and vibe of the compound.
     
-    Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
+    Focus exclusively on the flavor profile. Format exactly as plain text without markdown."""
             return cls.chat(prompt, drink_type=drink_type)
 
     @classmethod
@@ -357,7 +357,7 @@ class AIGenerationMixin:
     
     First, start with exactly this line:
     [MIXOLOGIST_NOTES]
-    Write a short, personalized note about this mix. You may selectively incorporate the Chemistry Lab Notes if they highlight safety or structural risks (like curdling or overflow), otherwise you can ignore them. Do not just parrot them.
+    Write a short, personalized note about this mix. You may selectively incorporate the Chemistry Lab Notes if they highlight safety or structural risks (like curdling or overflow), otherwise you can ignore them. Rephrase them naturally if used.
     
     Then, output exactly this line:
     [PROFILE_DESCRIPTION]
@@ -366,7 +366,7 @@ class AIGenerationMixin:
     Paragraph 2 — THE TASTING EXPERIENCE: What will this drink taste like? Describe the opening notes, the body, and the finish sequentially.
     Paragraph 3 — OVERALL IMPRESSION: A concluding sentence on the final aesthetic and vibe of the compound.
     
-    Do NOT give preparation instructions. Do NOT suggest more ingredients. No markdown formatting."""
+    Focus exclusively on the flavor profile. Format exactly as plain text without markdown."""
             yield from cls.chat_stream(prompt, drink_type=drink_type)
 
     @classmethod
@@ -388,10 +388,10 @@ Ingredients in the mixture: {ingredients_str}.
 Constraints:
 - Provide ONLY the name, nothing else.
 - Maximum 3 words.
-- Do not use quotes around the name.
-- Do not add any extra text or explanation.
-- Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo).
-- Do NOT include any ingredient brand names.
+- Provide the name exactly as unquoted plain text.
+- Provide the name exclusively without any extra text or explanation.
+- Keep the name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo).
+- Keep the name purely descriptive, omitting any ingredient brand names.
 """
         response = cls.chat(prompt, drink_type=drink_type, mode='creative')
         if not response:
@@ -424,13 +424,27 @@ Constraints:
             inspiration = random.choice(inspirations)
             inspiration_prompt = f'[RANDOM INSPIRATION SEED: "{inspiration}"] - Use this inspiration seed to dramatically influence the naming, descriptions, and ingredient combinations of these recipes.'
 
+        if drink_type == 'COFFEE':
+            mode_rules = """2. For parts: The base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0 parts. All other liquid modifiers should be distributed as relative parts (e.g. 50 parts dairy, 15 parts syrup).
+3. Ensure you include exactly ONE base coffee bean ingredient and ONE genuine dairy or milk ingredient.
+4. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+5. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+        elif drink_type == 'SLUSHIE':
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the slushie payload. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
+3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+        else:
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the total syrup profile. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
+3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+
         prompt = f"""[QUICK DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
         
 Task: Act as a master mixologist. Create exactly 5 distinct, highly creative, and appealing {drink_type} recipes using ONLY the ingredients available in the provided Inventory Registry. If the inventory has fewer than 10 total ingredients, you may generate fewer recipes (minimum 3).
 
 {inspiration_prompt}
 
-CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Do not rely on the same 5 combinations. Push the boundaries of mixology.
+CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Diversify the combinations actively to push the boundaries of mixology.
 
 OUTPUT FORMAT:
 Output your response as a JSON array of objects.
@@ -445,10 +459,8 @@ Each JSON object must have the following structure:
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
-2. For parts: Assign relative 'parts' out of 100 for each ingredient. For COFFEE, base coffee beans must be 18.0 parts.
-3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
-4. Do NOT include any ingredient brand names in the recipe name.
-5. If the request gives a specific flavor goal, optimize amounts for balance. If {drink_type} is COFFEE, ensure you include exactly ONE base coffee bean ingredient and ONE dairy/milk ingredient.
+2. Ingredient Count: Actively vary the complexity across your 5 recipes to showcase different styles. You must include at least one minimalist recipe (exactly 2 ingredients) and at least one highly complex recipe (4 to 5 ingredients). Distribute the remaining recipes naturally within that 2 to 5 ingredient range.
+{mode_rules}
 
 Inventory Registry: See context.
 """
@@ -492,6 +504,20 @@ Inventory Registry: See context.
         """Stream a single recipe based on a vibe prompt."""
         drink_type = drink_type.upper()
         
+        if drink_type == 'COFFEE':
+            mode_rules = """2. For parts: The base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0 parts. All other liquid modifiers should be distributed as relative parts (e.g. 50 parts dairy, 15 parts syrup).
+3. Ensure you include exactly ONE base coffee bean ingredient and ONE genuine dairy or milk ingredient.
+4. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+5. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+        elif drink_type == 'SLUSHIE':
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the slushie payload. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
+3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+        else:
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the total syrup profile. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
+3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
+4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+
         prompt = f"""[VIBE DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE].
         
 Task: Act as a master mixologist. Create a single, highly creative {drink_type} recipe that captures the essence of the following vibe/feeling: "{vibe_prompt}".
@@ -509,9 +535,8 @@ Output exactly ONE JSON object with the following structure:
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry.
-2. For parts: Assign relative 'parts' out of 100 for each ingredient. For COFFEE, base coffee beans must be 18.0 parts.
-3. Do NOT include the mode name (e.g. Experimental, Soda, Coffee, Cryo, Standard) in the recipe name.
-4. Do NOT include any ingredient brand names in the recipe name.
+2. Ingredient Count: Actively vary the complexity of your output to showcase different styles. Naturally use anywhere between 2 and 5 ingredients to best suit the vibe requested (e.g. use 2 ingredients for a clean, simple vibe, or up to 5 for a highly complex vibe).
+{mode_rules}
 """
         stream = cls.chat_stream(prompt, context=inventory, drink_type=drink_type, mode=mode)
         
