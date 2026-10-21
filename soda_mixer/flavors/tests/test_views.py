@@ -1,4 +1,5 @@
 import json
+import os
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -835,5 +836,197 @@ class BeverageLabBackupRestoreTest(TestCase):
             response = self.client.post(reverse('import_data'), {'backup_file': upload})
         self.assertEqual(response.status_code, 500)
         self.assertIn('Database restore failed', response.json().get('error', ''))
+
+
+class BeverageLabGFSBackupSystemTest(TestCase):
+    """Unit and integration tests for GFS rotation, encryption, storage drivers, and scheduler API."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.staff_user = User.objects.create_user(username="director", password="secure_password_123", is_staff=True)
+        self.client.login(username="director", password="secure_password_123")
+
+    def test_aes_gcm_encryption_roundtrip(self) -> None:
+        from ..backup_service import encrypt_payload, decrypt_payload, ENCRYPTION_MAGIC
+        raw_data = b"PostgreSQL database dump simulated binary stream"
+        passphrase = "UltraSecureLaboratoryPassphrase2026!"
+
+        encrypted = encrypt_payload(raw_data, passphrase)
+        self.assertTrue(encrypted.startswith(ENCRYPTION_MAGIC))
+        self.assertNotEqual(encrypted, raw_data)
+
+        decrypted = decrypt_payload(encrypted, passphrase)
+        self.assertEqual(decrypted, raw_data)
+
+        # Invalid passphrase fails decryption
+        with self.assertRaises(ValueError):
+            decrypt_payload(encrypted, "WrongPassword")
+
+    def test_determine_gfs_tier(self) -> None:
+        from datetime import datetime
+        from ..backup_service import determine_gfs_tier
+        from ..models import BackupConfiguration
+
+        config = BackupConfiguration.get_config()
+        config.monthly_day = 1
+        config.weekly_day = 6  # Sunday
+        config.keep_monthly = 3
+        config.keep_weekly = 4
+        config.keep_daily = 7
+        config.save()
+
+        # Monthly day match (e.g. 2026-06-01)
+        dt_monthly = datetime(2026, 6, 1, 2, 0, 0)
+        self.assertEqual(determine_gfs_tier(dt_monthly, config), 'MONTHLY')
+
+        # Weekly day match (e.g. Sunday 2026-06-07)
+        dt_weekly = datetime(2026, 6, 7, 2, 0, 0)
+        self.assertEqual(determine_gfs_tier(dt_weekly, config), 'WEEKLY')
+
+        # Normal daily (e.g. Tuesday 2026-06-02)
+        dt_daily = datetime(2026, 6, 2, 2, 0, 0)
+        self.assertEqual(determine_gfs_tier(dt_daily, config), 'DAILY')
+
+    def test_enforce_gfs_retention(self) -> None:
+        from ..backup_service import enforce_gfs_retention
+        from ..models import BackupConfiguration, BackupRecord
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = BackupConfiguration.get_config()
+            config.storage_type = 'LOCAL'
+            config.local_path = tmpdir
+            config.keep_daily = 2
+            config.keep_weekly = 1
+            config.keep_monthly = 1
+            config.save()
+
+            # Create 4 daily backups
+            for i in range(4):
+                fname = f"daily_{i}.sql.gz"
+                fpath = os.path.join(tmpdir, fname)
+                with open(fpath, 'wb') as f:
+                    f.write(b"data")
+                BackupRecord.objects.create(
+                    filename=fname,
+                    tier='DAILY',
+                    storage_type='LOCAL',
+                    file_size=4,
+                    status='SUCCESS'
+                )
+
+            # Manual backup (should never be pruned)
+            manual_file = "manual_keep.sql.gz"
+            with open(os.path.join(tmpdir, manual_file), 'wb') as f:
+                f.write(b"manual")
+            BackupRecord.objects.create(
+                filename=manual_file,
+                tier='MANUAL',
+                storage_type='LOCAL',
+                file_size=6,
+                status='SUCCESS'
+            )
+
+            pruned = enforce_gfs_retention(config)
+            self.assertEqual(len(pruned), 2)
+            self.assertEqual(BackupRecord.objects.filter(tier='DAILY').count(), 2)
+            self.assertTrue(BackupRecord.objects.filter(filename=manual_file).exists())
+
+    def test_save_backup_config_api(self) -> None:
+        url = reverse('save_backup_config_api')
+        payload = {
+            'is_enabled': True,
+            'backup_time': '03:30',
+            'weekly_day': 5,
+            'monthly_day': 15,
+            'keep_daily': 14,
+            'keep_weekly': 8,
+            'keep_monthly': 6,
+            'preserve_config_on_restore': True,
+            'storage_type': 'LOCAL',
+            'local_path': '/backups',
+            'encryption_passphrase': 'secret_passphrase',
+            'webhook_url': 'https://discord.com/api/webhooks/123/abc'
+        }
+        response = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'success')
+
+        from ..models import BackupConfiguration
+        config = BackupConfiguration.get_config()
+        self.assertTrue(config.is_enabled)
+        self.assertEqual(config.backup_time, '03:30')
+        self.assertEqual(config.weekly_day, 5)
+        self.assertEqual(config.monthly_day, 15)
+        self.assertEqual(config.keep_daily, 14)
+        self.assertEqual(config.encryption_passphrase, 'secret_passphrase')
+
+    def test_test_backup_storage_api_local(self) -> None:
+        import tempfile
+        url = reverse('test_backup_storage_api')
+        with tempfile.TemporaryDirectory() as tmpdir:
+            payload = {
+                'storage_type': 'LOCAL',
+                'local_path': tmpdir
+            }
+            response = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['status'], 'success')
+
+    def test_run_backup_now_api_dispatches_task(self) -> None:
+        url = reverse('run_backup_now_api')
+        with patch('soda_mixer.flavors.backup_service.execute_backup') as mock_exec:
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 202)
+            data = response.json()
+            self.assertEqual(data['status'], 'accepted')
+            self.assertIn('task_id', data)
+            self.assertTrue(mock_exec.called)
+
+    def test_download_and_delete_backup_record(self) -> None:
+        import tempfile
+        from ..models import BackupConfiguration, BackupRecord
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = BackupConfiguration.get_config()
+            config.storage_type = 'LOCAL'
+            config.local_path = tmpdir
+            config.save()
+
+            fname = "test_download.sql.gz"
+            fpath = os.path.join(tmpdir, fname)
+            with open(fpath, 'wb') as f:
+                f.write(b"content")
+
+            record = BackupRecord.objects.create(
+                filename=fname,
+                tier='MANUAL',
+                storage_type='LOCAL',
+                file_size=7,
+                status='SUCCESS'
+            )
+
+            # Download test
+            dl_url = reverse('download_backup_file', args=[record.uuid])
+            dl_res = self.client.get(dl_url)
+            self.assertEqual(dl_res.status_code, 200)
+            self.assertEqual(dl_res.content, b"content")
+
+            # Delete test
+            del_url = reverse('delete_backup_record_api', args=[record.uuid])
+            del_res = self.client.post(del_url)
+            self.assertEqual(del_res.status_code, 200)
+            self.assertEqual(del_res.json()['status'], 'success')
+            self.assertFalse(BackupRecord.objects.filter(uuid=record.uuid).exists())
+            self.assertFalse(os.path.exists(fpath))
+
+    def test_ssrf_validation_for_webhooks(self) -> None:
+        from ..backup_service import is_safe_webhook_url
+        self.assertFalse(is_safe_webhook_url("http://127.0.0.1:8000/webhook"))
+        self.assertFalse(is_safe_webhook_url("http://localhost:8000/webhook"))
+        self.assertFalse(is_safe_webhook_url("http://169.254.169.254/latest/meta-data"))
+        self.assertFalse(is_safe_webhook_url("http://192.168.1.1/secret"))
+        self.assertFalse(is_safe_webhook_url("ftp://discord.com/webhook"))
+
 
 

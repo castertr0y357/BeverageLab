@@ -2,7 +2,7 @@ from .base import SoftDeleteModel
 from .ingredients import Ingredient
 from .recipes import Recipe, RecipeCategory, RecipeIngredient
 from .history import MixHistory, MixHistoryIngredient
-from .config import LLMProvider, SystemConfiguration, BackgroundExecutionTask
+from .config import LLMProvider, SystemConfiguration, BackgroundExecutionTask, BackupConfiguration, BackupRecord
 
 __all__ = [
     'SoftDeleteModel',
@@ -15,4 +15,6 @@ __all__ = [
     'LLMProvider',
     'SystemConfiguration',
     'BackgroundExecutionTask',
+    'BackupConfiguration',
+    'BackupRecord',
 ]

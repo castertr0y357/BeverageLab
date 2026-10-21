@@ -9,10 +9,13 @@ ENV DJANGO_SETTINGS_MODULE=soda_mixer.settings
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for psycopg2 and PostgreSQL backup/restore utilities
+# Install system dependencies for psycopg2, PostgreSQL client, and libnfs userspace utilities
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     postgresql-client \
+    libnfs14 \
+    libnfs-dev \
+    libnfs-utils \
     gcc \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
@@ -24,9 +27,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create a non-privileged user and group, and change ownership of the application folder
+# Create a non-privileged user and group, create /backups directory, and set permissions
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
-    chown -R appuser:appgroup /app
+    mkdir -p /backups && \
+    chown -R appuser:appgroup /app /backups && \
+    chmod 700 /backups
 
 # Copy entrypoint script and make it executable
 RUN chmod +x entrypoint.sh

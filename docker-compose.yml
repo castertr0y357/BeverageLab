@@ -19,6 +19,8 @@ services:
     build: .
     ports:
       - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - backup_data:/backups
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-soda_mixer}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -38,3 +40,4 @@ services:
 
 volumes:
   postgres_data:
+  backup_data:
