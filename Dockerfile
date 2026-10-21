@@ -9,9 +9,10 @@ ENV DJANGO_SETTINGS_MODULE=soda_mixer.settings
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for psycopg2
+# Install system dependencies for psycopg2 and PostgreSQL backup/restore utilities
 RUN apt-get update && apt-get install -y \
     libpq-dev \
+    postgresql-client \
     gcc \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*

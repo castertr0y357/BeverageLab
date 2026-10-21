@@ -42,7 +42,8 @@ def backup():
 
     # We use docker compose exec to run pg_dump inside the db container
     # -T disables pseudo-TTY allocation to prevent stdout formatting issues
-    command = ['docker', 'compose', 'exec', '-T', 'db', 'pg_dump', '-U', DB_USER, DB_NAME]
+    # --no-owner and --no-acl ensure portable dumps across different instances/users
+    command = ['docker', 'compose', 'exec', '-T', 'db', 'pg_dump', '--no-owner', '--no-acl', '-U', DB_USER, DB_NAME]
 
     try:
         # Run command and capture output
@@ -72,12 +73,18 @@ def restore(backup_path: str):
 
     print(f"[STARTUP] Initiating restore protocol from '{backup_path}'...")
 
-    # Decompress backup file
+    # Decompress backup file if gzip-compressed, or read raw SQL bytes
     try:
-        with gzip.open(backup_path, 'rb') as f:
-            sql_content = f.read()
+        with open(backup_path, 'rb') as raw_f:
+            magic = raw_f.read(2)
+        if magic == b'\x1f\x8b':
+            with gzip.open(backup_path, 'rb') as f:
+                sql_content = f.read()
+        else:
+            with open(backup_path, 'rb') as f:
+                sql_content = f.read()
     except Exception as e:
-        print(f"[ERROR] Failed to decompress backup: {e}")
+        print(f"[ERROR] Failed to read/decompress backup: {e}")
         return False
 
     # Clean the current database schema first (drop and recreate public schema)

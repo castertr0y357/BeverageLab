@@ -707,3 +707,133 @@ class BeverageLabSettingsTest(TestCase):
         request_attacker = factory.post('/', HTTP_HOST='beveragelab.castertr0y357.net', HTTP_ORIGIN='https://attacker.com')
         self.assertFalse(middleware._origin_verified(request_attacker))
 
+
+class BeverageLabBackupRestoreTest(TestCase):
+    """Tests for compressed PostgreSQL database backup export and restore endpoints."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(username="lab_tech", password="secure_password_123")
+        self.staff_user = User.objects.create_user(username="director", password="secure_password_123", is_staff=True)
+
+    def test_export_data_unauthorized_for_non_staff(self) -> None:
+        self.client.login(username="lab_tech", password="secure_password_123")
+        response = self.client.get(reverse('export_data'))
+        self.assertEqual(response.status_code, 302)
+
+    @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
+    def test_export_data_returns_compressed_sql_gz(self, mock_popen: MagicMock) -> None:
+        import gzip
+        self.client.login(username="director", password="secure_password_123")
+
+        sample_sql = b"-- PostgreSQL database dump\nSET statement_timeout = 0;\n"
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate.return_value = (sample_sql, b"")
+        mock_popen.return_value = mock_proc
+
+        response = self.client.get(reverse('export_data'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/gzip')
+        self.assertIn('beveragelab_backup_', response['Content-Disposition'])
+        self.assertTrue(response['Content-Disposition'].endswith('.sql.gz"'))
+
+        decompressed = gzip.decompress(response.content)
+        self.assertEqual(decompressed, sample_sql)
+
+        called_cmd = mock_popen.call_args[0][0]
+        self.assertEqual(called_cmd[0], 'pg_dump')
+        self.assertIn('--no-owner', called_cmd)
+        self.assertIn('--no-acl', called_cmd)
+
+    @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
+    def test_export_data_handles_pg_dump_failure(self, mock_popen: MagicMock) -> None:
+        self.client.login(username="director", password="secure_password_123")
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 1
+        mock_proc.communicate.return_value = (b"", b"pg_dump: error: connection to server failed")
+        mock_popen.return_value = mock_proc
+
+        with self.assertLogs('soda_mixer.flavors.views.settings', level='ERROR'):
+            response = self.client.get(reverse('export_data'))
+        self.assertEqual(response.status_code, 500)
+
+    def test_import_data_missing_file_returns_400(self) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        response = self.client.post(reverse('import_data'), {})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('No file provided', response.json().get('error', ''))
+
+    def test_import_data_rejects_invalid_magic_signature(self) -> None:
+        self.client.login(username="director", password="secure_password_123")
+        bad_file = SimpleUploadedFile("fake.sql.gz", b'{"not": "a sql dump"}', content_type="application/gzip")
+        response = self.client.post(reverse('import_data'), {'backup_file': bad_file})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Invalid file signature', response.json().get('error', ''))
+
+    @patch('soda_mixer.flavors.views.settings.call_command')
+    @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
+    @patch('soda_mixer.flavors.views.settings.subprocess.run')
+    def test_import_data_restores_compressed_sql_gz(
+        self,
+        mock_run: MagicMock,
+        mock_popen: MagicMock,
+        mock_call_command: MagicMock,
+    ) -> None:
+        import gzip
+        self.client.login(username="director", password="secure_password_123")
+
+        mock_clean_res = MagicMock()
+        mock_clean_res.returncode = 0
+        mock_clean_res.stderr = b""
+        mock_run.return_value = mock_clean_res
+
+        mock_restore_proc = MagicMock()
+        mock_restore_proc.returncode = 0
+        mock_restore_proc.communicate.return_value = (b"SET\nCREATE TABLE\n", b"")
+        mock_popen.return_value = mock_restore_proc
+
+        raw_sql = b"-- PostgreSQL database dump\nSET statement_timeout = 0;\nCREATE TABLE public.test (id int);\n"
+        gz_payload = gzip.compress(raw_sql)
+        upload = SimpleUploadedFile("beveragelab_backup.sql.gz", gz_payload, content_type="application/gzip")
+
+        response = self.client.post(reverse('import_data'), {'backup_file': upload})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+
+        self.assertTrue(mock_run.called)
+        self.assertTrue(mock_popen.called)
+        self.assertEqual(mock_restore_proc.communicate.call_args[1]['input'], raw_sql)
+        mock_call_command.assert_called_once_with('migrate', interactive=False, verbosity=0)
+
+    @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
+    @patch('soda_mixer.flavors.views.settings.subprocess.run')
+    def test_import_data_handles_psql_restore_failure(
+        self,
+        mock_run: MagicMock,
+        mock_popen: MagicMock,
+    ) -> None:
+        import gzip
+        self.client.login(username="director", password="secure_password_123")
+
+        mock_clean_res = MagicMock()
+        mock_clean_res.returncode = 0
+        mock_clean_res.stderr = b""
+        mock_run.return_value = mock_clean_res
+
+        mock_restore_proc = MagicMock()
+        mock_restore_proc.returncode = 1
+        mock_restore_proc.communicate.return_value = (b"", b"ERROR: syntax error at or near")
+        mock_popen.return_value = mock_restore_proc
+
+        raw_sql = b"-- PostgreSQL database dump\nSELECT 1;\n"
+        upload = SimpleUploadedFile("backup.sql.gz", gzip.compress(raw_sql), content_type="application/gzip")
+
+        with self.assertLogs('soda_mixer.flavors.views.settings', level='ERROR'):
+            response = self.client.post(reverse('import_data'), {'backup_file': upload})
+        self.assertEqual(response.status_code, 500)
+        self.assertIn('Database restore failed', response.json().get('error', ''))
+
+

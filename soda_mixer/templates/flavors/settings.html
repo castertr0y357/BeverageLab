@@ -43,12 +43,12 @@
                         <div class="glass-surface p-4 h-100 border-white border-opacity-10">
                             <div class="d-flex align-items-center gap-2 mb-4">
                                 <i class="bi bi-download text-lab-accent"></i>
-                                <h5 class="mb-0 text-white">ARCHIVAL EXPORT</h5>
+                                <h5 class="mb-0 text-white">DATABASE BACKUP</h5>
                             </div>
-                            <p class="text-dim small mb-4">Complete archival dump of all formula profiles, laboratory notebooks, and interaction history into a single laboratory JSON format.</p>
+                            <p class="text-dim small mb-4">Export a complete compressed PostgreSQL database dump (<code>.sql.gz</code>) containing all formulas, ingredients, system configurations, and laboratory history, ready for restoration on any instance.</p>
                             <div class="d-grid mt-auto">
                                 <a href="{% url 'export_data' %}" class="btn btn-primary py-2 text-dark fw-bold">
-                                    <i class="bi bi-file-earmark-arrow-down"></i> Download Dossier
+                                    <i class="bi bi-file-earmark-arrow-down"></i> Download Database Backup (.sql.gz)
                                 </a>
                             </div>
                         </div>
@@ -57,11 +57,11 @@
                         <div class="glass-surface p-4 h-100 border-white border-opacity-10">
                             <div class="d-flex align-items-center gap-2 mb-4">
                                 <i class="bi bi-upload text-warning"></i>
-                                <h5 class="mb-0 text-white">INTEGRATION PROTOCOL</h5>
+                                <h5 class="mb-0 text-white">DATABASE RESTORE</h5>
                             </div>
-                            <p class="text-dim small mb-4">Re-integrate previously archived data into the laboratory index. Merges by name.</p>
+                            <p class="text-dim small mb-4">Restore a previously exported database backup file (<code>.sql.gz</code> or <code>.sql</code>) to this instance. <span class="text-warning">Warning: This will cleanly wipe and replace the current database state.</span></p>
                             <form id="importForm" enctype="multipart/form-data">
-                                <input class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white mb-3" type="file" id="backupFile" accept=".json" required>
+                                <input class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white mb-3" type="file" id="backupFile" accept=".gz,.sql" required>
                                 <div id="importStatus" class="mb-3" style="display: none;">
                                     <div class="progress bg-white bg-opacity-5" style="height: 4px;">
                                         <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning w-100"></div>
@@ -69,7 +69,7 @@
                                 </div>
                                 <div class="d-grid mt-auto">
                                     <button type="submit" class="btn btn-warning py-2 text-dark fw-bold">
-                                        <i class="bi bi-arrow-repeat"></i> Initiate Target Merge
+                                        <i class="bi bi-arrow-repeat"></i> Restore Database Backup
                                     </button>
                                 </div>
                             </form>
@@ -312,6 +312,7 @@ document.getElementById('importForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const fileInput = document.getElementById('backupFile');
     if (!fileInput.files.length) return;
+    if (!confirm('Restoring this database backup will completely replace the current database state. Do you wish to proceed?')) return;
 
     const formData = new FormData();
     formData.append('backup_file', fileInput.files[0]);
@@ -337,6 +338,9 @@ document.getElementById('importForm').addEventListener('submit', function(e) {
         if (data.status === 'success') {
             document.getElementById('modalTitle').innerText = 'PROTOCOL SUCCESS';
             document.getElementById('modalBody').innerHTML = `<p class="text-success"><i class="bi bi-check-circle-fill"></i> ${data.message}</p>`;
+            document.getElementById('statusModal').addEventListener('hidden.bs.modal', function () {
+                location.reload();
+            }, { once: true });
         } else {
             document.getElementById('modalTitle').innerText = 'LOG ERROR';
             document.getElementById('modalBody').innerHTML = `<p class="text-danger"><i class="bi bi-x-circle-fill"></i> ${data.error || 'Failed to integrate data.'}</p>`;

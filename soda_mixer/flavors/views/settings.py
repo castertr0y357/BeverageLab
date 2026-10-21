@@ -1,20 +1,39 @@
 """Settings and data management views."""
 
+import gzip
 import json
 import logging
-from typing import Dict, Any
+import os
+import subprocess
+from typing import Dict, Any, Tuple
 
+from django.conf import settings
+from django.core.management import call_command
+from django.db import connections
 from django.shortcuts import render
-from django.core import serializers
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 
-from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, MixHistory, MixHistoryIngredient
+from ..models import SystemConfiguration, LLMProvider
 
 logger = logging.getLogger(__name__)
+
+
+def _get_db_env_and_params() -> Tuple[Dict[str, str], str, str, str, str]:
+    """Extract database connection parameters and build subprocess environment."""
+    db_conf = settings.DATABASES.get('default', {})
+    db_name = str(db_conf.get('NAME') or os.environ.get('POSTGRES_DB', 'soda_mixer'))
+    db_user = str(db_conf.get('USER') or os.environ.get('POSTGRES_USER', 'postgres'))
+    db_password = str(db_conf.get('PASSWORD') or os.environ.get('POSTGRES_PASSWORD', 'postgres'))
+    db_host = str(db_conf.get('HOST') or os.environ.get('DATABASE_HOST', 'localhost'))
+    db_port = str(db_conf.get('PORT') or os.environ.get('DATABASE_PORT', '5432'))
+
+    env = os.environ.copy()
+    env['PGPASSWORD'] = db_password
+    return env, db_name, db_user, db_host, db_port
 
 
 @user_passes_test(lambda u: u.is_staff)
@@ -49,122 +68,166 @@ def save_settings_api(request: HttpRequest) -> JsonResponse:
 
 @user_passes_test(lambda u: u.is_staff)
 def export_data(request: HttpRequest) -> HttpResponse:
-    """Export all laboratory data to a JSON dossier."""
+    """Export a compressed PostgreSQL database backup (.sql.gz)."""
     try:
-        data = {
-            'ingredients': serializers.serialize('json', Ingredient.objects.all()),
-            'categories': serializers.serialize('json', RecipeCategory.objects.all()),
-            'recipes': serializers.serialize('json', Recipe.objects.all()),
-            'recipe_ingredients': serializers.serialize('json', RecipeIngredient.objects.all()),
-            'mix_history': serializers.serialize('json', MixHistory.objects.all()),
-            'mix_history_ingredients': serializers.serialize('json', MixHistoryIngredient.objects.all()),
-        }
-        
-        response = HttpResponse(json.dumps(data), content_type='application/json')
-        filename = f"beveragelab_dossier_{timezone.now().strftime('%Y%m%d_%H%M')}.json"
+        env, db_name, db_user, db_host, db_port = _get_db_env_and_params()
+        command = [
+            'pg_dump',
+            '--no-owner',
+            '--no-acl',
+            '-h', db_host,
+            '-p', db_port,
+            '-U', db_user,
+            db_name,
+        ]
+
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env
+        )
+        stdout, stderr = process.communicate(timeout=120)
+
+        if process.returncode != 0:
+            err_msg = stderr.decode('utf-8', errors='replace').strip()
+            logger.error(f"DatabaseBackup - Error - pg_dump failed: {err_msg}")
+            return HttpResponse("Backup Export Failed: Unable to dump database.", status=500)
+
+        compressed_data = gzip.compress(stdout)
+        response = HttpResponse(compressed_data, content_type='application/gzip')
+        filename = f"beveragelab_backup_{timezone.now().strftime('%Y%m%d_%H%M%S')}.sql.gz"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        logger.info(f"DatabaseBackup - Info - Successfully generated laboratory data dossier: {filename}")
+        logger.info(f"DatabaseBackup - Info - Successfully generated database backup: {filename}")
         return response
     except Exception as e:
-        logger.error(f"DatabaseBackup - Error - Failed to export data dossier: {e}")
+        logger.error(f"DatabaseBackup - Error - Failed to export database backup: {e}")
         return HttpResponse(f"Backup Export Failed: {str(e)}", status=500)
+
+
+def _extract_and_validate_sql_payload(raw_bytes: bytes) -> bytes:
+    """Validate file magic bytes (gzip or plain SQL) and return uncompressed SQL bytes."""
+    if not raw_bytes:
+        raise ValueError("Uploaded backup file is empty.")
+
+    # Check gzip magic signature (1f 8b)
+    if raw_bytes.startswith(b'\x1f\x8b'):
+        try:
+            sql_bytes = gzip.decompress(raw_bytes)
+        except Exception as exc:
+            raise ValueError("Corrupted gzip backup archive.") from exc
+    else:
+        sql_bytes = raw_bytes
+
+    # Verify the uncompressed content looks like a valid SQL dump
+    sample = sql_bytes[:2048].lstrip()
+    if sample.startswith(b'\xef\xbb\xbf'):
+        sample = sample[3:].lstrip()
+
+    try:
+        sample_str = sample.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError("Invalid file signature. File is not a valid SQL or .sql.gz database backup.") from exc
+
+    valid_prefixes = (
+        '--',
+        '/*',
+        'SET ',
+        'SELECT ',
+        'CREATE ',
+        'DROP ',
+        'ALTER ',
+        'INSERT ',
+        'COPY ',
+        'BEGIN',
+        '\\connect',
+        '\\restrict',
+    )
+    if not sample_str or not any(sample_str.upper().startswith(p.upper()) for p in valid_prefixes):
+        raise ValueError("Invalid file signature. File is not a valid SQL or .sql.gz database backup.")
+
+    return sql_bytes
 
 
 @user_passes_test(lambda u: u.is_staff)
 @csrf_exempt
 @require_http_methods(["POST"])
 def import_data(request: HttpRequest) -> JsonResponse:
-    """Restore laboratory data from a JSON dossier (Merge by Name)."""
+    """Restore the database from a compressed (.sql.gz) or plain (.sql) PostgreSQL backup file."""
     if 'backup_file' not in request.FILES:
-        logger.warning("DatabaseRestore - Warning - Import requested but no file was provided.")
+        logger.warning("DatabaseRestore - Warning - Restore requested but no file was provided.")
         return JsonResponse({'error': 'No file provided'}, status=400)
 
     try:
         uploaded_file = request.FILES['backup_file']
-        header = uploaded_file.read(512)
-        uploaded_file.seek(0)
-        
-        header_str = ""
+        raw_bytes = uploaded_file.read()
+
         try:
-            if header.startswith(b'\xef\xbb\xbf'):
-                header_str = header[3:].decode('utf-8').strip()
-            else:
-                header_str = header.decode('utf-8').strip()
-        except UnicodeDecodeError:
-            pass
-            
-        if not header_str or not (header_str.startswith('{') or header_str.startswith('[')):
-            logger.warning("DatabaseRestore - Warning - Dossier failed magic signature verification.")
-            return JsonResponse({'error': 'Invalid file signature. File is not a valid JSON dossier.'}, status=400)
+            sql_content = _extract_and_validate_sql_payload(raw_bytes)
+        except ValueError as ve:
+            logger.warning(f"DatabaseRestore - Warning - Backup file failed signature verification: {ve}")
+            return JsonResponse({'error': str(ve)}, status=400)
 
-        raw_data = json.load(uploaded_file)
-        
-        # 1. Restore Ingredients (Merge by Name)
-        ingredient_map: Dict[int, Ingredient] = {} # old_id -> new_object
-        for i_data in serializers.deserialize('json', raw_data['ingredients']):
-            i = i_data.object
-            old_id = i.id
-            existing = Ingredient.objects.filter(name=i.name, brand=getattr(i, 'brand', '')).first()
-            if existing:
-                ingredient_map[old_id] = existing
-            else:
-                i.id = None # Force new record
-                i.save()
-                ingredient_map[old_id] = i
+        env, db_name, db_user, db_host, db_port = _get_db_env_and_params()
 
-        # 2. Restore Categories (Merge by Name)
-        category_map: Dict[int, RecipeCategory] = {}
-        for c_data in serializers.deserialize('json', raw_data['categories']):
-            c = c_data.object
-            old_id = c.id
-            existing = RecipeCategory.objects.filter(name=c.name).first()
-            if existing:
-                category_map[old_id] = existing
-            else:
-                c.id = None
-                c.save()
-                category_map[old_id] = c
+        # Close active Django ORM connections so schema drop/recreate is not blocked
+        connections.close_all()
 
-        # 3. Restore Recipes
-        recipe_map: Dict[int, Recipe] = {}
-        for r_data in serializers.deserialize('json', raw_data['recipes']):
-            r = r_data.object
-            old_id = r.id
-            r.id = None
-            r.save()
-            recipe_map[old_id] = r
+        # 1. Clean current public schema
+        clean_command = [
+            'psql',
+            '-v', 'ON_ERROR_STOP=1',
+            '-h', db_host,
+            '-p', db_port,
+            '-U', db_user,
+            '-d', db_name,
+            '-c', 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+        ]
+        clean_proc = subprocess.run(
+            clean_command,
+            capture_output=True,
+            env=env,
+            timeout=60
+        )
+        if clean_proc.returncode != 0:
+            err_msg = clean_proc.stderr.decode('utf-8', errors='replace').strip()
+            logger.error(f"DatabaseRestore - Error - Schema cleanup failed: {err_msg}")
+            return JsonResponse({'error': 'Database schema cleanup failed prior to restore.'}, status=500)
 
-        # 4. Restore Recipe Ingredients
-        for ri_data in serializers.deserialize('json', raw_data['recipe_ingredients']):
-            ri = ri_data.object
-            if ri.recipe_id in recipe_map and ri.ingredient_id in ingredient_map:
-                ri.id = None
-                ri.recipe = recipe_map[ri.recipe_id]
-                ri.ingredient = ingredient_map[ri.ingredient_id]
-                ri.save()
+        # 2. Restore SQL dump into the clean schema
+        restore_command = [
+            'psql',
+            '-v', 'ON_ERROR_STOP=1',
+            '-h', db_host,
+            '-p', db_port,
+            '-U', db_user,
+            '-d', db_name,
+        ]
+        restore_proc = subprocess.Popen(
+            restore_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env
+        )
+        _, stderr = restore_proc.communicate(input=sql_content, timeout=180)
 
-        # 5. Restore Mix History
-        mix_map: Dict[int, MixHistory] = {}
-        for m_data in serializers.deserialize('json', raw_data['mix_history']):
-            m = m_data.object
-            old_id = m.id
-            m.id = None
-            if m.promoted_recipe_id and m.promoted_recipe_id in recipe_map:
-                m.promoted_recipe = recipe_map[m.promoted_recipe_id]
-            m.save()
-            mix_map[old_id] = m
+        if restore_proc.returncode != 0:
+            err_msg = stderr.decode('utf-8', errors='replace').strip()
+            logger.error(f"DatabaseRestore - Error - psql restore failed: {err_msg}")
+            return JsonResponse({'error': 'Database restore failed during SQL execution.'}, status=500)
 
-        # 6. Restore Mix History Ingredients
-        for mhi_data in serializers.deserialize('json', raw_data['mix_history_ingredients']):
-            mhi = mhi_data.object
-            if mhi.mix_id in mix_map and mhi.ingredient_id in ingredient_map:
-                mhi.id = None
-                mhi.mix = mix_map[mhi.mix_id]
-                mhi.ingredient = ingredient_map[mhi.ingredient_id]
-                mhi.save()
+        # 3. Ensure any newer migrations on this instance are applied seamlessly
+        try:
+            call_command('migrate', interactive=False, verbosity=0)
+        except Exception as mig_err:
+            logger.warning(f"DatabaseRestore - Warning - Post-restore migration check returned warning: {mig_err}")
 
-        logger.info("DatabaseRestore - Info - Successfully integrated laboratory data dossier.")
-        return JsonResponse({'status': 'success', 'message': 'Laboratory dossier integrated successfully'})
+        logger.info("DatabaseRestore - Info - Successfully restored database from backup archive.")
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Database backup restored and calibrated successfully.'
+        })
 
     except Exception as e:
         logger.error(f"DatabaseRestore - Error - Failed to restore database from backup file: {e}")

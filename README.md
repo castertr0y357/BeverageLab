@@ -73,8 +73,8 @@ The Beverage Laboratory does not exist in a silo. It connects seamlessly to your
 
 ### 🛡️ Archival & Data Insurance
 - **Vertical Navigation Hub**: Clean, component-based settings architectures.
-- **Dossier Export**: Complete laboratory dump (Flavors, Recipes, History) into a single archival JSON format.
-- **Target Merging**: Re-integration protocol prioritizing existing chemical identities to prevent database duplication.
+- **Database Backup (`.sql.gz`)**: Complete compressed PostgreSQL database dump (Flavors, Recipes, History, and System Configurations) directly downloadable from the Web UI or CLI.
+- **Instance Restoration**: 1-click database restore in the Settings Hub or via CLI to seamlessly migrate or recover an instance from a `.sql.gz` or `.sql` backup file.
 
 ---
 
@@ -121,7 +121,7 @@ graph TD
 
     subgraph External [External Endpoints]
         Mealie[Mealie Self-Hosted Instance]
-        Export[JSON Archival Payload]
+        Export[SQL.GZ Database Backup]
         
         Settings[Settings Hub] --> Export
         Settings --> SysConf
