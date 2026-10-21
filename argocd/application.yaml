@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/castertr0y357/BeverageLab.git
+    repoURL: https://github.com/your-username/BeverageLab.git
     targetRevision: HEAD
     path: k8s/overlays/production
   destination:

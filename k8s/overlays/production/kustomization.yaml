@@ -8,7 +8,7 @@ resources:
 
 # Production image configuration
 images:
-  - name: ghcr.io/castertr0y357/beveragelab
-    newName: ghcr.io/castertr0y357/beveragelab
+  - name: ghcr.io/your-username/beveragelab
+    newName: ghcr.io/your-username/beveragelab
     newTag: latest
 

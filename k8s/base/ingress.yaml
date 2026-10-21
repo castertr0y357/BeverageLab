@@ -9,7 +9,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: beveragelab.castertr0y357.net
+    - host: beveragelab.example.com
       http:
         paths:
           - path: /
@@ -19,3 +19,4 @@ spec:
                 name: web
                 port:
                   number: 80
+

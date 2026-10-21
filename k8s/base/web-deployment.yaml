@@ -21,7 +21,7 @@ spec:
         fsGroup: 999
       containers:
         - name: web
-          image: ghcr.io/castertr0y357/beveragelab:latest
+          image: ghcr.io/your-username/beveragelab:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

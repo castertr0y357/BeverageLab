@@ -700,12 +700,12 @@ class BeverageLabSettingsTest(TestCase):
 
         factory = RequestFactory()
         # Browser sends secure Origin header matching host (mismatched scheme)
-        request = factory.post('/', HTTP_HOST='beveragelab.castertr0y357.net', HTTP_ORIGIN='https://beveragelab.castertr0y357.net')
+        request = factory.post('/', HTTP_HOST='beveragelab.example.com', HTTP_ORIGIN='https://beveragelab.example.com')
         middleware = LaboratoryCsrfMiddleware(lambda r: None)
         self.assertTrue(middleware._origin_verified(request))
 
         # Browser sends Origin header with different host
-        request_attacker = factory.post('/', HTTP_HOST='beveragelab.castertr0y357.net', HTTP_ORIGIN='https://attacker.com')
+        request_attacker = factory.post('/', HTTP_HOST='beveragelab.example.com', HTTP_ORIGIN='https://attacker.com')
         self.assertFalse(middleware._origin_verified(request_attacker))
 
 
