@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: beveragelab-config
+data:
+  DATABASE_HOST: "db"
+  DATABASE_PORT: "5432"
+  POSTGRES_DB: "soda_mixer"
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  MOCK_MODE: "False"
+  CSRF_TRUSTED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000"
+

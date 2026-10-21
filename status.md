@@ -1,6 +1,14 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Configured production-ready Kubernetes deployment (Kustomize & ArgoCD) and GitHub Actions CI/CD pipeline:
+  - Created `.github/workflows/build.yml` with automated test execution against a PostgreSQL 16 service container, Docker Buildx QEMU multi-platform readiness, GitHub Actions layer caching (`type=gha`), and automated publishing to GitHub Container Registry (`ghcr.io/castertr0y357/beveragelab:latest`).
+  - Created modular Kustomize structure in `k8s/`:
+    - `k8s/base/`: ConfigMap (`beveragelab-config`), Secret template (`beveragelab-secret`), PersistentVolumeClaim for local backups (`beveragelab-backup-pvc`), PostgreSQL 16 StatefulSet with `volumeClaimTemplates` and health probes, PostgreSQL ClusterIP Service (`db:5432`), BeverageLab Web Deployment with non-root security context (`fsGroup: 999`, `runAsUser: 999`), and Web ClusterIP Service (`web:80`).
+    - `k8s/overlays/production/`: Sets target namespace `beveragelab` and production image overrides.
+  - Created declarative ArgoCD Application manifest in `argocd/application.yaml` with automated synchronization, self-healing, and namespace creation.
+  - Validated Kustomize output with `kubectl kustomize` cleanly without errors or deprecation warnings.
+  - Documented deployment workflows in `README.md`.
 - [x] Fixed cross-version PostgreSQL database restore compatibility:
   - Identified root cause of `Database restore failed during SQL execution: ERROR: unrecognized configuration parameter "transaction_timeout"`: The Debian trixie web container ships with `postgresql-client` 17.11 (`pg_dump` 17.11), which automatically emits `SET transaction_timeout = 0;`. When restoring onto PostgreSQL 16 (running in the `db` container), `psql -v ON_ERROR_STOP=1` rejected this unrecognized parameter and halted the restore.
   - Implemented `_sanitize_sql_for_compat` in `soda_mixer/flavors/views/settings.py` and updated `_extract_and_validate_sql_payload` and `_restore_sql_into_database` to comment out cross-version incompatibility directives (such as `SET transaction_timeout` and `SELECT pg_catalog.set_config('transaction_timeout', ...)`).

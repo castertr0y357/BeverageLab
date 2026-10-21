@@ -152,6 +152,25 @@ To start the application container stack immediately:
 ```bash
 docker compose up -d --build
 ```
+*(Or if using nerdctl: `nerdctl compose up -d --build`)*
+
+### ☸️ Kubernetes & ArgoCD Deployment (GitOps)
+BeverageLab provides production-ready Kustomize manifests and an ArgoCD Application resource.
+
+#### 1. Instant Kubernetes Deployment (Kustomize)
+Deploy the entire stack (bundled PostgreSQL StatefulSet, BeverageLab web deployment, persistent volumes, and ClusterIP services) into the `beveragelab` namespace:
+```bash
+kubectl apply -k k8s/overlays/production
+```
+
+#### 2. One-Click GitOps via ArgoCD
+Drop the application manifest into your ArgoCD-managed cluster to enable continuous automated synchronization and self-healing:
+```bash
+kubectl apply -f argocd/application.yaml
+```
+
+#### 3. Continuous Delivery (GitHub Actions)
+Pushes to the `main` branch or semver release tags automatically trigger [`.github/workflows/build.yml`](.github/workflows/build.yml), which executes the automated test suite, compiles multi-platform container images with Docker Buildx layer caching, and publishes them to GitHub Container Registry (`ghcr.io/castertr0y357/beveragelab:latest`).
 
 ### 🔑 Default Credentials
 - **Username**: `admin`
