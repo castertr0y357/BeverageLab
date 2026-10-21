@@ -9,5 +9,5 @@ data:
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
   MOCK_MODE: "False"
-  CSRF_TRUSTED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000"
+  CSRF_TRUSTED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000,https://beveragelab.castertr0y357.net,http://beveragelab.castertr0y357.net"
 

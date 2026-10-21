@@ -169,7 +169,15 @@ Drop the application manifest into your ArgoCD-managed cluster to enable continu
 kubectl apply -f argocd/application.yaml
 ```
 
-#### 3. Continuous Delivery (GitHub Actions)
+#### 3. Reverse Proxy & Ingress (Nginx Proxy Manager Plus / Traefik)
+- **Traefik Ingress**: Pre-configured in [`k8s/base/ingress.yaml`](k8s/base/ingress.yaml) targeting `beveragelab.castertr0y357.net` with `web,websecure` entrypoints.
+- **Nginx Proxy Manager Plus (npmplus)**: Configure a Proxy Host with:
+  - **Domain Names**: `beveragelab.castertr0y357.net`
+  - **Forward Scheme / Hostname / Port**: `http://web.beveragelab.svc.cluster.local:80`
+  - **Websockets Support**: Enabled (for live progress and streaming updates)
+  - **SSL**: Let's Encrypt / Certbot with Force SSL and HTTP/2 support.
+
+#### 4. Continuous Delivery (GitHub Actions)
 Pushes to the `main` branch or semver release tags automatically trigger [`.github/workflows/build.yml`](.github/workflows/build.yml), which executes the automated test suite, compiles multi-platform container images with Docker Buildx layer caching, and publishes them to GitHub Container Registry (`ghcr.io/castertr0y357/beveragelab:latest`).
 
 ### 🔑 Default Credentials

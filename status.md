@@ -4,7 +4,8 @@
 - [x] Configured production-ready Kubernetes deployment (Kustomize & ArgoCD) and GitHub Actions CI/CD pipeline:
   - Created `.github/workflows/build.yml` with automated test execution against a PostgreSQL 16 service container, Docker Buildx QEMU multi-platform readiness, GitHub Actions layer caching (`type=gha`), and automated publishing to GitHub Container Registry (`ghcr.io/castertr0y357/beveragelab:latest`).
   - Created modular Kustomize structure in `k8s/`:
-    - `k8s/base/`: ConfigMap (`beveragelab-config`), Secret template (`beveragelab-secret`), PersistentVolumeClaim for local backups (`beveragelab-backup-pvc`), PostgreSQL 16 StatefulSet with `volumeClaimTemplates` and health probes, PostgreSQL ClusterIP Service (`db:5432`), BeverageLab Web Deployment with non-root security context (`fsGroup: 999`, `runAsUser: 999`), and Web ClusterIP Service (`web:80`).
+    - `k8s/base/`: ConfigMap (`beveragelab-config`), Secret template (`beveragelab-secret`), PersistentVolumeClaim for local backups (`beveragelab-backup-pvc`), PostgreSQL 16 StatefulSet with `volumeClaimTemplates` and health probes, PostgreSQL ClusterIP Service (`db:5432`), BeverageLab Web Deployment with non-root security context (`fsGroup: 999`, `runAsUser: 999`), Web ClusterIP Service (`web:80`), and Traefik Ingress (`beveragelab-ingress` for `beveragelab.castertr0y357.net`).
+    - Added npmplus forward proxy destination instructions (`http://web.beveragelab.svc.cluster.local:80`) and verified `CSRF_TRUSTED_ORIGINS` includes the production domain.
     - `k8s/overlays/production/`: Sets target namespace `beveragelab` and production image overrides.
   - Created declarative ArgoCD Application manifest in `argocd/application.yaml` with automated synchronization, self-healing, and namespace creation.
   - Validated Kustomize output with `kubectl kustomize` cleanly without errors or deprecation warnings.

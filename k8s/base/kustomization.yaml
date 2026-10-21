@@ -13,4 +13,5 @@ resources:
   - db-statefulset.yaml
   - web-service.yaml
   - web-deployment.yaml
+  - ingress.yaml
 
