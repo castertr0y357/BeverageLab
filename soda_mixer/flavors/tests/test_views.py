@@ -809,6 +809,54 @@ class BeverageLabBackupRestoreTest(TestCase):
         self.assertEqual(mock_restore_proc.communicate.call_args[1]['input'], raw_sql)
         mock_call_command.assert_called_once_with('migrate', interactive=False, verbosity=0)
 
+    @patch('soda_mixer.flavors.views.settings.call_command')
+    @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
+    @patch('soda_mixer.flavors.views.settings.subprocess.run')
+    def test_import_data_sanitizes_transaction_timeout_for_cross_version_postgres(
+        self,
+        mock_run: MagicMock,
+        mock_popen: MagicMock,
+        mock_call_command: MagicMock,
+    ) -> None:
+        import gzip
+        from soda_mixer.flavors.views.settings import _sanitize_sql_for_compat
+
+        # Direct function test
+        sample_sql = (
+            b"-- PostgreSQL database dump\n"
+            b"SET statement_timeout = 0;\n"
+            b"SET transaction_timeout = 0;\n"
+            b"SELECT pg_catalog.set_config('transaction_timeout', '0', false);\n"
+            b"SELECT 1;\n"
+        )
+        sanitized = _sanitize_sql_for_compat(sample_sql)
+        self.assertIn(b"-- SET transaction_timeout = 0;\n", sanitized)
+        self.assertIn(b"-- SELECT pg_catalog.set_config('transaction_timeout', '0', false);\n", sanitized)
+        self.assertIn(b"SET statement_timeout = 0;\n", sanitized)
+        self.assertIn(b"SELECT 1;\n", sanitized)
+
+        # Integration test via import_data view
+        self.client.login(username="director", password="secure_password_123")
+
+        mock_clean_res = MagicMock()
+        mock_clean_res.returncode = 0
+        mock_clean_res.stderr = b""
+        mock_run.return_value = mock_clean_res
+
+        mock_restore_proc = MagicMock()
+        mock_restore_proc.returncode = 0
+        mock_restore_proc.communicate.return_value = (b"", b"")
+        mock_popen.return_value = mock_restore_proc
+
+        gz_payload = gzip.compress(sample_sql)
+        upload = SimpleUploadedFile("pg17_backup.sql.gz", gz_payload, content_type="application/gzip")
+
+        response = self.client.post(reverse('import_data'), {'backup_file': upload})
+        self.assertEqual(response.status_code, 200)
+        delivered_sql = mock_restore_proc.communicate.call_args[1]['input']
+        self.assertNotIn(b"\nSET transaction_timeout = 0;", delivered_sql)
+        self.assertIn(b"-- SET transaction_timeout = 0;", delivered_sql)
+
     @patch('soda_mixer.flavors.views.settings.subprocess.Popen')
     @patch('soda_mixer.flavors.views.settings.subprocess.run')
     def test_import_data_handles_psql_restore_failure(

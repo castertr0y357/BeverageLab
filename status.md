@@ -1,6 +1,12 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Fixed cross-version PostgreSQL database restore compatibility:
+  - Identified root cause of `Database restore failed during SQL execution: ERROR: unrecognized configuration parameter "transaction_timeout"`: The Debian trixie web container ships with `postgresql-client` 17.11 (`pg_dump` 17.11), which automatically emits `SET transaction_timeout = 0;`. When restoring onto PostgreSQL 16 (running in the `db` container), `psql -v ON_ERROR_STOP=1` rejected this unrecognized parameter and halted the restore.
+  - Implemented `_sanitize_sql_for_compat` in `soda_mixer/flavors/views/settings.py` and updated `_extract_and_validate_sql_payload` and `_restore_sql_into_database` to comment out cross-version incompatibility directives (such as `SET transaction_timeout` and `SELECT pg_catalog.set_config('transaction_timeout', ...)`).
+  - Added matching cross-version sanitization in `backup.py` (`restore()`) to ensure CLI restores are resilient against PostgreSQL 17 client dumps.
+  - Added unit and integration tests in `soda_mixer/flavors/tests/test_views.py` (`test_import_data_sanitizes_transaction_timeout_for_cross_version_postgres`) verifying that dumps containing `SET transaction_timeout = 0;` are sanitized into SQL comments and restored cleanly.
+  - Successfully verified all 121 unit and integration tests pass cleanly in `nerdctl`.
 - [x] Implemented automated GFS database backup scheduling and multi-target storage subsystem:
   - Added `BackupConfiguration` (singleton with scheduling, UTC time, weekly/monthly day promotion, daily/weekly/monthly GFS retention counts, preservation on restore, storage driver credentials, optional AES-256-GCM encryption, and failure webhook notification) and `BackupRecord` catalog models.
   - Built modular `soda_mixer/flavors/backup_service.py` supporting `LocalStorageDriver`, `S3StorageDriver` (`boto3`), `CIFSStorageDriver` (`smbprotocol`), and direct userspace `UserspaceNFSDriver` (`libnfs.so.14` via `ctypes`), as well as PBKDF2-HMAC-SHA256 + AES-GCM encryption/decryption (`BLABENC1` signature), GFS rotation enforcement, and SSRF-defended webhook failure alerting.

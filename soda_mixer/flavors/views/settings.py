@@ -4,6 +4,7 @@ import gzip
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from typing import Dict, Any, Tuple
@@ -113,6 +114,17 @@ def export_data(request: HttpRequest) -> HttpResponse:
         return HttpResponse(f"Backup Export Failed: {str(e)}", status=500)
 
 
+def _sanitize_sql_for_compat(sql_bytes: bytes) -> bytes:
+    """Sanitize SQL dump to ensure cross-version PostgreSQL compatibility.
+
+    PostgreSQL 17+ pg_dump emits 'SET transaction_timeout = 0;' which causes PostgreSQL <= 16
+    to fail with 'ERROR: unrecognized configuration parameter "transaction_timeout"' when
+    executed with ON_ERROR_STOP=1.
+    """
+    pattern = rb'(?im)^([ \t]*(?:SET\s+transaction_timeout|SELECT\s+pg_catalog\.set_config\(\s*\'transaction_timeout).*)$'
+    return re.sub(pattern, rb'-- \1', sql_bytes)
+
+
 def _extract_and_validate_sql_payload(raw_bytes: bytes) -> bytes:
     """Validate file magic bytes (gzip or plain SQL) and return uncompressed SQL bytes."""
     if not raw_bytes:
@@ -154,11 +166,12 @@ def _extract_and_validate_sql_payload(raw_bytes: bytes) -> bytes:
     if not sample_str or not any(sample_str.upper().startswith(p.upper()) for p in valid_prefixes):
         raise ValueError("Invalid file signature. File is not a valid SQL or .sql.gz database backup.")
 
-    return sql_bytes
+    return _sanitize_sql_for_compat(sql_bytes)
 
 
 def _restore_sql_into_database(sql_content: bytes, preserve_config: bool = True) -> None:
     """Executes schema clean, psql restore, migrations, and optional backup config preservation."""
+    sql_content = _sanitize_sql_for_compat(sql_content)
     env, db_name, db_user, db_host, db_port = _get_db_env_and_params()
 
     saved_backup_config_data = None

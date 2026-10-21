@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import gzip
+import re
 from datetime import datetime
 
 # Default container runner (nerdctl or docker fallback)
@@ -84,6 +85,10 @@ def restore(backup_path: str):
         else:
             with open(backup_path, 'rb') as f:
                 sql_content = f.read()
+
+        # Sanitize cross-version parameters (e.g. SET transaction_timeout in PG 17+ dumps on PG 16)
+        pattern = rb'(?im)^([ \t]*(?:SET\s+transaction_timeout|SELECT\s+pg_catalog\.set_config\(\s*\'transaction_timeout).*)$'
+        sql_content = re.sub(pattern, rb'-- \1', sql_content)
     except Exception as e:
         print(f"[ERROR] Failed to read/decompress backup: {e}")
         return False
