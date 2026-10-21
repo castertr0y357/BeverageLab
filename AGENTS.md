@@ -8,7 +8,7 @@ Run the project verification command when making significant changes to check fo
 ### Rebuild and Verify Command
 Run the following command from the workspace root:
 ```powershell
-docker compose run --rm web python manage.py test; docker compose down; docker compose up -d --build
+nerdctl compose exec -T web python manage.py test; nerdctl compose down; nerdctl compose up -d --build
 ```
 
 > [!IMPORTANT]

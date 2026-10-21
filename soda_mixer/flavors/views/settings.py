@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 from typing import Dict, Any, Tuple
 
 from django.conf import settings
@@ -170,8 +171,9 @@ def import_data(request: HttpRequest) -> JsonResponse:
 
         env, db_name, db_user, db_host, db_port = _get_db_env_and_params()
 
-        # Close active Django ORM connections so schema drop/recreate is not blocked
-        connections.close_all()
+        # Close active Django ORM connections so schema drop/recreate is not blocked (only outside of test runs)
+        if not getattr(settings, 'IS_TESTING', False) and 'test' not in sys.argv:
+            connections.close_all()
 
         # 1. Clean current public schema
         clean_command = [

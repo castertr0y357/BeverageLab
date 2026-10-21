@@ -326,7 +326,7 @@ class BeverageLabViewsTest(TestCase):
         self.assertEqual(data['suggestions'][0]['name'], 'Whole Milk')
         
         args, kwargs = mock_request.call_args
-        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'DAIRY'", kwargs['json']['messages'][1]['content'])
+        self.assertIn("MANDATORY RULE: You must EXCLUSIVELY suggest new ingredients of type 'DAIRY'", kwargs['json']['messages'][1]['content'])
 
     def test_save_llm_provider_api_thinking(self) -> None:
         self.client.login(username="director", password="secure_password_123")

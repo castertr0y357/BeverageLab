@@ -7,7 +7,8 @@ import subprocess
 import gzip
 from datetime import datetime
 
-# Default configuration from env
+# Default container runner (nerdctl or docker fallback)
+CONTAINER_CMD = os.environ.get('CONTAINER_CMD', 'nerdctl' if subprocess.run(['where', 'nerdctl'], capture_output=True).returncode == 0 else 'docker')
 DB_NAME = os.environ.get('POSTGRES_DB', 'soda_mixer')
 DB_USER = os.environ.get('POSTGRES_USER', 'postgres')
 BACKUP_DIR = 'backups'
@@ -43,7 +44,7 @@ def backup():
     # We use docker compose exec to run pg_dump inside the db container
     # -T disables pseudo-TTY allocation to prevent stdout formatting issues
     # --no-owner and --no-acl ensure portable dumps across different instances/users
-    command = ['docker', 'compose', 'exec', '-T', 'db', 'pg_dump', '--no-owner', '--no-acl', '-U', DB_USER, DB_NAME]
+    command = [CONTAINER_CMD, 'compose', 'exec', '-T', 'db', 'pg_dump', '--no-owner', '--no-acl', '-U', DB_USER, DB_NAME]
 
     try:
         # Run command and capture output
@@ -89,7 +90,7 @@ def restore(backup_path: str):
 
     # Clean the current database schema first (drop and recreate public schema)
     clean_command = [
-        'docker', 'compose', 'exec', '-T', 'db', 'psql', 
+        CONTAINER_CMD, 'compose', 'exec', '-T', 'db', 'psql', 
         '-U', DB_USER, '-d', DB_NAME, 
         '-c', 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
     ]
@@ -102,7 +103,7 @@ def restore(backup_path: str):
         return False
 
     # Run psql restore command
-    restore_command = ['docker', 'compose', 'exec', '-T', 'db', 'psql', '-U', DB_USER, '-d', DB_NAME]
+    restore_command = [CONTAINER_CMD, 'compose', 'exec', '-T', 'db', 'psql', '-U', DB_USER, '-d', DB_NAME]
 
     try:
         restore_proc = subprocess.Popen(restore_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

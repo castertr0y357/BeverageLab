@@ -115,7 +115,7 @@ class BeverageLabAIAssistantTest(TestCase):
         self.assertEqual(res['suggestions'][0]['name'], "Whole Milk")
         
         args, kwargs = mock_request.call_args
-        self.assertIn("MANDATORY RULE: You must ONLY suggest new ingredients of type 'ADDITIVE'", kwargs['json']['messages'][1]['content'])
+        self.assertIn("MANDATORY RULE: You must EXCLUSIVELY suggest new ingredients of type 'ADDITIVE'", kwargs['json']['messages'][1]['content'])
 
     @patch('requests.request')
     def test_ai_analyze_flavor_profile(self, mock_request: MagicMock) -> None:
