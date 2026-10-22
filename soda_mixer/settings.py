@@ -70,6 +70,10 @@ def bootstrap_env():
 # Run bootstrapping
 bootstrap_env()
 
+# In testing mode, default MOCK_MODE to False so unit test mocks can execute as expected
+if 'test' in sys.argv:
+    os.environ['MOCK_MODE'] = 'False'
+
 
 # Startup configuration validation
 REQUIRED_ENV_VARS = [

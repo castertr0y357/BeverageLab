@@ -1,6 +1,10 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Fixed CI test failures by correcting ambient MOCK_MODE behavior during test runs:
+  - Corrected .github/workflows/build.yml to pass MOCK_MODE: 'False' during the Django test job so unittest mocks can intercept AI provider calls as expected.
+  - Hardened soda_mixer/settings.py to default os.environ['MOCK_MODE'] = 'False' whenever executing under 'test' in sys.argv, preventing test failures if MOCK_MODE is enabled in local .env files or container environments while still allowing individual test cases to explicitly patch MOCK_MODE=True.
+  - Verified all 121 tests pass with and without ambient MOCK_MODE=True.
 - [x] Configured production-ready Kubernetes deployment (Kustomize & ArgoCD) and GitHub Actions CI/CD pipeline:
   - Created `.github/workflows/build.yml` with automated test execution against a PostgreSQL 16 service container, Docker Buildx QEMU multi-platform readiness, GitHub Actions layer caching (`type=gha`), and automated publishing to GitHub Container Registry (`ghcr.io/your-username/beveragelab:latest`).
   - Created modular Kustomize structure in `k8s/`:
