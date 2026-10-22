@@ -20,6 +20,10 @@ class LaboratoryAccessMiddleware:
             '/admin/',
             '/static/',
             '/media/',
+            '/readyz',
+            '/livez',
+            '/healthz',
+            '/metrics',
         ]
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
