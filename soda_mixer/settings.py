@@ -249,12 +249,12 @@ LOGGING = {
     "disable_existing_loggers": False,
     "filters": {
         "correlation": {
-            "()": "flavors.middleware_correlation.CorrelationIDFilter",
+            "()": "soda_mixer.flavors.middleware_correlation.CorrelationIDFilter",
         },
     },
     "formatters": {
         "json": {
-            "()": "flavors.middleware_correlation.LokiJsonFormatter",
+            "()": "soda_mixer.flavors.middleware_correlation.LokiJsonFormatter",
         },
         "console": {
             "format": "[%(asctime)s] [%(correlation_id)s] [%(levelname)s] [%(name)s] - %(message)s",
