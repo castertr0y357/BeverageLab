@@ -25,7 +25,8 @@ from .auth import login_view, login_api, logout_api
 from .settings import (
     settings_view, save_settings_api, export_data, import_data,
     save_backup_config_api, test_backup_storage_api, run_backup_now_api,
-    download_backup_file, restore_backup_record_api, delete_backup_record_api
+    download_backup_file, restore_backup_record_api, delete_backup_record_api,
+    metrics_view, debug_logging_toggle_api
 )
 from .coffee_chemistry import coffee_chemistry_api
 from .soda_chemistry import soda_chemistry_api
@@ -51,6 +52,6 @@ __all__ = [
     'settings_view', 'save_settings_api', 'export_data', 'import_data',
     'save_backup_config_api', 'test_backup_storage_api', 'run_backup_now_api',
     'download_backup_file', 'restore_backup_record_api', 'delete_backup_record_api',
+    'metrics_view', 'debug_logging_toggle_api',
     'task_status_api'
 ]
-

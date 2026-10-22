@@ -4,6 +4,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Observability
+    path('metrics', views.metrics_view, name='metrics_view'),
+    path('metrics/', views.metrics_view, name='metrics_view_slash'),
+    path('api/observability/debug/', views.debug_logging_toggle_api, name='debug_logging_toggle_api'),
+
     # Main pages
     path('', views.dashboard, name='dashboard'),
 

@@ -350,13 +350,20 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError as e:
-        logger.warning(f"CryoChemistry - Warning - Invalid JSON payload: {e}")
+        logger.warning(f"CryoChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.cryo"})
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     bottle_scale = float(data.get('bottle_scale', 1.0))
     ingredients_input = data.get('ingredients', [])
 
-    engine = CryoChemistryEngine(ingredients_input, bottle_scale)
-    res_data = engine.process()
-
-    return JsonResponse(res_data)
+    try:
+        engine = CryoChemistryEngine(ingredients_input, bottle_scale)
+        res_data = engine.process()
+        logger.info(
+            f"CryoChemistry - Synthesized recipe: status='{res_data.get('recipe_validation')}' scale={bottle_scale} ingredients={len(ingredients_input)}",
+            extra={"action": "chemistry.cryo"}
+        )
+        return JsonResponse(res_data)
+    except Exception as e:
+        logger.error(f"CryoChemistry - Processing error: {e}", exc_info=True, extra={"action": "chemistry.cryo"})
+        return JsonResponse({'error': str(e)}, status=500)

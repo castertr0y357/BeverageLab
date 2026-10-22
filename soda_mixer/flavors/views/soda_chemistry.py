@@ -260,14 +260,21 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError as e:
-        logger.warning(f"SodaChemistry - Warning - Invalid JSON payload: {e}")
+        logger.warning(f"SodaChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.soda"})
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     sweetness_style = data.get('sweetness_style', '').strip().upper()
     bottle_scale = float(data.get('bottle_scale', 1.0))
     ingredients_input = data.get('ingredients', [])
 
-    engine = SodaChemistryEngine(ingredients_input, sweetness_style, bottle_scale)
-    res_data = engine.process()
-
-    return JsonResponse(res_data)
+    try:
+        engine = SodaChemistryEngine(ingredients_input, sweetness_style, bottle_scale)
+        res_data = engine.process()
+        logger.info(
+            f"SodaChemistry - Synthesized recipe: status='{res_data.get('recipe_validation')}' sweetness={engine.sweetness_style} ingredients={len(ingredients_input)}",
+            extra={"action": "chemistry.soda"}
+        )
+        return JsonResponse(res_data)
+    except Exception as e:
+        logger.error(f"SodaChemistry - Processing error: {e}", exc_info=True, extra={"action": "chemistry.soda"})
+        return JsonResponse({'error': str(e)}, status=500)

@@ -655,7 +655,7 @@ def coffee_chemistry_api(request):
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError as e:
-        logger.warning(f"CoffeeChemistry - Warning - Invalid JSON payload: {e}")
+        logger.warning(f"CoffeeChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.coffee"})
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     drink_category = data.get("drink_category", "Hot Coffee").strip()
@@ -663,5 +663,14 @@ def coffee_chemistry_api(request):
     ingredients_input = data.get("ingredients", [])
     espresso_hot_mode = data.get("espresso_hot_mode", "shots").strip().lower()
 
-    engine = CoffeeChemistryEngine(ingredients_input, drink_category, cup_size_oz, espresso_hot_mode)
-    return JsonResponse(engine.process())
+    try:
+        engine = CoffeeChemistryEngine(ingredients_input, drink_category, cup_size_oz, espresso_hot_mode)
+        res_data = engine.process()
+        logger.info(
+            f"CoffeeChemistry - Synthesized recipe: category='{drink_category}' cup_size={cup_size_oz}oz ingredients={len(ingredients_input)}",
+            extra={"action": "chemistry.coffee"}
+        )
+        return JsonResponse(res_data)
+    except Exception as e:
+        logger.error(f"CoffeeChemistry - Processing error: {e}", exc_info=True, extra={"action": "chemistry.coffee"})
+        return JsonResponse({"error": str(e)}, status=500)

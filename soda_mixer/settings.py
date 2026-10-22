@@ -239,3 +239,48 @@ if 'test' in sys.argv or any('test' in arg for arg in sys.argv):
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',
     ]
+
+
+# Observability, Loki JSON Logging, and Prometheus Settings
+APP_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "correlation": {
+            "()": "flavors.middleware_correlation.CorrelationIDFilter",
+        },
+    },
+    "formatters": {
+        "json": {
+            "()": "flavors.middleware_correlation.LokiJsonFormatter",
+        },
+        "console": {
+            "format": "[%(asctime)s] [%(correlation_id)s] [%(levelname)s] [%(name)s] - %(message)s",
+        },
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "filters": ["correlation"],
+            "formatter": "console" if os.environ.get("CONSOLE_PRETTY", "").lower() in ("true", "1") else "json",
+        },
+    },
+    "root": {
+        "handlers": ["stdout"],
+        "level": APP_LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["stdout"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "flavors": {
+            "handlers": ["stdout"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}

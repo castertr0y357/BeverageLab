@@ -538,3 +538,29 @@ def delete_backup_record_api(request: HttpRequest, uuid: Any) -> JsonResponse:
     except Exception as e:
         logger.error(f"BackupDelete - Error - Failed to delete snapshot {uuid}: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def metrics_view(request: HttpRequest) -> HttpResponse:
+    """Expose Prometheus metrics for scraping."""
+    from ..middleware_correlation import metrics
+    return HttpResponse(
+        metrics.generate_metrics(),
+        content_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def debug_logging_toggle_api(request: HttpRequest) -> JsonResponse:
+    """Get or toggle runtime debug logging."""
+    from ..middleware_correlation import set_debug_logging, is_debug_enabled
+    if request.method == "POST":
+        try:
+            body = json.loads(request.body.decode('utf-8'))
+            enabled = bool(body.get('enabled', False))
+            set_debug_logging(enabled)
+            return JsonResponse({'debug_enabled': is_debug_enabled(), 'message': f'Debug logging set to {enabled}'})
+        except Exception as e:
+            return JsonResponse({'error': f'Invalid request: {e}'}, status=400)
+    return JsonResponse({'debug_enabled': is_debug_enabled()})
