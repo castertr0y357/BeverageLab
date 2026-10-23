@@ -68,6 +68,7 @@ jobs:
           DEBUG: 'False'
           MOCK_MODE: 'False'
         run: |
+          python manage.py collectstatic --no-input
           python manage.py test
 
   build-and-push:
