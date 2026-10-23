@@ -1,6 +1,13 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Resolved production static files 404 MIME type error in Kubernetes and container environments:
+  - Root Cause: In production environments with DEBUG=False running under Gunicorn, Django disables built-in static asset serving by default and returns 404 HTML responses for static URLs (/static/...). When browsers load `<link rel="stylesheet">` or `<script>` tags, strict MIME type checking rejects the 404 text/html response, breaking stylesheets (`style.css`) and JavaScript (`core_utils.js`). Without `style.css`, the page defaulted to Bootstrap's white background with transparent/white gradient text, making cards unreadable.
+  - Installed `whitenoise>=6.6.0` in `requirements.txt` and integrated `whitenoise.middleware.WhiteNoiseMiddleware` immediately following `SecurityMiddleware` in `soda_mixer/settings.py`.
+  - Configured `STATIC_ROOT` dynamically to `/staticfiles` when running in Docker or `BASE_DIR / 'staticfiles'`, enabled `CompressedManifestStaticFilesStorage`, and added a fallback in `settings.py` for mounted filesystems (WSL/CIFS/NFS) that restrict non-root `utime` updates.
+  - Fixed a UTF-16 BOM encoding issue in legacy `lab_core_old.js` that caused static post-processing decoding failures during `collectstatic`.
+  - Added build-time static asset pre-collection to `Dockerfile` and automated runtime static gathering to `entrypoint.sh`.
+  - Created automated test coverage in `soda_mixer/flavors/tests/test_static_serving.py` verifying static CSS and JavaScript assets are served with status 200 and valid MIME types when `DEBUG=False`. Verified all 123 tests pass cleanly in `nerdctl`.
 - [x] Fixed CI test failures by correcting ambient MOCK_MODE behavior during test runs:
   - Corrected .github/workflows/build.yml to pass MOCK_MODE: 'False' during the Django test job so unittest mocks can intercept AI provider calls as expected.
   - Hardened soda_mixer/settings.py to default os.environ['MOCK_MODE'] = 'False' whenever executing under 'test' in sys.argv, preventing test failures if MOCK_MODE is enabled in local .env files or container environments while still allowing individual test cases to explicitly patch MOCK_MODE=True.

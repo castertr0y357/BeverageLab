@@ -27,10 +27,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create a non-privileged user and group, create /backups directory, and set permissions
+# Pre-collect static assets for WhiteNoise
+RUN SECRET_KEY=build-time-secret-key-placeholder \
+    POSTGRES_DB=build_db \
+    POSTGRES_USER=build_user \
+    POSTGRES_PASSWORD=build_pw \
+    DATABASE_HOST=localhost \
+    DATABASE_PORT=5432 \
+    python manage.py collectstatic --no-input
+
+# Create a non-privileged user and group, create /backups and /staticfiles directories, and set permissions
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
-    mkdir -p /backups && \
-    chown -R appuser:appgroup /app /backups && \
+    mkdir -p /backups /staticfiles /app/staticfiles && \
+    chown -R appuser:appgroup /app /backups /staticfiles && \
     chmod 700 /backups
 
 # Copy entrypoint script and make it executable

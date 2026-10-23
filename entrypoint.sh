@@ -23,6 +23,10 @@ python manage.py makemigrations --no-input
 echo "Step 2: Calibrating database schema (Applying migrations)..."
 python manage.py migrate --no-input
 
+# Collect static assets
+echo "Step 2b: Gathering static assets (collectstatic)..."
+python manage.py collectstatic --no-input
+
 # Create default superuser if it doesn't exist
 echo "Step 3: Verifying laboratory administrator..."
 python manage.py shell <<EOF

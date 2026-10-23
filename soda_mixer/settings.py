@@ -160,6 +160,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'soda_mixer.flavors.middleware_correlation.LaboratoryCorrelationMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'soda_mixer.flavors.middleware.LaboratoryCsrfMiddleware',
@@ -229,6 +230,32 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'soda_mixer' / 'static']
+STATIC_ROOT = Path(os.environ.get('STATIC_ROOT', '/staticfiles' if os.path.isdir('/staticfiles') else BASE_DIR / 'staticfiles'))
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+WHITENOISE_MANIFEST_STRICT = False
+
+# Robust fallback for mounted filesystems (WSL/CIFS/NFS) that restrict utime modifications
+try:
+    import whitenoise.compress
+    _orig_write_data = whitenoise.compress.Compressor.write_data
+    def _safe_write_data(self, path, content, extension, stat_result):
+        try:
+            return _orig_write_data(self, path, content, extension, stat_result)
+        except (PermissionError, OSError):
+            filename = path + extension
+            with open(filename, 'wb') as f:
+                f.write(content)
+            return filename
+    whitenoise.compress.Compressor.write_data = _safe_write_data
+except Exception:
+    pass
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

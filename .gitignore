@@ -53,3 +53,6 @@ backups/
 
 # QA testing
 QA_recipes/
+
+# Static collection
+staticfiles/
