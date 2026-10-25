@@ -281,52 +281,93 @@ def update_recipe_categories_api(request: HttpRequest, uuid: str) -> JsonRespons
 @csrf_exempt
 @require_http_methods(["POST"])
 def save_mix_to_history_api(request: HttpRequest) -> JsonResponse:
-    """Save an ad-hoc mix to history. Returns the history ID."""
+    """Save or update an ad-hoc mix in history. Returns the history UUID."""
     try:
         data = json.loads(request.body)
-        ingredients = data.get('ingredients', [])  # [{id, amount}, ...]
+        mix_id = data.get('mix_id')
+        ingredients = data.get('ingredients', [])  # [{id, amount, is_primary}, ...]
         drink_type = data.get('drink_type', 'SODA').upper()
         if drink_type == 'CRYO':
             drink_type = 'SLUSHIE'
 
-        if not ingredients:
-            logger.warning("HistoryMixSave - Warning - No ingredients provided for mixing history.")
-            return JsonResponse({'error': 'No ingredients provided'}, status=400)
-
-        mix = MixHistory.objects.create(drink_type=drink_type)
-        for item in ingredients:
+        mix = None
+        if mix_id:
             try:
-                raw_id = item.get('id')
-                if not raw_id:
-                    continue
-                
-                ingredient_id = int(raw_id)
-                amount = float(item.get('amount', 1.0))
-                
-                # Extract synthesized profile overrides if provided
-                profile = item.get('profile', {})
-                intensity = profile.get('intensity') if profile else item.get('intensity')
-                sweetness = profile.get('sweetness') if profile else item.get('sweetness')
-                acidity = profile.get('acidity') if profile else item.get('acidity')
-                bitterness = profile.get('bitterness') if profile else item.get('bitterness')
-                
-                # Verify ingredient existence to prevent broken relations
-                target_ing = Ingredient.objects.filter(id=ingredient_id).first()
-                if target_ing:
-                    MixHistoryIngredient.objects.create(
-                        mix=mix,
-                        ingredient=target_ing,
-                        amount=amount,
-                        intensity=intensity,
-                        sweetness=sweetness,
-                        acidity=acidity,
-                        bitterness=bitterness
-                    )
-            except (ValueError, TypeError) as e:
-                logger.error(f"HistoryMixSave - Error - Failed to attach ingredient {item} to history mix: {e}")
-                continue
+                mix = MixHistory.objects.filter(uuid=mix_id).first()
+            except Exception:
+                mix = None
 
-        logger.info(f"HistoryMixSave - Info - Successfully saved history mix UUID: {mix.uuid}")
+        if not mix:
+            if not ingredients:
+                logger.warning("HistoryMixSave - Warning - No ingredients provided for mixing history.")
+                return JsonResponse({'error': 'No ingredients provided'}, status=400)
+            mix = MixHistory.objects.create(drink_type=drink_type)
+
+        # Update metadata if present in payload
+        if 'name' in data:
+            mix.name = str(data.get('name') or '').strip()
+        if 'description' in data:
+            mix.description = str(data.get('description') or '')
+        if 'mixologist_notes' in data:
+            mix.mixologist_notes = str(data.get('mixologist_notes') or '')
+        if 'profile_description' in data:
+            mix.profile_description = str(data.get('profile_description') or '')
+        if 'coffee_style' in data:
+            mix.coffee_style = data.get('coffee_style')
+        if 'coffee_base_type' in data:
+            mix.coffee_base_type = data.get('coffee_base_type')
+        if 'drink_size_oz' in data and data.get('drink_size_oz') is not None:
+            try:
+                mix.drink_size_oz = float(data.get('drink_size_oz'))
+            except (ValueError, TypeError):
+                pass
+        if 'sweetness_style' in data:
+            mix.sweetness_style = data.get('sweetness_style')
+        if 'bottle_scale' in data and data.get('bottle_scale') is not None:
+            try:
+                mix.bottle_scale = float(data.get('bottle_scale'))
+            except (ValueError, TypeError):
+                pass
+        mix.save()
+
+        # If ingredients were passed, synchronize them
+        if ingredients:
+            # Clear existing mix ingredients on update
+            mix.mix_ingredients.all().delete()
+            for item in ingredients:
+                try:
+                    raw_id = item.get('id')
+                    if not raw_id:
+                        continue
+                    
+                    ingredient_id = int(raw_id)
+                    amount = float(item.get('amount', 1.0))
+                    is_primary = bool(item.get('is_primary', False))
+                    
+                    # Extract synthesized profile overrides if provided
+                    profile = item.get('profile', {})
+                    intensity = profile.get('intensity') if profile else item.get('intensity')
+                    sweetness = profile.get('sweetness') if profile else item.get('sweetness')
+                    acidity = profile.get('acidity') if profile else item.get('acidity')
+                    bitterness = profile.get('bitterness') if profile else item.get('bitterness')
+                    
+                    target_ing = Ingredient.objects.filter(id=ingredient_id).first()
+                    if target_ing:
+                        MixHistoryIngredient.objects.create(
+                            mix=mix,
+                            ingredient=target_ing,
+                            amount=amount,
+                            is_primary=is_primary,
+                            intensity=intensity,
+                            sweetness=sweetness,
+                            acidity=acidity,
+                            bitterness=bitterness
+                        )
+                except (ValueError, TypeError) as e:
+                    logger.error(f"HistoryMixSave - Error - Failed to attach ingredient {item} to history mix: {e}")
+                    continue
+
+        logger.info(f"HistoryMixSave - Info - Successfully saved/updated history mix UUID: {mix.uuid}")
         return JsonResponse({'status': 'saved', 'mix_id': str(mix.uuid)})
     except json.JSONDecodeError as e:
         logger.warning(f"HistoryMixSave - Warning - Invalid JSON payload: {e}")
@@ -378,11 +419,12 @@ def promote_mix_to_recipe_api(request: HttpRequest, uuid: str) -> JsonResponse:
                 logger.error(f"HistoryMixPromotion - Error - Failed to apply categories {category_ids} to promoted recipe: {e}")
                 pass
 
-        mix.promoted_recipe = recipe
-        mix.save()
+        recipe_uuid = str(recipe.uuid)
+        mix_uuid = mix.uuid
+        mix.delete(force=True)
 
-        logger.info(f"HistoryMixPromotion - Info - Promoted mix UUID {uuid} to recipe '{recipe.name}' (UUID: {recipe.uuid})")
-        return JsonResponse({'status': 'promoted', 'recipe_id': str(recipe.uuid)})
+        logger.info(f"HistoryMixPromotion - Info - Promoted mix UUID {mix_uuid} to recipe '{recipe.name}' (UUID: {recipe_uuid}) and scrubbed from history")
+        return JsonResponse({'status': 'promoted', 'recipe_id': recipe_uuid})
     except json.JSONDecodeError as e:
         logger.warning(f"HistoryMixPromotion - Warning - Invalid JSON payload: {e}")
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -407,148 +449,3 @@ def delete_history_api(request: HttpRequest, uuid: str) -> JsonResponse:
     except Exception as e:
         logger.error(f"HistoryMixDeletion - Error - Failed to decommission MixHistory UUID {uuid}: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
-def export_to_mealie_task(update_progress: Callable[..., None], recipe_uuid: uuid.UUID) -> None:
-    update_progress(10, status='RUNNING')
-    try:
-        recipe = Recipe.objects.get(uuid=recipe_uuid)
-    except Recipe.DoesNotExist:
-        update_progress(100, status='FAILURE', error_msg="Recipe not found.")
-        return
-
-    config = SystemConfiguration.get_config()
-    if not config.mealie_url or not config.mealie_api_key:
-        update_progress(100, status='FAILURE', error_msg="Mealie configuration is incomplete. Update settings in System Protocols.")
-        return
-
-    mealie_url = config.mealie_url.rstrip('/')
-    from urllib.parse import urlparse
-    import socket
-    try:
-        parsed = urlparse(mealie_url)
-        hostname = parsed.hostname
-        if hostname:
-            ip = socket.gethostbyname(hostname)
-            if ip == "169.254.169.254" or ip.startswith("169.254."):
-                update_progress(100, status='FAILURE', error_msg="SSRF Block: Link-local and metadata IPs are banned.")
-                return
-    except Exception as e:
-        update_progress(100, status='FAILURE', error_msg=f"Invalid Mealie URL format: {e}")
-        return
-
-    url = mealie_url + '/api/recipes'
-    headers = {
-        'Authorization': f'Bearer {config.mealie_api_key}',
-        'Content-Type': 'application/json'
-    }
-
-    lab_description = recipe.description or ""
-    lab_description += "\n\n### Beverage Laboratory Telemetry\n"
-    lab_description += f"- **Synthesis Type**: {recipe.get_drink_type_display()}\n"
-    if recipe.brew_method:
-        lab_description += f"- **Method**: {recipe.get_brew_method_display()}\n"
-    
-    mealie_ingredients = []
-    for ring in recipe.recipe_ingredients.all():
-        is_coffee_bean = (ring.ingredient.physical_state == 'SOLID_EXTRACTABLE') if (ring.ingredient and ring.ingredient.physical_state) else (ring.ingredient and ring.ingredient.ingredient_type == 'COFFEE_BEAN')
-        unit = "oz" if recipe.drink_type == "SLUSHIE" else ("g" if recipe.drink_type == "COFFEE" and is_coffee_bean else "ml")
-        ing_full_name = ring.ingredient.name
-        amount = float(ring.amount)
-        
-        display_text = f"{amount} {unit} {ing_full_name}"
-        if ring.notes:
-            display_text += f" ({ring.notes})"
-        
-        mealie_ingredients.append({
-            "referenceId": str(uuid.uuid4()),
-            "note": display_text,
-            "title": ing_full_name,
-            "display": display_text
-        })
-
-    instructions = [
-        {
-            "id": str(uuid.uuid4()), 
-            "title": "Preparation", 
-            "text": f"Initiate Laboratory Extract protocol for {recipe.get_drink_type_display()}.",
-            "ingredientReferences": []
-        },
-        {
-            "id": str(uuid.uuid4()), 
-            "title": "Synthesis", 
-            "text": "Assemble molecular components according to synthesis specifications.",
-            "ingredientReferences": []
-        }
-    ]
-
-    payload = {
-        "name": recipe.name,
-        "description": lab_description,
-        "recipeYield": "1 serving",
-        "recipeIngredient": mealie_ingredients,
-        "recipeInstructions": instructions,
-    }
-
-    try:
-        init_payload = {"name": payload['name']}
-        logger.info(f"MealieExport - Info - Phase 1: Initializing Shell at {url}")
-        
-        response = requests.post(url, json=init_payload, headers=headers, timeout=15, allow_redirects=False)
-        
-        if response.status_code in [301, 302, 307, 308]:
-            new_url = response.headers.get('Location')
-            if new_url:
-                url = new_url
-                response = requests.post(url, json=init_payload, headers=headers, timeout=15, allow_redirects=False)
-
-        if response.status_code not in [200, 201]:
-            logger.warning(f"MealieExport - Warning - Mealie Initialization Failed! Response: {response.text}")
-            update_progress(100, status='FAILURE', error_msg=f"Mealie rejected initialization (HTTP {response.status_code}): {response.text}")
-            return
-
-        recipe_data = response.json()
-        slug = None
-        if isinstance(recipe_data, dict):
-            slug = recipe_data.get('slug') or recipe_data.get('id')
-        elif isinstance(recipe_data, str):
-            slug = recipe_data
-
-        if not slug:
-            update_progress(100, status='FAILURE', error_msg="Mealie successfully initialized but failed to return a valid slug/id.")
-            return
-
-        update_progress(50, status='RUNNING')
-
-        patch_url = f"{url.rstrip('/')}/{slug}"
-        logger.info(f"MealieExport - Info - Phase 2: Injecting data into {patch_url}")
-        
-        patch_response = requests.patch(patch_url, json=payload, headers=headers, timeout=15)
-        
-        if patch_response.status_code in [200, 201]:
-            logger.info(f"MealieExport - Info - Mealie Response HTTP {patch_response.status_code} - Data Synchronized!")
-            update_progress(100, status='SUCCESS', result_data={'slug': slug, 'mealie_url': f"{mealie_url.rstrip('/')}/recipe/{slug}"})
-        else:
-            logger.warning(f"MealieExport - Warning - Mealie Data Injection Failed! Response: {patch_response.text}")
-            update_progress(100, status='FAILURE', error_msg=f"Mealie rejected the data injection (HTTP {patch_response.status_code}): {patch_response.text}")
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"MealieExport - Error - Mealie Connection Error: {e}")
-        update_progress(100, status='FAILURE', error_msg=f"Failed to contact Mealie: {str(e)}")
-
-
-from typing import Callable
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def export_recipe_to_mealie_api(request: HttpRequest, uuid: str) -> JsonResponse:
-    """Push a local recipe to a configured Mealie instance (asynchronously)."""
-    recipe = get_object_or_404(Recipe, uuid=uuid)
-    
-    import os
-    if os.environ.get('MOCK_MODE', 'False').lower() in ('true', '1', 't'):
-        logger.info("MealieExport - Info - MOCK_MODE active. Returning mock success response.")
-        return JsonResponse({'status': 'success', 'message': 'Recipe successfully pushed and enriched in Mealie! (MOCK_MODE)'})
-
-    task = submit_task("Mealie Recipe Export", export_to_mealie_task, recipe_uuid=recipe.uuid)
-    return JsonResponse({'status': 'accepted', 'task_id': str(task.uuid)}, status=202)

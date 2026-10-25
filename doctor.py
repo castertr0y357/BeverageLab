@@ -118,29 +118,6 @@ def run_diagnostics() -> bool:
     except Exception as e:
         print(f"❌ AI Assistant service check failed: {e}")
         
-    # 4. External Integrations
-    print("\n[4/4] Verifying External Integrations (Mealie)...")
-    try:
-        from soda_mixer.flavors.models import SystemConfiguration
-        config = SystemConfiguration.get_config()
-        if not config.mealie_url or not config.mealie_api_key:
-            print("ℹ️ Mealie is not configured (optional).")
-        else:
-            print(f"✅ Mealie URL: {config.mealie_url}")
-            # Try connecting
-            import requests
-            try:
-                # Get request with timeout
-                resp = requests.get(config.mealie_url.rstrip('/') + '/api/about', timeout=3)
-                if resp.status_code == 200:
-                    print("✅ Mealie instance is reachable and healthy.")
-                else:
-                    print(f"⚠️ Mealie responded with status code {resp.status_code}.")
-            except Exception as conn_err:
-                print(f"⚠️ Could not establish connection to Mealie: {conn_err}")
-    except Exception as e:
-         print(f"❌ External integration check failed: {e}")
-         
     print("\n------------------------------------------------")
     print("✅ DIAGNOSTICS COMPLETE")
     print("------------------------------------------------")

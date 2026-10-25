@@ -100,10 +100,9 @@ class BeverageLabModelTest(TestCase):
 
     def test_system_configuration_singleton(self) -> None:
         config1 = SystemConfiguration.get_config()
-        config1.mealie_url = "https://mealie.local"
         config1.save()
         
         config2 = SystemConfiguration.get_config()
-        self.assertEqual(config2.mealie_url, "https://mealie.local")
+        self.assertEqual(config1.pk, config2.pk)
         self.assertEqual(SystemConfiguration.objects.count(), 1)
 

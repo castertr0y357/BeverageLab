@@ -62,17 +62,7 @@ def settings_view(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["POST"])
 def save_settings_api(request: HttpRequest) -> JsonResponse:
     """Update global system configuration."""
-    try:
-        data = json.loads(request.body)
-        config = SystemConfiguration.get_config()
-        config.mealie_url = data.get('mealie_url', '').strip()
-        config.mealie_api_key = data.get('mealie_api_key', '').strip()
-        config.save()
-        logger.info("SystemSettings - Info - Global laboratory configuration updated.")
-        return JsonResponse({'status': 'success', 'message': 'Configuration saved successfully.'})
-    except Exception as e:
-        logger.error(f"SystemSettings - Error - Failed to save global settings: {e}")
-        return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'status': 'success', 'message': 'Configuration saved successfully.'})
 
 
 @user_passes_test(lambda u: u.is_staff)

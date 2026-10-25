@@ -44,15 +44,6 @@ class LLMProvider(models.Model):
 
 class SystemConfiguration(models.Model):
     """Singleton model for laboratory-wide settings and API credentials."""
-    mealie_url = models.URLField(
-        blank=True, 
-        help_text="The base URL of your Mealie instance (e.g., https://mealie.local)"
-    )
-    mealie_api_key = models.CharField(
-        max_length=255, 
-        blank=True, 
-        help_text="Long-lived API token generated in Mealie User Settings"
-    )
     default_llm_provider = models.ForeignKey(
         LLMProvider,
         null=True,

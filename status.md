@@ -1,6 +1,40 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Implemented Historical Archive Scrubbing, Synopsis Metadata Persistence, Unified Synopsis View for Completed Recipes, Quick Drinks Existing Recipe Discovery, and Mealie Sync Removal:
+  - **Archive Scrubbing on Recipe Promotion**:
+    - Fixed autoArchiveSynopsis() in synopsis.js to assign returned mix_id to sourceMixIdField and sessionStorage, ensuring the mix UUID is preserved and submitted when clicking ARCHIVE SYNTHESIS.
+    - Updated create_recipe in views/recipes.py to scrub/delete the MixHistory record on promotion.
+    - Updated promote_mix_to_recipe_api to delete the promoted MixHistory record (mix.delete(force=True)).
+    - Filtered mix_history_list in views/main.py by promoted_recipe__isnull=True to exclude already-promoted records from the ledger.
+  - **Synopsis Metadata Persistence & Zero-AI Reload**:
+    - Expanded MixHistory model with name, description, mixologist_notes, profile_description, coffee_style, coffee_base_type, drink_size_oz, sweetness_style, and bottle_scale.
+    - Added is_primary boolean to MixHistoryIngredient. Generated and executed migration 0037_remove_systemconfiguration_mealie_api_key_and_more.
+    - Enhanced save_mix_to_history_api to accept mix_id to idempotently update existing MixHistory records with formula name, profile description, and mixologist notes.
+    - Implemented debounced and event-driven syncSynopsisToHistory() in synopsis.js that syncs LLM synthesis notes and edited names directly into MixHistory.
+    - Updated mix_history.html to display saved formulation names and mixologist notes preview, passing stored parameters and skip_ai: true in recipe_data when clicking Index.
+    - Updated synopsis.js to populate #llmProfileDescriptionText and #llmMixologistNotesText directly from saved prefill data and bypass triggerLlmStream(), achieving zero AI calls when loading from History.
+  - **Unified Synopsis View for Completed Recipes**:
+    - Updated recipe_detail in views/main.py (/recipes/<uuid>/) to render flavors/synopsis.html with is_saved_recipe=True and skip_ai=True.
+    - In synopsis.html and synopsis.js, hid #formSubmitArea (ARCHIVE SYNTHESIS button and name input) when viewing a saved recipe.
+    - Bypassed autoArchiveSynopsis() when viewing completed recipes to prevent duplicate history records.
+    - Added completed recipe header controls (star rating widget, Print, Modify Formula, Decommission) directly to synopsis.html.
+    - Preserved compatibility anchors for coffee/soda/slushie scaling tests (scale12oz, scale16oz, scale64oz, iceDetailVolume).
+  - **Up to 5 Random 'Existing Recipes' First in Quick Drinks + Novelty AI Guidance**:
+    - Added quick_existing_recipes_api (GET /api/quick-existing-recipes/) returning at most 5 randomly sampled matching saved recipes where all ingredients are in stock.
+    - In quick_drinks_old.html and lab_quick.js, added #existingRecipesContainer displaying saved recipes with badges, rating stars, a 'View Formula' link to the unified synopsis view, a 'Shuffle' option if more than 5 exist, and a 'Synthesize New AI Drinks' button.
+    - If 0 matching saved recipes exist, Quick Drinks automatically falls back to AI generation immediately.
+    - Updated stream_quick_recommendations in generation.py with affirmative, positive phrasing for small local models and anchor-aware signature checking ((flavor_set, dominant_anchor)), allowing recipe ingredients to be reused when the dominant anchor hierarchy is inverted while filtering out ratio-nudged clones.
+  - **Complete Removal of Mealie Sync Integration**:
+    - Removed mealie_url and mealie_api_key from SystemConfiguration in models/config.py.
+    - Removed export_to_mealie_task and export_recipe_to_mealie_api from views/recipes.py, views/__init__.py, and urls.py.
+    - Removed Mealie settings pane and submission logic from settings.html and settings.py.
+    - Removed external integration step from doctor.py.
+    - Removed Mealie references and diagram node from README.md.
+    - Updated test_models.py to test SystemConfiguration singleton behavior without mealie_url.
+  - **Testing & Rebuild**:
+    - Created unit & integration test suite in test_archive_and_discovery.py covering auto-archive updating, source mix scrubbing, promote scrubbing, unified synopsis rendering without submit form, and Quick Drinks existing recipe discovery and stock filtering.
+    - Executed full project test suite with all 129 tests passing with zero errors. Successfully rebuilt containers via nerdctl compose down; nerdctl compose up -d --build.
 - [x] Resolved production static files 404 MIME type error in Kubernetes and container environments:
   - Root Cause: In production environments with DEBUG=False running under Gunicorn, Django disables built-in static asset serving by default and returns 404 HTML responses for static URLs (/static/...). When browsers load `<link rel="stylesheet">` or `<script>` tags, strict MIME type checking rejects the 404 text/html response, breaking stylesheets (`style.css`) and JavaScript (`core_utils.js`). Without `style.css`, the page defaulted to Bootstrap's white background with transparent/white gradient text, making cards unreadable.
   - Installed `whitenoise>=6.6.0` in `requirements.txt` and integrated `whitenoise.middleware.WhiteNoiseMiddleware` immediately following `SecurityMiddleware` in `soda_mixer/settings.py`.

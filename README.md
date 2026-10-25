@@ -125,7 +125,6 @@ graph TD
         
         Settings[Settings Hub] --> Export
         Settings --> SysConf
-        Rec -- "REST API Push" --> Mealie
     end
 ```
 

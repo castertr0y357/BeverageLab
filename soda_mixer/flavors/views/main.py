@@ -207,21 +207,73 @@ def recipe_list(request: HttpRequest) -> HttpResponse:
 
 
 def recipe_detail(request: HttpRequest, uuid: str) -> HttpResponse:
-    """Show a single recipe's details."""
+    """Show a single recipe's details rendered in the unified synopsis view."""
     recipe = get_object_or_404(Recipe, uuid=uuid)
-    stats = calculate_recipe_stats(recipe.recipe_ingredients.all())
-    all_categories = RecipeCategory.objects.all().order_by('name')
+    
+    # Parse description into profile_description and mixologist_notes if present
+    full_desc = recipe.description or ""
+    profile_desc = full_desc
+    mix_notes = ""
+    if "AI Mixologist Notes:" in full_desc:
+        parts = full_desc.split("AI Mixologist Notes:", 1)
+        profile_desc = parts[0].strip()
+        mix_notes = parts[1].strip()
 
-    return render(request, 'flavors/recipe_detail.html', {
+    ingredients_payload = []
+    for ring in recipe.recipe_ingredients.select_related('ingredient').all():
+        if not ring.ingredient:
+            continue
+        ing = ring.ingredient
+        ingredients_payload.append({
+            'id': ing.id,
+            'name': ing.name,
+            'amount': float(ring.amount),
+            'unit': 'oz' if recipe.drink_type == 'SLUSHIE' else ('g' if (recipe.drink_type == 'COFFEE' and getattr(ing, 'ingredient_type', None) == 'COFFEE_BEAN') else 'ml'),
+            'category': ing.category,
+            'type': ing.ingredient_type,
+            'ingredient_type': ing.ingredient_type,
+            'physical_state': ing.physical_state,
+            'mixology_function': ing.mixology_function,
+            'is_primary': ring.is_primary,
+            'intensity': ring.intensity,
+            'sweetness': ring.sweetness,
+            'acidity': ring.acidity,
+            'bitterness': ring.bitterness,
+        })
+
+    prefill_data = {
+        'is_saved_recipe': True,
+        'skip_ai': True,
+        'recipe_uuid': str(recipe.uuid),
+        'name': recipe.name,
+        'drink_type': recipe.drink_type,
+        'coffee_style': recipe.coffee_style.upper() if recipe.coffee_style else 'HOT',
+        'coffee_base_type': recipe.coffee_base_type.upper() if recipe.coffee_base_type else 'ESPRESSO',
+        'drink_size_oz': recipe.drink_size_oz or 12.0,
+        'sweetness_style': getattr(recipe, 'sweetness_style', 'CRAFT') or 'CRAFT',
+        'bottle_scale': getattr(recipe, 'bottle_scale', 1.0) or 1.0,
+        'profile_description': profile_desc,
+        'mixologist_notes': mix_notes,
+        'ingredients': ingredients_payload,
+    }
+
+    lab_mode = 'coffee' if recipe.drink_type == 'COFFEE' else ('cryo' if recipe.drink_type == 'SLUSHIE' else 'soda')
+
+    return render(request, 'flavors/synopsis.html', {
         'recipe': recipe,
-        'stats': stats,
-        'all_categories': all_categories,
+        'is_saved_recipe': True,
+        'lab_mode': lab_mode,
+        'drink_type': recipe.drink_type,
+        'coffee_style': recipe.coffee_style,
+        'coffee_base_type': recipe.coffee_base_type,
+        'drink_size_oz': recipe.drink_size_oz,
+        'prefill_json': json.dumps(prefill_data),
     })
 
 
 def mix_history_list(request: HttpRequest) -> HttpResponse:
     """Show mix history with option to promote entries to recipes."""
-    history = MixHistory.objects.prefetch_related('mix_ingredients__ingredient').order_by('-mixed_at')
+    history = MixHistory.objects.filter(promoted_recipe__isnull=True).prefetch_related('mix_ingredients__ingredient').order_by('-mixed_at')
     all_categories = RecipeCategory.objects.all().order_by('name')
     return render(request, 'flavors/mix_history.html', {
         'history': history,

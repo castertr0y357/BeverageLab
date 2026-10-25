@@ -399,15 +399,15 @@ Constraints:
         return response.strip(' "\'')
 
     @classmethod
-    def stream_quick_recommendations(cls, inventory: str, drink_type: str = 'SODA', mode: str = 'creative', profile: str = None) -> Generator[Dict[str, Any], None, None]:
-        """Stream 5 distinct recipes based on active inventory."""
+    def stream_quick_recommendations(cls, inventory: str, drink_type: str = 'SODA', mode: str = 'creative', profile: str = None, existing_recipes: list = None) -> Generator[Dict[str, Any], None, None]:
+        """Stream 5 distinct recipes based on active inventory, prioritizing anchor shifts and novel combinations."""
         drink_type = drink_type.upper()
         
         import random
         seed = random.randint(10000, 99999)
         
         if profile:
-            inspiration_prompt = f'[TARGET PROFILE: "{profile.upper()}"] - The PRIMARY base flavor of ALL recipes MUST strongly align with the "{profile}" profile. However, actively select secondary modifiers and accents from OTHER complementary categories to build complex, well-balanced drinks.'
+            inspiration_prompt = f'[TARGET PROFILE: "{profile.upper()}"] - Feature the "{profile}" profile prominently as a core foundation. Complement it with secondary modifiers and accents from other available flavor categories to create harmonious, multi-layered beverages.'
         else:
             inspirations = [
                 "neon, cyberpunk, futuristic",
@@ -425,26 +425,32 @@ Constraints:
             inspiration_prompt = f'[RANDOM INSPIRATION SEED: "{inspiration}"] - Use this inspiration seed to dramatically influence the naming, descriptions, and ingredient combinations of these recipes.'
 
         if drink_type == 'COFFEE':
-            mode_rules = """2. For parts: The base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0 parts. All other liquid modifiers should be distributed as relative parts (e.g. 50 parts dairy, 15 parts syrup).
-3. Ensure you include exactly ONE base coffee bean ingredient and ONE genuine dairy or milk ingredient.
-4. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
-5. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+            mode_rules = """2. For parts: The base coffee beans (State: SOLID_EXTRACTABLE) MUST be 18.0 parts. Distribute all other liquid modifiers as relative parts (e.g. 50 parts dairy, 15 parts syrup).
+3. Include exactly ONE base coffee bean ingredient and ONE genuine dairy or milk ingredient.
+4. Craft evocative menu titles focused on flavor, sensation, and atmosphere."""
         elif drink_type == 'SLUSHIE':
-            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the slushie payload. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
-3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
-4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the slushie payload. Use fractional values (like 0.25 or 0.5) for delicate accents, and larger values (like 3.0 or 5.0) for primary bases.
+3. Craft evocative menu titles focused on flavor, sensation, and atmosphere."""
         else:
-            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the total syrup profile. Use organic fractional values (like 0.25 or 1.5) that naturally represent the ratio. Use fractional parts (like 0.5 or 0.25) for microscopic accents, and larger parts (like 3 or 5) for bases.
-3. Keep the recipe name purely creative, omitting any mode names (e.g. Experimental, Soda, Coffee, Cryo, Standard).
-4. Keep the recipe name purely descriptive, omitting any ingredient brand names."""
+            mode_rules = """2. For parts: Assign relative mathematical 'parts' to represent each ingredient's proportion in the total syrup profile. Use fractional values (like 0.25 or 0.5) for delicate accents, and larger values (like 3.0 or 5.0) for primary bases.
+3. Craft evocative menu titles focused on flavor, sensation, and atmosphere."""
+
+        novelty_guidance = ""
+        if existing_recipes and len(existing_recipes) > 0:
+            novelty_guidance = f"""
+FRESH FLAVOR EXPLORATION:
+- Focus on pairing the core {profile or 'drink'} theme with diverse and under-explored accents from the inventory.
+- Ensure each of your 5 recipes features a distinctly unique dominant flavor lead (the ingredient with the largest parts).
+- When combining familiar ingredients, create a fresh flavor experience by shifting the hierarchy (for instance, elevating a subtle accent to the bold primary lead and reducing previous leads to a subtle background accent).
+"""
 
         prompt = f"""[QUICK DRINKS REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
         
 Task: Act as a master mixologist. Create exactly 5 distinct, highly creative, and appealing {drink_type} recipes using ONLY the ingredients available in the provided Inventory Registry. If the inventory has fewer than 10 total ingredients, you may generate fewer recipes (minimum 3).
 
 {inspiration_prompt}
-
-CRITICAL RULE: The recipes MUST be completely different from typical or past responses. Vary the flavor profiles radically (e.g., earthy, ultra-tart, creamy, herbal, spicy, or exotic fruit combinations). Diversify the combinations actively to push the boundaries of mixology.
+{novelty_guidance}
+DIVERSITY DIRECTIVE: Each recipe must showcase a unique balance of flavors (such as tart, earthy, creamy, floral, or aromatic spice). Vary the complexity across your formulations to deliver 5 distinctly different tasting experiences.
 
 OUTPUT FORMAT:
 Output your response as a JSON array of objects.
@@ -459,7 +465,7 @@ Each JSON object must have the following structure:
 
 Rules:
 1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
-2. Ingredient Count: Actively vary the complexity across your 5 recipes to showcase different styles. You must include at least one minimalist recipe (exactly 2 ingredients) and at least one highly complex recipe (4 to 5 ingredients). Distribute the remaining recipes naturally within that 2 to 5 ingredient range.
+2. Ingredient Count: Vary the complexity across your 5 recipes. Include at least one minimalist recipe (exactly 2 ingredients) and at least one complex recipe (4 to 5 ingredients). Distribute the remaining recipes naturally within the 2 to 5 ingredient range.
 {mode_rules}
 
 Inventory Registry: See context.
@@ -468,6 +474,40 @@ Inventory Registry: See context.
         
         buffer = ""
         yielded_indices = set()
+        emitted_signatures = []
+
+        # Helper to compute signature of a recipe
+        def get_flavor_signature(recipe_dict):
+            ings = recipe_dict.get('ingredients', [])
+            if not ings:
+                return set(), None
+            # Filter non-structural
+            flavor_ings = []
+            for item in ings:
+                name_clean = item.get('name', '').strip().lower()
+                parts = float(item.get('parts', item.get('amount', 1.0)))
+                # If coffee, skip structural beans and plain dairy for modifier comparison
+                if drink_type == 'COFFEE':
+                    if any(term in name_clean for term in ['bean', 'espresso', 'roast', 'whole milk', 'oat milk', 'skim milk', 'almond milk', 'soy milk']):
+                        continue
+                flavor_ings.append((name_clean, parts))
+            
+            if not flavor_ings:
+                # Fallback to all ingredients if only structural ingredients present
+                flavor_ings = [(item.get('name', '').strip().lower(), float(item.get('parts', item.get('amount', 1.0)))) for item in ings]
+
+            flavor_set = frozenset(name for name, _ in flavor_ings)
+            # Find dominant flavor lead
+            dominant = max(flavor_ings, key=lambda x: x[1])[0] if flavor_ings else None
+            return flavor_set, dominant
+
+        # Pre-compute signatures for existing recipes
+        existing_signatures = []
+        if existing_recipes:
+            for er in existing_recipes:
+                fset, dom = get_flavor_signature(er)
+                if fset:
+                    existing_signatures.append((fset, dom))
         
         for event in stream:
             if event.startswith('data: '):
@@ -478,11 +518,6 @@ Inventory Registry: See context.
                     chunk = data_json.get('chunk', '')
                     buffer += chunk
                     
-                    # Regex to find complete JSON objects inside the array
-                    # This finds things that look like {"name": ..., "ingredients": [...]}
-                    # We can do a simple parse of all objects in the buffer so far.
-                    
-                    # To safely parse partial JSON arrays, we can use a regex to find all objects
                     all_objects = re.findall(r'\{\s*"name"\s*:.*?"ingredients"\s*:.*?\]\s*\}', buffer, re.DOTALL)
                     for i, obj_str in enumerate(all_objects):
                         if i not in yielded_indices:
@@ -492,8 +527,31 @@ Inventory Registry: See context.
                                     for ing in obj.get('ingredients', []):
                                         if 'parts' in ing and 'amount' not in ing:
                                             ing['amount'] = ing['parts']
-                                    yield obj
-                                    yielded_indices.add(i)
+                                    
+                                    # Novelty & Anchor Check
+                                    cand_fset, cand_dom = get_flavor_signature(obj)
+                                    is_clone = False
+                                    
+                                    # 1. Compare against existing saved recipes
+                                    for ex_fset, ex_dom in existing_signatures:
+                                        if cand_fset == ex_fset and cand_dom == ex_dom:
+                                            is_clone = True
+                                            break
+                                    
+                                    # 2. Compare against already yielded recipes in this stream
+                                    if not is_clone:
+                                        for prev_fset, prev_dom in emitted_signatures:
+                                            if cand_fset == prev_fset and cand_dom == prev_dom:
+                                                is_clone = True
+                                                break
+                                    
+                                    if not is_clone:
+                                        emitted_signatures.append((cand_fset, cand_dom))
+                                        yield obj
+                                        yielded_indices.add(i)
+                                    else:
+                                        # Mark handled so we don't re-process
+                                        yielded_indices.add(i)
                             except json.JSONDecodeError:
                                 pass
                 except json.JSONDecodeError:

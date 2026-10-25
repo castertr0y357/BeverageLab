@@ -465,7 +465,25 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
         def sse_generator():
             try:
                 inventory_context = AIAssistant.get_static_ingredients_context(drink_type=drink_type)
-                stream = AIAssistant.stream_quick_recommendations(inventory_context, drink_type=drink_type, mode=mode, profile=profile)
+                
+                # Fetch existing saved recipe ingredient structures to prevent ratio-clones
+                existing_qs = Recipe.objects.filter(drink_type=drink_type).prefetch_related('recipe_ingredients__ingredient')
+                existing_recipes_data = []
+                for er in existing_qs:
+                    ings = []
+                    for ring in er.recipe_ingredients.all():
+                        if ring.ingredient:
+                            ings.append({'name': ring.ingredient.name, 'parts': float(ring.amount)})
+                    if ings:
+                        existing_recipes_data.append({'name': er.name, 'ingredients': ings})
+
+                stream = AIAssistant.stream_quick_recommendations(
+                    inventory_context, 
+                    drink_type=drink_type, 
+                    mode=mode, 
+                    profile=profile,
+                    existing_recipes=existing_recipes_data
+                )
                 
                 for index, recipe in enumerate(stream):
                     recipe['index'] = index
@@ -517,4 +535,84 @@ def ai_vibe_creation_api(request: HttpRequest) -> HttpResponse:
         return response
     except Exception as e:
         logger.error(f"ai_vibe_creation_api - Error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+def quick_existing_recipes_api(request: HttpRequest) -> JsonResponse:
+    """Return up to 5 randomly selected matching saved recipes for a Quick Drinks profile."""
+    try:
+        import random
+        drink_type = request.GET.get('lab_mode', request.GET.get('drink_type', 'SODA')).upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
+        profile = (request.GET.get('profile') or '').strip()
+
+        # Query all recipes of this drink type whose ingredients are all in inventory
+        qs = Recipe.objects.filter(drink_type=drink_type).prefetch_related(
+            'recipe_ingredients__ingredient', 'categories'
+        )
+
+        matching_recipes = []
+        for r in qs:
+            rings = list(r.recipe_ingredients.all())
+            if not rings:
+                continue
+            # Check all ingredients in stock
+            if not all(ring.ingredient and ring.ingredient.is_in_inventory for ring in rings):
+                continue
+
+            # Check profile match
+            matched = False
+            if not profile:
+                matched = True
+            else:
+                p_lower = profile.lower()
+                # Check category tag
+                if any(cat.name.lower() == p_lower for cat in r.categories.all()):
+                    matched = True
+                else:
+                    for ring in rings:
+                        ing = ring.ingredient
+                        if not ing: continue
+                        # In Coffee, match on non-structural modifiers unless profile is Coffee or Dairy
+                        if drink_type == 'COFFEE' and p_lower not in ('coffee', 'dairy'):
+                            if ing.ingredient_type in ('COFFEE_BEAN',) or ing.mixology_function == 'COFFEE_BASE' or ing.mixology_function == 'DAIRY':
+                                continue
+                        if ing.category and ing.category.lower() == p_lower:
+                            matched = True
+                            break
+
+            if matched:
+                matching_recipes.append(r)
+
+        total_matching = len(matching_recipes)
+        selected = random.sample(matching_recipes, min(5, total_matching)) if total_matching > 0 else []
+
+        payload = []
+        for r in selected:
+            ings_summary = []
+            for ring in r.recipe_ingredients.all():
+                if ring.ingredient:
+                    ings_summary.append({
+                        'id': ring.ingredient.id,
+                        'name': ring.ingredient.name,
+                        'amount': float(ring.amount),
+                        'category': ring.ingredient.category,
+                        'is_primary': ring.is_primary
+                    })
+            payload.append({
+                'uuid': str(r.uuid),
+                'name': r.name,
+                'description': r.description or '',
+                'rating': r.rating,
+                'drink_type': r.drink_type,
+                'ingredients': ings_summary
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'total_matching': total_matching,
+            'recipes': payload
+        })
+    except Exception as e:
+        logger.error(f"quick_existing_recipes_api - Error: {e}", exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)

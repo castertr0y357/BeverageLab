@@ -23,9 +23,6 @@
             <button class="nav-link active text-start py-3 fw-bold" id="v-pills-archival-tab" data-bs-toggle="pill" data-bs-target="#v-pills-archival" type="button" role="tab" aria-selected="true">
                 <i class="bi bi-floppy me-2"></i> Data & Archival
             </button>
-            <button class="nav-link text-start py-3 fw-bold" id="v-pills-integrations-tab" data-bs-toggle="pill" data-bs-target="#v-pills-integrations" type="button" role="tab" aria-selected="false">
-                <i class="bi bi-plug me-2"></i> Integrations
-            </button>
             <button class="nav-link text-start py-3 fw-bold" id="v-pills-ai-tab" data-bs-toggle="pill" data-bs-target="#v-pills-ai" type="button" role="tab" aria-selected="false">
                 <i class="bi bi-robot me-2"></i> AI Assistant
             </button>
@@ -364,35 +361,6 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-
-            <!-- Integrations Pane -->
-            <div class="tab-pane fade" id="v-pills-integrations" role="tabpanel">
-                <div class="glass-surface p-4 border-white border-opacity-10">
-                    <div class="d-flex align-items-center gap-2 mb-4">
-                        <i class="bi bi-database-up text-primary fs-4"></i>
-                        <h4 class="mb-0 text-white">External Integrations</h4>
-                    </div>
-                    
-                    <h6 class="text-lab-accent mb-3">Mealie Recipe Management</h6>
-                    <p class="text-dim small mb-4">Synchronize Beverage Laboratory syntheses precisely into your Mealie instance repository via standard API token.</p>
-                    
-                    <form id="settingsForm">
-                        <div class="mb-4">
-                            <label class="form-label text-white fw-bold small">Mealie Instance URL</label>
-                            <input type="url" name="mealie_url" id="mealie_url" class="form-control bg-dark text-white border-white border-opacity-10" placeholder="https://mealie.local" value="{{ config.mealie_url }}">
-                            <div class="form-text text-dim">The full root URL of the instance without any trailing slash routes.</div>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label text-white fw-bold small">Private API Token</label>
-                            <input type="password" name="mealie_api_key" id="mealie_api_key" class="form-control bg-dark text-white border-white border-opacity-10" placeholder="••••••••••••••••" value="{{ config.mealie_api_key }}">
-                            <div class="form-text text-dim">Generate a long-lived API token from the Mealie User Profile interface.</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary px-5 py-2 fw-bold text-dark" id="saveSettingsBtn">
-                            <i class="bi bi-floppy"></i> Save Configuration
-                        </button>
-                    </form>
                 </div>
             </div>
 

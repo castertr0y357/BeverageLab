@@ -37,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (synthesisData) {
+        window.currentIsSavedRecipe = !!synthesisData.is_saved_recipe;
+        if (synthesisData.source_mix_id) {
+            window.currentSynopsisMixId = synthesisData.source_mix_id;
+            const srcField = document.getElementById('sourceMixIdField');
+            if (srcField) srcField.value = synthesisData.source_mix_id;
+        }
         // Inject Lab Theme
         if (synthesisData.drink_type) {
             const dt = synthesisData.drink_type.toUpperCase();
@@ -93,7 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        nameField.addEventListener('input', checkName);
+                nameField.addEventListener('input', () => {
+            checkName();
+            clearTimeout(window.synopsisNameSyncTimeout);
+            window.synopsisNameSyncTimeout = setTimeout(() => {
+                syncSynopsisToHistory();
+            }, 600);
+        });
         
         // Use MutationObserver or setInterval to handle AI populating the name field
         // since setting .value programmatically doesn't always trigger 'input'
@@ -102,9 +114,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function syncSynopsisToHistory(additionalData = {}) {
+    if (window.currentIsSavedRecipe) return;
+    const mixId = window.currentSynopsisMixId;
+    if (!mixId) return;
+
+    const payload = {
+        mix_id: mixId,
+        drink_type: document.getElementById('drinkTypeField')?.value || 'SODA',
+        name: document.getElementById('recipeNameField')?.value || '',
+        mixologist_notes: document.getElementById('llmMixologistNotesText')?.innerText || '',
+        profile_description: document.getElementById('llmProfileDescriptionText')?.innerText || '',
+        coffee_style: synopsisCoffeeStyle,
+        coffee_base_type: synopsisCoffeeBase,
+        drink_size_oz: synopsisCoffeeSize,
+        sweetness_style: synopsisSweetnessStyle,
+        bottle_scale: synopsisBottleScale,
+        ...additionalData
+    };
+
+    fetch('/api/history/save/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.status === 'saved') {
+            console.log("Synced synopsis state to history mix:", mixId);
+        }
+    })
+    .catch(err => console.warn('Failed to sync synopsis to history:', err));
+}
+
 function autoArchiveSynopsis(data) {
+    if (data.is_saved_recipe || window.currentIsSavedRecipe) {
+        console.log("Viewing saved recipe, skipping auto-archive.");
+        return;
+    }
     if (data.source_mix_id) {
-        console.log("Loaded from existing archive, skipping auto-archive.");
+        window.currentSynopsisMixId = data.source_mix_id;
+        const srcField = document.getElementById('sourceMixIdField');
+        if (srcField) srcField.value = data.source_mix_id;
+        console.log("Loaded from existing archive UUID:", data.source_mix_id);
         return;
     }
 
@@ -112,8 +164,12 @@ function autoArchiveSynopsis(data) {
     const hash = data.drink_type + '_' + (data.ingredients || []).map(i => i.id + '_' + i.amount).join('-');
     const storageKey = 'synopsis_archived_' + btoa(hash).substring(0, 32);
     
-    if (sessionStorage.getItem(storageKey)) {
-        console.log("Already archived this synopsis session.");
+    const existingMixId = sessionStorage.getItem(storageKey);
+    if (existingMixId) {
+        window.currentSynopsisMixId = existingMixId;
+        const srcField = document.getElementById('sourceMixIdField');
+        if (srcField) srcField.value = existingMixId;
+        console.log("Already archived this synopsis session with UUID:", existingMixId);
         return;
     }
     
@@ -124,9 +180,12 @@ function autoArchiveSynopsis(data) {
     })
     .then(r => r.json())
     .then(res => {
-        if (res.status === 'saved') {
-            sessionStorage.setItem(storageKey, 'true');
-            console.log("Auto-archived mix to history.");
+        if (res.status === 'saved' && res.mix_id) {
+            window.currentSynopsisMixId = res.mix_id;
+            const srcField = document.getElementById('sourceMixIdField');
+            if (srcField) srcField.value = res.mix_id;
+            sessionStorage.setItem(storageKey, res.mix_id);
+            console.log("Auto-archived mix to history with UUID:", res.mix_id);
         }
     })
     .catch(err => console.error('Archive auto-save failed:', err));
@@ -583,8 +642,25 @@ function triggerFlavorSynthesis(data) {
         // Now render the big report skeleton
         renderChemistryReport(chemistryData, data);
 
-        // TRIGGER THE LLM SSE STREAM for Profile and Notes ONLY ONCE!
-        if (!llmStreamTriggered) {
+        // Check if prefill already provides mixologist notes and profile description
+        const hasSavedNotes = data.mixologist_notes || data.profile_description || data.skip_ai || data.is_saved_recipe;
+        if (hasSavedNotes) {
+            const profileText = document.getElementById('llmProfileDescriptionText');
+            const profileSpinner = document.getElementById('llmProfileDescriptionSpinner');
+            const notesText = document.getElementById('llmMixologistNotesText');
+            const notesSpinner = document.getElementById('llmMixologistNotesSpinner');
+            
+            if (profileSpinner) profileSpinner.remove();
+            if (notesSpinner) notesSpinner.remove();
+            
+            if (profileText && data.profile_description) {
+                profileText.innerHTML = data.profile_description;
+            }
+            if (notesText && data.mixologist_notes) {
+                notesText.innerHTML = data.mixologist_notes;
+            }
+            console.log("Pre-loaded mixologist notes and description without AI invocation.");
+        } else if (!llmStreamTriggered) {
             triggerLlmStream(data);
             llmStreamTriggered = true;
         }
@@ -625,6 +701,8 @@ function triggerLlmStream(data) {
         if (notesSpinner) notesSpinner.remove();
         window.activeSynopsisStream.close();
         window.activeSynopsisStream = null;
+        // Automatically sync the generated notes & description to history
+        syncSynopsisToHistory();
     });
     
     window.activeSynopsisStream.onerror = function(e) {

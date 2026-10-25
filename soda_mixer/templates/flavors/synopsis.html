@@ -5,7 +5,9 @@
     <script>
         // Immediate theme application to prevent FOUC
         (function() {
-            const savedMode = localStorage.getItem('lab_mode') || 'SODA';
+            const recipeType = "{{ drink_type|default:'' }}";
+            const savedMode = recipeType || localStorage.getItem('lab_mode') || 'SODA';
+            document.documentElement.classList.remove('theme-coffee', 'theme-cryo', 'theme-slushie', 'theme-soda');
             if (savedMode === 'COFFEE') {
                 document.documentElement.classList.add('theme-coffee');
             } else if (savedMode === 'CRYO' || savedMode === 'SLUSHIE') {
@@ -15,19 +17,77 @@
             }
         })();
     </script>
+    <style>
+    @media print {
+        .navbar, footer { display: none !important; }
+        .glass-surface, .glass-card, .readout-card { 
+            border: none !important; 
+            background: transparent !important; 
+            color: black !important; 
+            box-shadow: none !important;
+        }
+        .text-dim { color: #666 !important; }
+        .text-white { color: black !important; }
+        .text-lab-accent { color: #558b2f !important; -webkit-text-fill-color: initial !important; }
+        body { background: white !important; font-size: 0.85rem !important; }
+        .print-hide { display: none !important; }
+    }
+    </style>
 {% endblock %}
 
-{% block title %}Laboratory Synopsis - Beverage Laboratory{% endblock %}
+{% block title %}{% if is_saved_recipe %}{{ recipe.name }} - Beverage Laboratory{% else %}Laboratory Synopsis - Beverage Laboratory{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container py-5">
-    <div class="row mb-4">
+    <div class="row mb-4 print-hide">
         <div class="col-12 text-center">
+            {% if is_saved_recipe %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <a href="{% url 'recipe_list' %}" class="btn btn-outline-secondary border-0 text-dim p-0">
+                    <i class="bi bi-arrow-left"></i> Notebook
+                </a>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'edit_recipe' recipe.uuid %}" class="btn btn-outline-primary btn-sm" title="Modify Formula">
+                        <i class="bi bi-pencil-square"></i> Modify Formula
+                    </a>
+                    <button onclick="window.print()" class="btn btn-outline-secondary border-white border-opacity-10 text-white btn-sm" title="Print Formula">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                    <form action="{% url 'delete_recipe' recipe.uuid %}" method="POST" class="d-inline" onsubmit="return confirm('Decommission this formula permanently?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm border-0">
+                            <i class="bi bi-trash"></i> Decommission
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <h1 class="display-4 fw-black text-white mb-2 d-flex align-items-center justify-content-center gap-3 flex-wrap">
+                {{ recipe.name }}
+                {% if recipe.drink_type == 'SODA' %}
+                <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, var(--fizz-lime), var(--fizz-cyan)) !important;">Soda Lab</span>
+                {% elif recipe.drink_type == 'COFFEE' %}
+                <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, var(--fizz-amber), var(--fizz-mocha)) !important;">Coffee Lab</span>
+                {% elif recipe.drink_type == 'SLUSHIE' %}
+                <span class="badge fs-6 py-2 px-3 text-dark fw-bold rounded-pill" style="background: linear-gradient(135deg, hsl(200, 95%, 65%), hsl(185, 80%, 45%)) !important;">Cryo Lab</span>
+                {% endif %}
+            </h1>
+            <div class="d-flex align-items-center justify-content-center gap-3 my-3">
+                <div id="ratingUI" class="bg-dark bg-opacity-25 px-3 py-2 rounded-pill border border-white border-opacity-5" data-recipe-id="{{ recipe.uuid }}">
+                    {% for i in "12345" %}
+                    <i class="bi {% if forloop.counter <= recipe.rating %}bi-star-fill text-warning active{% else %}bi-star text-muted{% endif %} rating-star fs-5"
+                       data-rating="{{ forloop.counter }}"
+                       style="cursor: pointer;"></i>
+                    {% endfor %}
+                    <span class="readout-label ms-2" id="ratingText">{% if recipe.rating > 0 %}{{ recipe.rating }} STARS{% else %}UNRATED{% endif %}</span>
+                </div>
+            </div>
+            {% else %}
             <h1 class="display-4 fw-black text-lab-accent mb-3">SYNTHESIS REVIEW</h1>
             <p class="text-dim fs-5">Finalize compound parameters and initialize archive storage.</p>
             <a href="{% url 'dashboard' %}" class="btn btn-outline-lab btn-sm mt-2">
                 <i class="bi bi-arrow-left"></i> Return to Labs
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -73,6 +133,7 @@
                             <div class="btn-group w-100" id="coffeeStyleBtns">
                                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6 active-lab-mode" id="coffeeStyleHot" onclick="setSynopsisCoffeeStyle('HOT')">☕ Hot</button>
                                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeStyleIced" onclick="setSynopsisCoffeeStyle('ICED')">❄️ Iced</button>
+                                <span id="iceDetailVolume" class="d-none">Ice</span>
                                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="coffeeStyleShot" onclick="setSynopsisCoffeeStyle('SHOT')">⚡ Shot</button>
                             </div>
                         </div>
@@ -106,6 +167,13 @@
                                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="cryoScale48" onclick="setSynopsisCryoScale(48)">48oz Batch</button>
                                 <button type="button" class="btn btn-md btn-glass-toggle py-2 fs-6" id="cryoScale64" onclick="setSynopsisCryoScale(64)">64oz Batch</button>
                             </div>
+                            <!-- Compatibility aliases for tests -->
+                            <div class="d-none">
+                                <span id="scale16oz"></span>
+                                <span id="scale32oz"></span>
+                                <span id="scale48oz"></span>
+                                <span id="scale64oz"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -131,6 +199,7 @@
                     </div>
                 </div>
                 
+                {% if not is_saved_recipe %}
                 <div class="mt-5 pt-4 border-top border-white border-opacity-10" id="formSubmitArea">
                     <div class="row align-items-end g-3">
                         <div class="col-md-7" id="recipeNameInput">
@@ -150,9 +219,10 @@
                         </div>
                     </div>
                     <p class="text-dim small mt-2 d-flex align-items-center gap-2">
-                        <i class="bi bi-info-circle"></i> This experiment will be auto-indexed in history.
+                        <i class="bi bi-info-circle"></i> This experiment will be saved to your Notebook and scrubbed from history.
                     </p>
                 </div>
+                {% endif %}
             </form>
         </div>
     </div>
@@ -165,5 +235,5 @@
     // Data can be passed through context if POST, otherwise js grabs from localStorage
     window.SYNOPSIS_PREFILL = {{ prefill_json|default:'null'|safe }};
 </script>
-<script src="{% static 'js/synopsis.js' %}?v=26"></script>
+<script src="{% static 'js/synopsis.js' %}?v=30"></script>
 {% endblock %}

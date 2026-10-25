@@ -6,10 +6,107 @@ function selectProfile(profile) {
     window.currentProfile = profile;
     const profilesContainer = document.getElementById('quickProfilesContainer');
     const aiContainer = document.getElementById('aiQuickContainer');
+    const existingContainer = document.getElementById('existingRecipesContainer');
     
     if (profilesContainer) profilesContainer.style.display = 'none';
-    if (aiContainer) aiContainer.style.display = 'block';
     
+    // Check for existing saved recipes first
+    checkExistingRecipes(profile);
+}
+
+function checkExistingRecipes(profile) {
+    const existingContainer = document.getElementById('existingRecipesContainer');
+    const existingList = document.getElementById('existingRecipesList');
+    const existingCatName = document.getElementById('existingRecipeCategoryName');
+    const aiCatName = document.getElementById('aiRecipeCategoryName');
+    const btnShuffle = document.getElementById('btnShuffleExisting');
+    
+    if (existingCatName) existingCatName.innerText = profile;
+    if (aiCatName) aiCatName.innerText = profile;
+
+    const params = new URLSearchParams({
+        lab_mode: currentLabMode,
+        profile: profile
+    });
+
+    fetch(`/api/quick-existing-recipes/?${params.toString()}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success' && data.recipes && data.recipes.length > 0) {
+                renderExistingRecipes(data.recipes);
+                if (btnShuffle) {
+                    btnShuffle.style.display = data.total_matching > 5 ? 'inline-block' : 'none';
+                }
+                if (existingContainer) existingContainer.style.display = 'block';
+            } else {
+                // No existing saved recipes, proceed straight to AI generation
+                if (existingContainer) existingContainer.style.display = 'none';
+                startAiGenerationDirectly();
+            }
+        })
+        .catch(err => {
+            console.error('Error checking existing recipes:', err);
+            startAiGenerationDirectly();
+        });
+}
+
+function renderExistingRecipes(recipes) {
+    const existingList = document.getElementById('existingRecipesList');
+    if (!existingList) return;
+    existingList.innerHTML = '';
+
+    recipes.forEach(recipe => {
+        const card = document.createElement('div');
+        card.className = 'glass-card p-3 animate-fade-in border-white border-opacity-10 d-flex justify-content-between align-items-center flex-wrap gap-3';
+        
+        let badgesHtml = '';
+        if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+            badgesHtml = recipe.ingredients.map(ing => {
+                const catClass = ing.category ? `bg-${ing.category.toLowerCase().trim()}` : 'bg-secondary';
+                return `<span class="badge-fizz ${catClass}">${ing.name}</span>`;
+            }).join(' ');
+        }
+
+        let ratingStars = '';
+        if (recipe.rating > 0) {
+            ratingStars = `<span class="text-warning small me-2">${'★'.repeat(recipe.rating)}${'☆'.repeat(5 - recipe.rating)}</span>`;
+        }
+
+        card.innerHTML = `
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <h5 class="fw-black mb-0 text-white">${recipe.name}</h5>
+                    ${ratingStars}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25" style="font-size: 0.65rem;">SAVED RECIPE</span>
+                </div>
+                ${recipe.description ? `<p class="text-dim small mb-2 lh-sm">${recipe.description.substring(0, 150)}${recipe.description.length > 150 ? '...' : ''}</p>` : ''}
+                <div class="d-flex flex-wrap gap-1">${badgesHtml}</div>
+            </div>
+            <div>
+                <a href="/recipes/${recipe.uuid}/" class="btn btn-sm btn-outline-primary px-3 py-2 fw-bold text-white">
+                    <i class="bi bi-eye me-1"></i> View Formula
+                </a>
+            </div>
+        `;
+        existingList.appendChild(card);
+    });
+}
+
+function shuffleExistingRecipes() {
+    if (window.currentProfile) {
+        checkExistingRecipes(window.currentProfile);
+    }
+}
+
+function startAiGenerationFromExisting() {
+    const existingContainer = document.getElementById('existingRecipesContainer');
+    if (existingContainer) existingContainer.style.display = 'none';
+    startAiGenerationDirectly();
+}
+
+function startAiGenerationDirectly() {
+    const aiContainer = document.getElementById('aiQuickContainer');
+    if (aiContainer) aiContainer.style.display = 'block';
     generateQuickRecommendations();
 }
 
@@ -17,6 +114,7 @@ function resetToProfiles() {
     window.currentProfile = null;
     const profilesContainer = document.getElementById('quickProfilesContainer');
     const aiContainer = document.getElementById('aiQuickContainer');
+    const existingContainer = document.getElementById('existingRecipesContainer');
     const list = document.getElementById('quickDrinksList');
     
     if (window.quickDrinksSource) {
@@ -25,6 +123,7 @@ function resetToProfiles() {
     }
     
     if (list) list.innerHTML = '';
+    if (existingContainer) existingContainer.style.display = 'none';
     if (aiContainer) aiContainer.style.display = 'none';
     if (profilesContainer) profilesContainer.style.display = 'block';
 }

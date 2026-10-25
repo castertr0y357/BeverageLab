@@ -10,6 +10,15 @@ class MixHistory(SoftDeleteModel):
     """An ad-hoc mix experiment that hasn't been named/saved yet."""
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     drink_type = models.CharField(max_length=10, choices=Recipe.DRINK_TYPE_CHOICES, default='SODA')
+    name = models.CharField(max_length=100, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    mixologist_notes = models.TextField(blank=True, default='')
+    profile_description = models.TextField(blank=True, default='')
+    coffee_style = models.CharField(max_length=20, blank=True, null=True)
+    coffee_base_type = models.CharField(max_length=20, blank=True, null=True)
+    drink_size_oz = models.FloatField(blank=True, null=True)
+    sweetness_style = models.CharField(max_length=20, blank=True, null=True)
+    bottle_scale = models.FloatField(blank=True, null=True)
     mixed_at = models.DateTimeField(auto_now_add=True)
     promoted_recipe = models.OneToOneField(
         Recipe,
@@ -33,6 +42,7 @@ class MixHistoryIngredient(models.Model):
     mix = models.ForeignKey(MixHistory, on_delete=models.CASCADE, related_name='mix_ingredients')
     ingredient = models.ForeignKey(Ingredient, on_delete=models.SET_NULL, null=True, blank=True, related_name='mix_usage')
     amount = models.FloatField(default=1.0)
+    is_primary = models.BooleanField(default=False)
     
     # 🧪 Synthesized Profile Overrides (captured from AI suggestions)
     intensity = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])

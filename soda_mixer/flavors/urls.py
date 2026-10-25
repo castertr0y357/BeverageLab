@@ -49,12 +49,12 @@ urlpatterns = [
     path('api/categories/create/', views.create_category_api, name='create_category_api'),
     path('api/categories/<uuid:uuid>/delete/', views.delete_recipe_category_api, name='delete_recipe_category_api'),
     path('api/ingredient-profiles/delete/', views.delete_ingredient_profile_api, name='delete_ingredient_profile_api'),
-    path('api/recipes/<uuid:uuid>/export/', views.export_recipe_to_mealie_api, name='export_recipe_to_mealie_api'),
     path('api/tasks/<uuid:uuid>/', views.task_status_api, name='task_status_api'),
 
     # AI Assistant endpoints
     path('api/ai/chat/', views.ai_chat_api, name='ai_chat_api'),
     path('api/ai/quick-recommendations/', views.ai_quick_recommendations_api, name='ai_quick_recommendations_api'),
+    path('api/quick-existing-recipes/', views.quick_existing_recipes_api, name='quick_existing_recipes_api'),
     path('api/ai/vibe-creation/', views.ai_vibe_creation_api, name='ai_vibe_creation_api'),
     path('api/ai/provider/save/', views.save_llm_provider_api, name='save_llm_provider_api'),
     path('api/ai/provider/<int:pk>/delete/', views.delete_llm_provider_api, name='delete_llm_provider_api'),
