@@ -55,6 +55,8 @@ urlpatterns = [
     path('api/ai/chat/', views.ai_chat_api, name='ai_chat_api'),
     path('api/ai/quick-recommendations/', views.ai_quick_recommendations_api, name='ai_quick_recommendations_api'),
     path('api/quick-existing-recipes/', views.quick_existing_recipes_api, name='quick_existing_recipes_api'),
+    path('api/quick-drinks/draw/', views.quick_drinks_draw_api, name='quick_drinks_draw_api'),
+    path('api/quick-drinks/<uuid:uuid>/dismiss/', views.dismiss_cached_quick_drink_api, name='dismiss_cached_quick_drink_api'),
     path('api/ai/vibe-creation/', views.ai_vibe_creation_api, name='ai_vibe_creation_api'),
     path('api/ai/provider/save/', views.save_llm_provider_api, name='save_llm_provider_api'),
     path('api/ai/provider/<int:pk>/delete/', views.delete_llm_provider_api, name='delete_llm_provider_api'),
@@ -85,4 +87,6 @@ urlpatterns = [
     path('settings/backup/<uuid:uuid>/download/', views.download_backup_file, name='download_backup_file'),
     path('settings/backup/<uuid:uuid>/restore/', views.restore_backup_record_api, name='restore_backup_record_api'),
     path('settings/backup/<uuid:uuid>/delete/', views.delete_backup_record_api, name='delete_backup_record_api'),
+    path('settings/quick-cache/config/', views.save_quick_cache_config_api, name='save_quick_cache_config_api'),
+    path('settings/quick-cache/run-now/', views.run_quick_cache_now_api, name='run_quick_cache_now_api'),
 ]

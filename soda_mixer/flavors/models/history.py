@@ -19,6 +19,7 @@ class MixHistory(SoftDeleteModel):
     drink_size_oz = models.FloatField(blank=True, null=True)
     sweetness_style = models.CharField(max_length=20, blank=True, null=True)
     bottle_scale = models.FloatField(blank=True, null=True)
+    source_cached_drink_uuid = models.UUIDField(blank=True, null=True, db_index=True)
     mixed_at = models.DateTimeField(auto_now_add=True)
     promoted_recipe = models.OneToOneField(
         Recipe,

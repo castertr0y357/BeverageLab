@@ -167,3 +167,38 @@ class RecipeIngredient(models.Model):
 
     class Meta:
         unique_together = ['recipe', 'ingredient']
+
+
+class CachedQuickDrink(models.Model):
+    """A pre-generated Quick Drink recipe stored in the nightly cache pool."""
+    DRINK_TYPE_CHOICES = [
+        ('SODA', 'Soda Synthesis'),
+        ('COFFEE', 'Coffee Laboratory'),
+        ('SLUSHIE', 'Cryo-Slushie Lab'),
+    ]
+    MODE_CHOICES = [
+        ('standard', 'Standard Mode'),
+        ('experimental', 'Experimental Mode'),
+    ]
+
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    drink_type = models.CharField(max_length=10, choices=DRINK_TYPE_CHOICES, default='SODA', db_index=True)
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default='experimental', db_index=True)
+    profile = models.CharField(max_length=50, db_index=True, help_text="Category profile (e.g. Fruity, Sweet, Citrus)")
+    ingredient_count = models.IntegerField(db_index=True, help_text="Total ingredient count bucket (2, 3, 4, or 5)")
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default='', help_text="Short 20-30 word menu blurb")
+    mixologist_notes = models.TextField(blank=True, default='', help_text="Pre-generated mixologist note for instant Synopsis view")
+    profile_description = models.TextField(blank=True, default='', help_text="Pre-generated 3-paragraph sensory report for instant Synopsis view")
+    ingredients_json = models.JSONField(default=list, help_text="List of {id, name, parts, is_primary}")
+    flavor_signature = models.CharField(max_length=255, db_index=True, help_text="Canonical signature: dominant_anchor::sorted_modifiers")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Cached Quick Drink"
+        verbose_name_plural = "Cached Quick Drinks"
+
+    def __str__(self):
+        return f"[{self.drink_type}/{self.profile}/{self.ingredient_count}-ing] {self.name}"
+

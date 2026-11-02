@@ -19,9 +19,10 @@ class FlavorsConfig(AppConfig):
             return
         
         # Start keep-warm thread
-        from .tasks import start_keep_warm_task, start_backup_scheduler_task
+        from .tasks import start_keep_warm_task, start_backup_scheduler_task, start_quick_cache_scheduler_task
         start_keep_warm_task()
         start_backup_scheduler_task()
+        start_quick_cache_scheduler_task()
 
         # Preheat suggestions cache on boot in background
         from .ai_service import AIAssistant

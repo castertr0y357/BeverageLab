@@ -205,3 +205,32 @@ class BackupRecord(models.Model):
     def __str__(self):
         return f"{self.filename} ({self.tier} - {self.storage_type})"
 
+
+class QuickDrinkCacheConfiguration(models.Model):
+    """Singleton model configuring automated nightly Quick Drink cache pre-generation."""
+    MODE_CHOICES = [
+        ('EXPERIMENTAL', 'Experimental Mode Only'),
+        ('STANDARD', 'Standard Mode Only'),
+        ('BOTH', 'Both (Experimental First, Then Standard)'),
+    ]
+
+    is_enabled = models.BooleanField(default=True, help_text="Enable scheduled nightly Quick Drink cache replenishment.")
+    schedule_time = models.CharField(max_length=5, default="02:00", help_text="UTC time of daily execution (HH:MM in 24hr format).")
+    cache_modes = models.CharField(max_length=20, choices=MODE_CHOICES, default='BOTH')
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=20, blank=True, default='')
+    last_summary = models.TextField(blank=True, default='')
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_config(cls):
+        config, created = cls.objects.get_or_create(pk=1)
+        return config
+
+    class Meta:
+        verbose_name_plural = "Quick Drink Cache Configurations"
+
+

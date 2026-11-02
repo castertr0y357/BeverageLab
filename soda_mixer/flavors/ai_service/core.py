@@ -261,6 +261,27 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
                         { "name": "Club Soda", "amount": 150.0, "role": "Carbonation baseline" }
                     ]
                 })
+            elif "[SINGLE QUICK DRINK CACHE REQUEST]" in user_prompt:
+                names = re.findall(r'^-\s+([^(\[\n]+)', context or '', re.MULTILINE)
+                clean_names = [n.strip() for n in names if n.strip()]
+                count_match = re.search(r'exactly\s+(\d+)\s+total\s+ingredients|between\s+(\d+)\s+total\s+ingredients', user_prompt)
+                target_count = 3
+                if count_match:
+                    target_count = int(count_match.group(1) or count_match.group(2) or 3)
+                import random
+                selected = clean_names[:target_count] if len(clean_names) >= target_count else clean_names
+                if len(clean_names) > target_count:
+                    selected = random.sample(clean_names, target_count)
+                ings = []
+                for idx, nm in enumerate(selected):
+                    ings.append({"name": nm, "parts": 60.0 if idx == 0 else float(20 - idx * 3)})
+                return json.dumps({
+                    "name": f"Mock Cached Elixir {random.randint(100, 999)}",
+                    "description": "A crisp, pre-generated laboratory mock formulation with balanced aromatics.",
+                    "mixologist_notes": "Balanced specifically for nightly cache validation.",
+                    "profile_description": "Opening with bright top notes, transitioning into a smooth mid-palate, and finishing clean.",
+                    "ingredients": ings
+                })
             elif "FLAVOR SYNTHESIS REPORT" in user_prompt:
                 return (
                     "The selected ingredients combine to form a highly balanced, refreshing flavor profile (MOCK_MODE). "

@@ -19,14 +19,16 @@ from .ai import (
     ai_chat_api, save_llm_provider_api, delete_llm_provider_api,
     fetch_provider_models_api, discover_provider_models_api, ai_suggest_api,
     ai_synthesize_api, ai_analyze_ingredient_api, ai_bulk_analyze_api, random_pairing_api,
-    ai_quick_recommendations_api, ai_vibe_creation_api, quick_existing_recipes_api
+    ai_quick_recommendations_api, ai_vibe_creation_api, quick_existing_recipes_api,
+    quick_drinks_draw_api, dismiss_cached_quick_drink_api
 )
 from .auth import login_view, login_api, logout_api
 from .settings import (
     settings_view, save_settings_api, export_data, import_data,
     save_backup_config_api, test_backup_storage_api, run_backup_now_api,
     download_backup_file, restore_backup_record_api, delete_backup_record_api,
-    metrics_view, debug_logging_toggle_api
+    metrics_view, debug_logging_toggle_api,
+    save_quick_cache_config_api, run_quick_cache_now_api
 )
 from .coffee_chemistry import coffee_chemistry_api
 from .soda_chemistry import soda_chemistry_api
@@ -45,6 +47,7 @@ __all__ = [
     'fetch_provider_models_api', 'discover_provider_models_api', 'ai_suggest_api',
     'ai_synthesize_api', 'ai_analyze_ingredient_api', 'ai_bulk_analyze_api', 'random_pairing_api',
     'ai_quick_recommendations_api', 'ai_vibe_creation_api', 'quick_existing_recipes_api',
+    'quick_drinks_draw_api', 'dismiss_cached_quick_drink_api',
     'coffee_chemistry_api',
     'soda_chemistry_api',
     'cryo_chemistry_api',
@@ -53,5 +56,6 @@ __all__ = [
     'save_backup_config_api', 'test_backup_storage_api', 'run_backup_now_api',
     'download_backup_file', 'restore_backup_record_api', 'delete_backup_record_api',
     'metrics_view', 'debug_logging_toggle_api',
+    'save_quick_cache_config_api', 'run_quick_cache_now_api',
     'task_status_api'
 ]

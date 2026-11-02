@@ -623,3 +623,82 @@ Rules:
                         pass
                 except json.JSONDecodeError:
                     pass
+
+    @classmethod
+    def generate_single_quick_drink(
+        cls,
+        inventory: str,
+        drink_type: str = 'SODA',
+        mode: str = 'experimental',
+        profile: str = 'Fruity',
+        ingredient_count: int = 3,
+        excluded_signatures: Optional[List[str]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Generate a single Quick Drink recipe for a specific bucket (1-at-a-time for small local models),
+        including full pre-generated mixologist_notes and profile_description.
+        """
+        import random
+        drink_type = drink_type.upper()
+        if drink_type == 'CRYO':
+            drink_type = 'SLUSHIE'
+
+        seed = random.randint(10000, 99999)
+
+        if drink_type == 'COFFEE':
+            modifier_count = max(1, ingredient_count - 2)
+            mode_rules = f"""2. Exact Ingredient Count: Include exactly {ingredient_count} total ingredients:
+   - 1 coffee bean base (State: SOLID_EXTRACTABLE) at 18.0 parts
+   - 1 genuine dairy or plant milk base (Function: VOLUME_BASE, State: LIQUID) at 50.0 parts
+   - {modifier_count} flavor modifier(s) featuring the "{profile}" profile with distinct parts (e.g., 25.0 parts for the primary flavor lead, 10.0 to 15.0 parts for secondary accents)."""
+        elif drink_type == 'SLUSHIE':
+            mode_rules = f"""2. Exact Ingredient Count: Include between {ingredient_count} total ingredients from the Inventory Registry.
+   - Assign the largest 'parts' value (e.g. 5.0) to a "{profile}" ingredient so it serves as the unmistakable primary flavor lead.
+   - Assign smaller 'parts' values (e.g. 2.0, 1.0, 0.5) to the remaining {ingredient_count - 1} complementary ingredient(s)."""
+        else:
+            mode_rules = f"""2. Exact Ingredient Count: Include exactly {ingredient_count} total ingredients from the Inventory Registry.
+   - Assign the largest 'parts' value (e.g. 5.0 or 60.0) to a "{profile}" ingredient so it serves as the unmistakable primary flavor lead.
+   - Assign smaller 'parts' values (e.g. 2.0, 1.0, 0.5) to the remaining {ingredient_count - 1} complementary ingredient(s)."""
+
+        avoid_block = ""
+        if excluded_signatures:
+            recent_sigs = excluded_signatures[-30:]
+            readable_sigs = [s.replace('::', ' leading with ').replace('|', ', ') for s in recent_sigs]
+            avoid_block = (
+                "\nFRESH COMBINATION REQUIREMENT:\n"
+                "Select a fresh combination of ingredients that differs from these existing formulas:\n- "
+                + "\n- ".join(readable_sigs)
+                + "\n"
+            )
+
+        prompt = f"""[SINGLE QUICK DRINK CACHE REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
+
+Task: Act as a master mixologist. Create 1 distinct, creative {drink_type} recipe featuring the "{profile}" flavor category using ONLY the ingredients in the Inventory Registry.
+{avoid_block}
+OUTPUT FORMAT:
+Output a single JSON object with this exact structure:
+{{
+    "name": "Creative Menu Title",
+    "description": "A vivid 20-30 word menu blurb describing the drink's flavor vibe.",
+    "mixologist_notes": "A personalized 1-2 sentence bartender note on why this ratio works.",
+    "profile_description": "A vivid 2-3 paragraph sensory tasting report covering aroma, palate progression, and finish.",
+    "ingredients": [
+        {{ "name": "Exact Ingredient Name from Inventory", "parts": 60.0 }}
+    ]
+}}
+
+Rules:
+1. USE THE EXACT NOMENCLATURE from the Inventory Registry for ingredient names.
+{mode_rules}
+3. Keep the recipe title creative and evocative.
+"""
+        response = cls.chat(prompt, context=inventory, drink_type=drink_type, mode=mode)
+        parsed = cls._extract_json(response)
+        if isinstance(parsed, list) and len(parsed) > 0:
+            parsed = parsed[0]
+        if isinstance(parsed, dict) and 'name' in parsed and 'ingredients' in parsed:
+            for ing in parsed.get('ingredients', []):
+                if 'parts' in ing and 'amount' not in ing:
+                    ing['amount'] = ing['parts']
+            return parsed
+        return None
+

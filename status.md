@@ -1,6 +1,25 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Implemented Nightly Quick Drinks Pre-Generation Cache, Anchor-Aware Uniqueness Fingerprinting, Unified Draw & Cycle Engine, and 1-at-a-Time Full Synopsis Pre-Computation:
+  - **Models & Migration (`0038_cachedquickdrink_quickdrinkcacheconfiguration_and_more.py`)**:
+    - Created `CachedQuickDrink` storing `drink_type`, `mode`, `profile`, `ingredient_count` (`2, 3, 4, 5`), `name`, `description`, `mixologist_notes`, `profile_description`, `ingredients_json`, and canonical `flavor_signature`.
+    - Created singleton `QuickDrinkCacheConfiguration` (`is_enabled`, `schedule_time` defaulting to `02:00` UTC, `cache_modes`, and telemetry fields).
+    - Added `source_cached_drink_uuid` to `MixHistory` to link history archives back to their originating cached Quick Drink.
+    - Added forward data migration backfilling `is_primary=True` onto the dominant flavor ingredient of all existing saved `Recipe` records so they match Quick Drink categories accurately.
+  - **1-at-a-Time Generation & Dynamic Bucket Sizing (`quick_cache_service.py` & `generation.py`)**:
+    - Defined dynamic bucket capacities supporting 5 full cycles of 5 drinks without repeats: `{2: 5, 3: 8, 4: 8, 5: 5}` (26 per category) for `SODA` and `SLUSHIE`, and `{3: 8, 4: 8, 5: 5}` (21 per category) for `COFFEE`.
+    - Implemented `AIAssistant.generate_single_quick_drink()` generating 1 recipe per LLM call with exact ingredient count constraints and full pre-computed `mixologist_notes` and `profile_description`.
+    - Implemented `compute_flavor_signature()` (`dominant_anchor::sorted_remaining_modifiers`), blocking ratio/order clones (`Cherry 60, Lime 20, Vanilla 10` vs `Cherry 60, Vanilla 20, Lime 10`) while permitting genuine anchor shifts (`Lime 60, Vanilla 20, Cherry 10`), checked across `Recipe`, `MixHistory`, and `CachedQuickDrink`.
+    - Enforced a 2-attempt saturation limit per bucket when unique combinations are exhausted.
+    - Added nightly scheduler daemon `quick_cache_scheduler_loop()` in `tasks.py` and `apps.py` (with PostgreSQL advisory lock `987654322`) and a Settings UI card with a **"Replenish Now"** async task button.
+  - **Unified Quick Drinks Draw, Cycle, Dismiss & Promotion Scrubbing**:
+    - Added `GET /api/quick-drinks/draw/` combining in-stock `EXISTING RECIPE` records and `CACHED AI` drinks into a unified 5-card draw following complexity distribution, cycling unseen drinks across shuffles, and only falling back to live LLM streaming when a category pool is 0.
+    - Added `POST /api/quick-drinks/<uuid>/dismiss/` and `✕` button on cached cards to evict unwanted recipes and immediately draw a replacement card.
+    - Updated `lab_quick.js` and `synopsis.js` so selecting a cached Quick Drink passes pre-computed `mixologist_notes` and `profile_description` (`skip_ai: true`) for instant 0ms Synopsis loading, and promoting/saving to an official `Recipe` scrubs the `CachedQuickDrink` entry so the nightly job replenishes the slot.
+  - **Verification**:
+    - Added unit and integration test suite in `test_quick_drink_cache.py`. Verified all 135 tests pass in 7.79s and rebuilt containers via `nerdctl compose`.
+- [x] Added **Critical Idea Evaluation & Anti-Sycophancy (Pushback Protocol)** to global (`C:\Users\caste\.gemini\project.md`) and workspace rules (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`), and synchronized the AI Integrations & Small-Model Prompt Engineering section across all rule files.
 - [x] Implemented Historical Archive Scrubbing, Synopsis Metadata Persistence, Unified Synopsis View for Completed Recipes, Quick Drinks Existing Recipe Discovery, and Mealie Sync Removal:
   - **Archive Scrubbing on Recipe Promotion**:
     - Fixed autoArchiveSynopsis() in synopsis.js to assign returned mix_id to sourceMixIdField and sessionStorage, ensuring the mix UUID is preserved and submitted when clicking ARCHIVE SYNTHESIS.

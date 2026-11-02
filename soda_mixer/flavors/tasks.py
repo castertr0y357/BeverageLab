@@ -80,3 +80,52 @@ def start_backup_scheduler_task():
     thread = threading.Thread(target=backup_scheduler_loop, daemon=True, name="BackupSchedulerThread")
     thread.start()
     logger.info("BackupScheduler - Dispatched automated GFS backup daemon thread.")
+
+
+def quick_cache_scheduler_loop():
+    """Periodic daemon loop checking every 60s if a scheduled Quick Drink cache replenishment is due."""
+    logger.info("QuickCacheScheduler - Started nightly Quick Drink cache daemon thread.")
+    while True:
+        try:
+            from django.db import connection
+            from django.utils import timezone
+            from .models import QuickDrinkCacheConfiguration
+            from .quick_cache_service import replenish_quick_drink_cache
+
+            config = QuickDrinkCacheConfiguration.get_config()
+            if config.is_enabled:
+                now = timezone.now()
+                try:
+                    target_hour, target_min = map(int, (config.schedule_time or '02:00').split(':'))
+                except ValueError:
+                    target_hour, target_min = 2, 0
+
+                is_due_time = (now.hour > target_hour) or (now.hour == target_hour and now.minute >= target_min)
+                not_run_today = (config.last_run_at is None) or (config.last_run_at.date() < now.date())
+
+                if is_due_time and not_run_today:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_try_advisory_lock(987654322);")
+                        locked = cursor.fetchone()[0]
+
+                    if locked:
+                        try:
+                            config.refresh_from_db()
+                            if (config.last_run_at is None) or (config.last_run_at.date() < now.date()):
+                                logger.info("QuickCacheScheduler - Executing scheduled nightly Quick Drink cache replenishment...")
+                                replenish_quick_drink_cache()
+                                logger.info("QuickCacheScheduler - Scheduled nightly Quick Drink cache replenishment succeeded.")
+                        finally:
+                            with connection.cursor() as cursor:
+                                cursor.execute("SELECT pg_advisory_unlock(987654322);")
+        except Exception as e:
+            logger.error(f"QuickCacheScheduler - Error in scheduler loop: {e}", exc_info=True)
+
+        time.sleep(60)
+
+
+def start_quick_cache_scheduler_task():
+    thread = threading.Thread(target=quick_cache_scheduler_loop, daemon=True, name="QuickCacheSchedulerThread")
+    thread.start()
+    logger.info("QuickCacheScheduler - Dispatched nightly Quick Drink cache daemon thread.")
+

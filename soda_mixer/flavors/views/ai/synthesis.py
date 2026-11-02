@@ -8,7 +8,14 @@ from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.db.models import Q
-from ...models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, LLMProvider, BackgroundExecutionTask
+from ...models import (
+    Ingredient, Recipe, RecipeIngredient, RecipeCategory,
+    SystemConfiguration, LLMProvider, BackgroundExecutionTask, CachedQuickDrink
+)
+from ...quick_cache_service import (
+    draw_quick_drinks, compute_flavor_signature, resolve_generated_ingredients,
+    BUCKET_TARGETS, normalize_drink_type
+)
 from ...tasks_registry import submit_task
 from ...recommendations import (
     suggest_categories, calculate_recipe_stats
@@ -485,8 +492,31 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
                     existing_recipes=existing_recipes_data
                 )
                 
+                in_stock_pool = list(Ingredient.objects.filter(is_in_inventory=True))
                 for index, recipe in enumerate(stream):
                     recipe['index'] = index
+                    # Also persist live-generated recipes into CachedQuickDrink if profile is present
+                    if profile:
+                        try:
+                            resolved_ings = resolve_generated_ingredients(recipe.get('ingredients', []), in_stock_pool, drink_type)
+                            sig, actual_count, _ = compute_flavor_signature(resolved_ings, drink_type)
+                            if sig and not CachedQuickDrink.objects.filter(drink_type=drink_type, flavor_signature=sig).exists():
+                                bucket_cnt = max(2, min(5, actual_count or len(resolved_ings)))
+                                if drink_type == 'COFFEE' and bucket_cnt < 3:
+                                    bucket_cnt = 3
+                                cqd = CachedQuickDrink.objects.create(
+                                    drink_type=drink_type,
+                                    mode=mode.lower(),
+                                    profile=profile.strip().title(),
+                                    ingredient_count=bucket_cnt,
+                                    name=str(recipe.get('name') or 'Synthesized Elixir')[:120],
+                                    description=str(recipe.get('description') or ''),
+                                    ingredients_json=resolved_ings,
+                                    flavor_signature=sig,
+                                )
+                                recipe['cached_uuid'] = str(cqd.uuid)
+                        except Exception as cache_err:
+                            logger.warning(f"ai_quick_recommendations_api - Could not cache streamed recipe: {cache_err}")
                     yield f"event: recipe\ndata: {json.dumps(recipe)}\n\n"
                 
                 yield "event: close\ndata: {}\n\n"
@@ -616,3 +646,50 @@ def quick_existing_recipes_api(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         logger.error(f"quick_existing_recipes_api - Error: {e}", exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def quick_drinks_draw_api(request: HttpRequest) -> JsonResponse:
+    """Unified Quick Drinks draw endpoint returning up to `count` items from
+    Official Saved Recipes + CachedQuickDrink according to complexity bucket distribution.
+    """
+    try:
+        drink_type = request.GET.get('lab_mode', request.GET.get('drink_type', 'SODA')).upper()
+        profile = (request.GET.get('profile') or '').strip()
+        mode = (request.GET.get('mode') or 'experimental').strip().lower()
+        raw_exclude = (request.GET.get('exclude_ids') or '').strip()
+        exclude_ids = {s.strip() for s in raw_exclude.split(',') if s.strip()}
+        try:
+            count = max(1, min(10, int(request.GET.get('count', 5))))
+        except (ValueError, TypeError):
+            count = 5
+
+        result = draw_quick_drinks(
+            drink_type=drink_type,
+            profile=profile,
+            mode=mode,
+            exclude_ids=exclude_ids,
+            count=count,
+        )
+        return JsonResponse({
+            'status': 'success',
+            **result,
+        })
+    except Exception as e:
+        logger.error(f"quick_drinks_draw_api - Error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def dismiss_cached_quick_drink_api(request: HttpRequest, uuid: str) -> JsonResponse:
+    """Manually dismiss/delete a CachedQuickDrink entry so the nightly job replaces it."""
+    try:
+        deleted_count, _ = CachedQuickDrink.objects.filter(uuid=uuid).delete()
+        if deleted_count == 0:
+            return JsonResponse({'error': 'Cached drink not found'}, status=404)
+        logger.info(f"QuickCacheDismiss - Info - Dismissed CachedQuickDrink UUID {uuid}")
+        return JsonResponse({'status': 'dismissed', 'uuid': str(uuid)})
+    except Exception as e:
+        logger.error(f"dismiss_cached_quick_drink_api - Error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+

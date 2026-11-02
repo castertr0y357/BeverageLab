@@ -13,7 +13,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from ..models import Ingredient, Recipe, RecipeIngredient, RecipeCategory, SystemConfiguration, MixHistory, MixHistoryIngredient
+from ..models import (
+    Ingredient, Recipe, RecipeIngredient, RecipeCategory,
+    SystemConfiguration, MixHistory, MixHistoryIngredient, CachedQuickDrink
+)
+from ..quick_cache_service import ensure_recipe_primary_ingredient
 from ..tasks_registry import submit_task
 
 logger = logging.getLogger(__name__)
@@ -78,14 +82,26 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
             except (ValueError, ValidationError, IntegrityError) as e:
                 logger.error(f"RecipeCreation - Error - Failed to attach ingredient {ingredient_id} to recipe {recipe.id}: {e}")
 
+        ensure_recipe_primary_ingredient(recipe)
+
+        cached_uuid_to_scrub = request.POST.get('source_cached_drink_id')
         source_mix_id = request.POST.get('source_mix_id')
         if source_mix_id:
             try:
                 mix = MixHistory.objects.get(uuid=source_mix_id)
+                if not cached_uuid_to_scrub and mix.source_cached_drink_uuid:
+                    cached_uuid_to_scrub = str(mix.source_cached_drink_uuid)
                 mix.delete()
                 logger.info(f"RecipeCreation - Info - Deleted source mix {source_mix_id} from archives")
             except MixHistory.DoesNotExist:
                 pass
+
+        if cached_uuid_to_scrub:
+            try:
+                CachedQuickDrink.objects.filter(uuid=cached_uuid_to_scrub).delete()
+                logger.info(f"RecipeCreation - Info - Scrubbed promoted CachedQuickDrink {cached_uuid_to_scrub} from cache pool")
+            except Exception as e:
+                logger.warning(f"RecipeCreation - Warning - Could not scrub CachedQuickDrink {cached_uuid_to_scrub}: {e}")
 
         logger.info(f"RecipeCreation - Info - Successfully created recipe {recipe.name} (ID: {recipe.id})")
         return redirect('recipe_detail', uuid=recipe.uuid)
@@ -328,6 +344,11 @@ def save_mix_to_history_api(request: HttpRequest) -> JsonResponse:
                 mix.bottle_scale = float(data.get('bottle_scale'))
             except (ValueError, TypeError):
                 pass
+        if data.get('source_cached_drink_id'):
+            try:
+                mix.source_cached_drink_uuid = uuid.UUID(str(data.get('source_cached_drink_id')))
+            except (ValueError, TypeError):
+                pass
         mix.save()
 
         # If ingredients were passed, synchronize them
@@ -405,13 +426,16 @@ def promote_mix_to_recipe_api(request: HttpRequest, uuid: str) -> JsonResponse:
                     recipe=recipe,
                     ingredient=mi.ingredient,
                     amount=mi.amount,
+                    is_primary=mi.is_primary,
                     # Carry over synthesized profile overrides
                     intensity=mi.intensity,
                     sweetness=mi.sweetness,
                     acidity=mi.acidity,
                     bitterness=mi.bitterness
                 )
-        
+
+        ensure_recipe_primary_ingredient(recipe)
+
         if category_ids:
             try:
                 recipe.categories.set(RecipeCategory.objects.filter(id__in=[int(cid) for cid in category_ids if str(cid).isdigit()]))
@@ -421,7 +445,12 @@ def promote_mix_to_recipe_api(request: HttpRequest, uuid: str) -> JsonResponse:
 
         recipe_uuid = str(recipe.uuid)
         mix_uuid = mix.uuid
+        cached_uuid = mix.source_cached_drink_uuid
         mix.delete(force=True)
+
+        if cached_uuid:
+            CachedQuickDrink.objects.filter(uuid=cached_uuid).delete()
+            logger.info(f"HistoryMixPromotion - Info - Scrubbed promoted CachedQuickDrink {cached_uuid} from cache pool")
 
         logger.info(f"HistoryMixPromotion - Info - Promoted mix UUID {mix_uuid} to recipe '{recipe.name}' (UUID: {recipe_uuid}) and scrubbed from history")
         return JsonResponse({'status': 'promoted', 'recipe_id': recipe_uuid})

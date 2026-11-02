@@ -19,7 +19,10 @@ from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 
-from ..models import SystemConfiguration, LLMProvider, BackupConfiguration, BackupRecord
+from ..models import (
+    SystemConfiguration, LLMProvider, BackupConfiguration, BackupRecord,
+    QuickDrinkCacheConfiguration, CachedQuickDrink
+)
 from ..tasks_registry import submit_task
 
 logger = logging.getLogger(__name__)
@@ -44,11 +47,16 @@ def settings_view(request: HttpRequest) -> HttpResponse:
     """Settings page for backups and system management."""
     config = SystemConfiguration.get_config()
     backup_config = BackupConfiguration.get_config()
+    quick_cache_config = QuickDrinkCacheConfiguration.get_config()
+    cached_drinks_count = CachedQuickDrink.objects.count()
     backup_records = BackupRecord.objects.all().order_by('-created_at')[:50]
     providers = LLMProvider.objects.all().order_by('name')
     return render(request, 'flavors/settings.html', {
         'config': config,
         'backup_config': backup_config,
+        'quick_cache_config': quick_cache_config,
+        'cached_drinks_count': cached_drinks_count,
+        'quick_cache_mode_choices': QuickDrinkCacheConfiguration.MODE_CHOICES,
         'backup_records': backup_records,
         'storage_choices': BackupConfiguration.STORAGE_CHOICES,
         'weekday_choices': BackupConfiguration.WEEKDAY_CHOICES,
@@ -554,3 +562,51 @@ def debug_logging_toggle_api(request: HttpRequest) -> JsonResponse:
         except Exception as e:
             return JsonResponse({'error': f'Invalid request: {e}'}, status=400)
     return JsonResponse({'debug_enabled': is_debug_enabled()})
+
+
+@user_passes_test(lambda u: u.is_staff)
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_quick_cache_config_api(request: HttpRequest) -> JsonResponse:
+    """Save nightly Quick Drink cache schedule configuration."""
+    try:
+        data = json.loads(request.body)
+        config = QuickDrinkCacheConfiguration.get_config()
+        config.is_enabled = bool(data.get('is_enabled', True))
+        schedule_time = str(data.get('schedule_time', '02:00')).strip()
+        if not re.match(r'^([01]\d|2[0-3]):([0-5]\d)$', schedule_time):
+            return JsonResponse({'error': 'Schedule time must be in 24-hour HH:MM format (e.g., 02:00).'}, status=400)
+        config.schedule_time = schedule_time
+        cache_modes = str(data.get('cache_modes', 'BOTH')).upper()
+        if cache_modes in ('EXPERIMENTAL', 'STANDARD', 'BOTH'):
+            config.cache_modes = cache_modes
+        config.save()
+        logger.info(f"QuickCacheConfig - Info - Updated nightly cache schedule (enabled={config.is_enabled}, time={config.schedule_time})")
+        return JsonResponse({'status': 'success', 'message': 'Quick Drink cache schedule saved.'})
+    except Exception as e:
+        logger.error(f"QuickCacheConfig - Error - Failed to save config: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def _replenish_quick_cache_task(update_progress):
+    """Background task function to replenish Quick Drink cache."""
+    from ..quick_cache_service import replenish_quick_drink_cache
+    return replenish_quick_drink_cache(progress_callback=update_progress)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@csrf_exempt
+@require_http_methods(["POST"])
+def run_quick_cache_now_api(request: HttpRequest) -> JsonResponse:
+    """Dispatch an asynchronous task to replenish the Quick Drink cache immediately."""
+    try:
+        task = submit_task("Quick Drink Cache Replenishment", _replenish_quick_cache_task)
+        return JsonResponse({
+            'status': 'accepted',
+            'task_id': str(task.uuid),
+            'message': 'Quick Drink cache replenishment started.'
+        }, status=202)
+    except Exception as e:
+        logger.error(f"QuickCacheRunNow - Error - Failed to dispatch replenishment task: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+

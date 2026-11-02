@@ -43,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const srcField = document.getElementById('sourceMixIdField');
             if (srcField) srcField.value = synthesisData.source_mix_id;
         }
+        if (synthesisData.source_cached_drink_id) {
+            window.currentSourceCachedDrinkId = synthesisData.source_cached_drink_id;
+            const cachedField = document.getElementById('sourceCachedDrinkIdField');
+            if (cachedField) cachedField.value = synthesisData.source_cached_drink_id;
+        }
         // Inject Lab Theme
         if (synthesisData.drink_type) {
             const dt = synthesisData.drink_type.toUpperCase();
@@ -538,6 +543,14 @@ function populateSynopsis(data, chemistryData = null) {
             amtInput.name = `amount_${ing.id}`;
             amtInput.value = volumeMl || 0;
             formInputsContainer.appendChild(amtInput);
+
+            if (isPrimary || ing.is_primary || ing.isPrimary) {
+                const priInput = document.createElement('input');
+                priInput.type = 'hidden';
+                priInput.name = `is_primary_${ing.id}`;
+                priInput.value = 'true';
+                formInputsContainer.appendChild(priInput);
+            }
         });
         
         // Append form inputs container

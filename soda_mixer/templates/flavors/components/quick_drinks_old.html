@@ -31,51 +31,29 @@
     </div>
 </div>
 
-<!-- Section for Existing Recipes (Shown when matching saved recipes exist) -->
-<div id="existingRecipesContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5 mb-4" style="display: none;">
-    <div class="d-flex justify-content-between align-items-center mb-3 w-100 flex-wrap gap-2">
-        <div>
-            <h5 class="fw-bold mb-0 text-white d-flex align-items-center gap-2">
-                <i class="bi bi-journal-bookmark text-lab-accent"></i> Existing Saved Recipes (<span id="existingRecipeCategoryName"></span>)
-            </h5>
-            <p class="text-dim small mb-0">Found matching formulas in your notebook using active inventory.</p>
-        </div>
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-2 text-white" onclick="resetToProfiles()">
-                <i class="bi bi-arrow-left me-1"></i> CATEGORIES
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-2 text-white" id="btnShuffleExisting" onclick="shuffleExistingRecipes()" style="display: none;">
-                <i class="bi bi-shuffle me-1"></i> SHUFFLE
-            </button>
-            <button type="button" class="btn btn-sm btn-accent px-3 py-2 fw-bold text-dark" onclick="startAiGenerationFromExisting()">
-                <i class="bi bi-robot me-1"></i> Synthesize New AI Drinks
-            </button>
-        </div>
-    </div>
-    <div id="existingRecipesList" class="d-flex flex-column gap-3">
-        <!-- Rendered dynamically -->
-    </div>
-</div>
-
-<!-- Section for AI Quick Drinks Recommendations -->
+<!-- Unified Quick Drinks Recommendations Container (Cycles Cached AI & Existing Saved Recipes) -->
 <div id="aiQuickContainer" class="p-4 rounded-4 bg-dark bg-opacity-25 border border-white border-opacity-5" style="display: none;">
+    <div id="existingRecipesContainer" style="display: none;"><div id="existingRecipesList"></div></div>
     <div class="d-flex justify-content-between align-items-center mb-4 w-100 flex-wrap gap-2">
         <div>
             <h5 class="fw-bold mb-0 text-lab-accent d-flex align-items-center gap-2">
-                <i class="bi bi-stars"></i> Quick AI Recommendations (<span id="aiRecipeCategoryName"></span>)
+                <i class="bi bi-stars"></i> Quick Drinks (<span id="aiRecipeCategoryName"></span><span id="existingRecipeCategoryName" style="display: none;"></span>)
             </h5>
-            <p class="text-dim small mb-0">Algorithmic flavor discovery synthesized with active inventory.</p>
+            <p class="text-dim small mb-0" id="quickDrinksPoolSubtext">Cycling pre-generated vault & saved formulas across complexity tiers.</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-2 fs-6 text-white" onclick="resetToProfiles()" id="btnSwitchCategories">
                 <i class="bi bi-arrow-left me-1"></i> CATEGORIES
             </button>
+            <button type="button" class="btn btn-sm btn-outline-primary px-4 py-2 fs-6 fw-bold text-white" style="display: none;" onclick="cycleQuickDrinks()" id="btnShuffleExisting">
+                <i class="bi bi-shuffle me-1"></i> CYCLE / SHUFFLE
+            </button>
             <button type="button" class="btn btn-sm btn-outline-experimental px-4 py-2 fs-6" style="display: none;" onclick="generateQuickRecommendations()" id="btnGenerateQuick">
-                <i class="bi bi-lightning-charge me-1"></i> GENERATE MORE
+                <i class="bi bi-lightning-charge me-1"></i> GENERATE LIVE
             </button>
         </div>
     </div>
     <div id="quickDrinksList" class="d-flex flex-column gap-3">
-        <!-- Streamed cards will appear here -->
+        <!-- Unified Existing + Cached AI cards (or live fallback stream) appear here -->
     </div>
 </div>
