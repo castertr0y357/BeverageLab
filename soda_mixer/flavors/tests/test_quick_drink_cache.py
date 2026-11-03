@@ -10,7 +10,8 @@ from soda_mixer.flavors.models import (
 )
 from soda_mixer.flavors.quick_cache_service import (
     compute_flavor_signature, BUCKET_TARGETS, replenish_quick_drink_cache,
-    draw_quick_drinks, ensure_recipe_primary_ingredient, get_recipe_primary_category
+    draw_quick_drinks, ensure_recipe_primary_ingredient, get_recipe_primary_category,
+    sanitize_card_description
 )
 
 User = get_user_model()
@@ -123,7 +124,12 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         and excludes out-of-stock recipes.
         """
         # 1. Create an official saved recipe with Cherry as dominant primary
-        saved = Recipe.objects.create(name="Saved Cherry Fizz", drink_type="SODA", rating=5)
+        saved = Recipe.objects.create(
+            name="Saved Cherry Fizz",
+            drink_type="SODA",
+            rating=5,
+            description="FLAVOR SYNERGY: Complex cherry esters.\n\nOVERALL IMPRESSION: A radiant and sparkling cherry sensation."
+        )
         RecipeIngredient.objects.create(recipe=saved, ingredient=self.cherry, amount=60.0, is_primary=False)
         RecipeIngredient.objects.create(recipe=saved, ingredient=self.vanilla, amount=20.0, is_primary=False)
         ensure_recipe_primary_ingredient(saved)
@@ -164,6 +170,11 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         self.assertEqual(len(data1['items']), 5)
         self.assertFalse(data1['needs_live_generation'])
 
+        existing_card = next((item for item in data1['items'] if item['id'] == str(saved.uuid)), None)
+        if existing_card:
+            self.assertEqual(existing_card['description'], "A radiant and sparkling cherry sensation.")
+            self.assertIn("FLAVOR SYNERGY", existing_card['full_description'])
+
         seen_ids = [item['id'] for item in data1['items']]
 
         # Draw 2nd hand passing seen_ids -> should prioritize the 2 unseen items first
@@ -175,6 +186,12 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         second_ids = {item['id'] for item in data2['items']}
         # All 7 items in the pool must have been covered across the two draws
         self.assertEqual(len(set(seen_ids) | second_ids), 7)
+
+        # Check existing card description if it was drawn in the 2nd hand
+        existing_card_2 = next((item for item in data2['items'] if item['id'] == str(saved.uuid)), None)
+        if existing_card_2:
+            self.assertEqual(existing_card_2['description'], "A radiant and sparkling cherry sensation.")
+            self.assertIn("FLAVOR SYNERGY", existing_card_2['full_description'])
 
         # Mark Mint out of stock -> Cached 3, 4, 6 should be excluded dynamically (leaving 4 in-stock items)
         self.mint.is_in_inventory = False
@@ -291,3 +308,40 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         self.assertIn('profile_description', schema['properties'])
         self.assertIn('ingredients', schema['properties'])
         self.assertFalse(schema.get('additionalProperties', True))
+
+    def test_sanitize_card_description_overall_impression_extraction(self):
+        """Verify full multi-paragraph sensory reports are distilled into the clean 1-2 sentence OVERALL IMPRESSION."""
+        full_synopsis = (
+            "FLAVOR SYNERGY & AROMA: The synergy here is achieved through aromatic coupling. "
+            "The rich, dark anthocyanins of the wild grape provide a deep base.\n\n"
+            "THE TASTING EXPERIENCE: The initial taste is a vibrant burst of fruit.\n\n"
+            "OVERALL IMPRESSION: This compound is a sophisticated, comforting synthesis, evoking the deep aesthetic of autumn. "
+            "It finishes with remarkable clarity.\n\n"
+            "AI Mixologist Notes: This compound represents a highly stable pairing."
+        )
+        distilled = sanitize_card_description(full_synopsis)
+        self.assertEqual(
+            distilled,
+            "This compound is a sophisticated, comforting synthesis, evoking the deep aesthetic of autumn. "
+            "It finishes with remarkable clarity."
+        )
+
+    def test_sanitize_card_description_without_overall_impression(self):
+        """Verify descriptions without an OVERALL IMPRESSION header have section prefixes stripped and cap at 2 sentences."""
+        raw_text = (
+            "FLAVOR SYNERGY & AROMA: Crisp lime cuts through sugary berry syrup. "
+            "A sharp, effervescent bite refreshes the palate. "
+            "Additional notes that should be trimmed off because they exceed two sentences. "
+            "AI Mixologist Notes: Technical notes here."
+        )
+        distilled = sanitize_card_description(raw_text)
+        self.assertEqual(distilled, "Crisp lime cuts through sugary berry syrup. A sharp, effervescent bite refreshes the palate.")
+
+    def test_sanitize_card_description_plain_and_empty(self):
+        """Verify simple descriptions are preserved and empty/None returns empty string."""
+        self.assertEqual(sanitize_card_description(""), "")
+        self.assertEqual(sanitize_card_description(None), "")
+        self.assertEqual(
+            sanitize_card_description("A velvety blend of espresso and vanilla."),
+            "A velvety blend of espresso and vanilla."
+        )

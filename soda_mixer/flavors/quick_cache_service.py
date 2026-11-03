@@ -50,6 +50,70 @@ def is_coffee_structural_ingredient(ing_obj: Optional[Ingredient], raw_name: str
     return any(term in name_clean for term in COFFEE_STRUCTURAL_TERMS)
 
 
+def sanitize_card_description(raw_desc: Optional[str]) -> str:
+    """Format and distill a potentially long or multi-paragraph recipe description
+    into a concise, visually consistent 1-to-2 sentence menu card description (~20-30 words).
+    
+    If the description contains an 'OVERALL IMPRESSION:' section (from a full AI sensory report),
+    that section is extracted directly as it represents the polished, 1-2 sentence mixologist summary.
+    Otherwise, section headers are stripped and the text is trimmed to the first 1-2 clean sentences.
+    """
+    if not raw_desc or not raw_desc.strip():
+        return ""
+
+    text = raw_desc.strip()
+
+    # 1. Look for OVERALL IMPRESSION section (case-insensitive)
+    overall_match = re.search(
+        r'(?:OVERALL\s+IMPRESSION|Overall\s+Impression)\s*:?\s*(.+?)(?=(?:AI\s+Mixologist\s+Notes|FLAVOR\s+SYNERGY|THE\s+TASTING\s+EXPERIENCE|\r?\n\r?\n|\Z))',
+        text,
+        re.DOTALL | re.IGNORECASE
+    )
+    if overall_match:
+        extracted = overall_match.group(1).strip()
+        extracted = re.sub(r'[*_#`]', '', extracted).strip()
+        if extracted:
+            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', extracted) if s.strip()]
+            if sentences:
+                candidate = " ".join(sentences[:2])
+                if not candidate.endswith(('.', '!', '?')):
+                    candidate += '.'
+                return candidate
+
+    # 2. If no OVERALL IMPRESSION, strip other standard sensory report headers if present at the start
+    cleaned = re.sub(
+        r'^(?:FLAVOR\s+SYNERGY(?:\s*&\s*AROMA)?|THE\s+TASTING\s+EXPERIENCE|FLAVOR\s+PROFILE|SENSORY\s+NOTES)\s*:?\s*',
+        '',
+        text,
+        flags=re.IGNORECASE
+    ).strip()
+
+    # If it contains AI Mixologist Notes later, cut that off so it doesn't leak into the 1-2 sentences
+    notes_idx = re.search(r'(?:AI\s+Mixologist\s+Notes|Mixologist\s+Notes)\s*:?', cleaned, re.IGNORECASE)
+    if notes_idx:
+        cleaned = cleaned[:notes_idx.start()].strip()
+
+    # Remove markdown bold/italic formatting
+    cleaned = re.sub(r'[*_#`]', '', cleaned).strip()
+
+    # 3. Split into sentences and take the first 1-2 sentences
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', cleaned) if s.strip()]
+    if not sentences:
+        short_text = cleaned[:160].strip()
+        if len(cleaned) > 160:
+            short_text = short_text.rsplit(' ', 1)[0] + '...'
+        return short_text
+
+    result = " ".join(sentences[:2])
+    if len(result) > 240 and len(sentences) > 1 and len(sentences[0]) >= 40:
+        result = sentences[0]
+
+    if not result.endswith(('.', '!', '?')):
+        result += '.'
+
+    return result
+
+
 def compute_flavor_signature(
     ingredients: List[Dict[str, Any]],
     drink_type: str = 'SODA'
@@ -638,13 +702,17 @@ def draw_quick_drinks(
         if dt == 'COFFEE' and bucket_key < 3:
             bucket_key = 3
 
+        short_desc = sanitize_card_description(r.description)
         item_dict = {
             'id': str(r.uuid),
             'uuid': str(r.uuid),
             'source_type': 'existing',
             'badge_label': 'EXISTING RECIPE',
             'name': r.name,
-            'description': r.description or '',
+            'description': short_desc,
+            'full_description': r.description or '',
+            'profile_description': r.description or '',
+            'mixologist_notes': '',
             'rating': r.rating,
             'drink_type': dt,
             'ingredient_count': bucket_key,
