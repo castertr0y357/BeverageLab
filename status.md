@@ -17,6 +17,7 @@
     - Added `GET /api/quick-drinks/draw/` combining in-stock `EXISTING RECIPE` records and `CACHED AI` drinks into a unified 5-card draw following complexity distribution, cycling unseen drinks across shuffles, and only falling back to live LLM streaming when a category pool is 0.
     - Added `POST /api/quick-drinks/<uuid>/dismiss/` and `✕` button on cached cards to evict unwanted recipes and immediately draw a replacement card.
     - Updated `lab_quick.js` and `synopsis.js` so selecting a cached Quick Drink passes pre-computed `mixologist_notes` and `profile_description` (`skip_ai: true`) for instant 0ms Synopsis loading, and promoting/saving to an official `Recipe` scrubs the `CachedQuickDrink` entry so the nightly job replenishes the slot.
+    - Added a dedicated **Quick Drinks Cache** sidebar tab under **System Protocols** in `settings.html`, displaying live vault capacity cards (inventory count, 5-cycle rotation target, nightly schedule status), UTC schedule time, synthesis mode selectors, and the **"Replenish Now"** async progress runner.
   - **Verification**:
     - Added unit and integration test suite in `test_quick_drink_cache.py`. Verified all 135 tests pass in 7.79s and rebuilt containers via `nerdctl compose`.
 - [x] Added **Critical Idea Evaluation & Anti-Sycophancy (Pushback Protocol)** to global (`C:\Users\caste\.gemini\project.md`) and workspace rules (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`), and synchronized the AI Integrations & Small-Model Prompt Engineering section across all rule files.
