@@ -3,6 +3,7 @@
 import logging
 import random
 import re
+import time
 from typing import Dict, Any, List, Optional, Set, Tuple, Callable
 from django.utils import timezone
 
@@ -271,6 +272,23 @@ def resolve_generated_ingredients(
     return resolved
 
 
+def format_eta(seconds: Optional[int]) -> str:
+    """Format an ETA in seconds into a human-friendly duration string."""
+    if seconds is None:
+        return "Calculating..."
+    if seconds <= 0:
+        return "Finishing up..."
+    if seconds < 60:
+        return f"~{seconds}s"
+    minutes = seconds // 60
+    rem_sec = seconds % 60
+    if minutes < 60:
+        return f"~{minutes}m {rem_sec:02d}s"
+    hours = minutes // 60
+    rem_min = minutes % 60
+    return f"~{hours}h {rem_min:02d}m"
+
+
 def count_in_stock_cached_drinks(
     drink_type: str,
     mode: str,
@@ -295,7 +313,7 @@ def count_in_stock_cached_drinks(
 
 
 def replenish_quick_drink_cache(
-    progress_callback: Optional[Callable[[int, str], None]] = None,
+    progress_callback: Optional[Callable[..., None]] = None,
     target_lab: Optional[str] = None,
     target_profile: Optional[str] = None,
     target_mode: Optional[str] = None,
@@ -304,8 +322,9 @@ def replenish_quick_drink_cache(
     """Replenish the Quick Drink cache across labs, categories, and complexity buckets.
 
     Generates 1 recipe at a time for maximum small-model quality, pre-computing
-    mixologist_notes and profile_description, and stopping after 2 consecutive
-    failed/duplicate attempts on any saturated bucket.
+    mixologist_notes and profile_description, tracks real-time generation metrics
+    (created, remaining, ETA), and stops after 2 consecutive failed/duplicate attempts
+    on any saturated bucket.
     """
     config = QuickDrinkCacheConfiguration.get_config()
 
@@ -339,13 +358,80 @@ def replenish_quick_drink_cache(
     skipped_full_buckets = 0
     saturated_buckets = 0
 
-    for idx, (dt, mode, cat, ing_count, target_cap) in enumerate(work_buckets):
-        pct = int((idx / max(1, total_buckets)) * 95)
-        if progress_callback:
-            progress_callback(pct, f"Checking {dt} / {cat} ({ing_count}-ing, {mode})...")
+    # Helper for telemetry notifications supporting 2-arg or 3-arg callback signatures
+    def notify(pct: int, msg: str, telem: Optional[Dict[str, Any]] = None):
+        if not progress_callback:
+            return
+        import inspect
+        try:
+            sig = inspect.signature(progress_callback)
+            if len(sig.parameters) >= 3 or any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values()):
+                progress_callback(pct, msg, telem or {})
+            else:
+                progress_callback(pct, msg)
+        except Exception:
+            try:
+                progress_callback(pct, msg, telem or {})
+            except TypeError:
+                progress_callback(pct, msg)
 
+    # Pre-scan buckets to determine total recipes needed
+    bucket_plan: List[Dict[str, Any]] = []
+    total_recipes_needed = 0
+    for dt, mode, cat, ing_count, target_cap in work_buckets:
         current_valid = count_in_stock_cached_drinks(dt, mode, cat, ing_count, in_stock_ids)
-        if current_valid >= target_cap:
+        needed = max(0, target_cap - current_valid)
+        total_recipes_needed += needed
+        bucket_plan.append({
+            'dt': dt,
+            'mode': mode,
+            'cat': cat,
+            'ing_count': ing_count,
+            'target_cap': target_cap,
+            'current_valid': current_valid,
+            'needed': needed,
+        })
+
+    recipes_remaining = total_recipes_needed
+    durations: List[float] = []
+    start_time = time.time()
+
+    if total_recipes_needed == 0:
+        summary = f"All {total_buckets} quick drink cache buckets are already at full capacity."
+        config.last_run_at = timezone.now()
+        config.last_status = 'SUCCESS'
+        config.last_summary = summary
+        config.save()
+        final_telemetry = {
+            'created': 0,
+            'total_needed': 0,
+            'remaining': 0,
+            'eta_seconds': 0,
+            'eta_display': 'Cache is full',
+            'current_bucket': 'All buckets complete',
+            'message': summary,
+        }
+        notify(100, summary, final_telemetry)
+        return {
+            'created': 0,
+            'total_needed': 0,
+            'total_buckets': total_buckets,
+            'skipped_full_buckets': total_buckets,
+            'saturated_buckets': 0,
+            'summary': summary,
+            'telemetry': final_telemetry,
+        }
+
+    for item in bucket_plan:
+        dt = item['dt']
+        mode = item['mode']
+        cat = item['cat']
+        ing_count = item['ing_count']
+        target_cap = item['target_cap']
+        needed = item['needed']
+        bucket_label = f"{dt} / {cat} ({ing_count}-ing, {mode})"
+
+        if needed <= 0:
             skipped_full_buckets += 1
             continue
 
@@ -359,13 +445,41 @@ def replenish_quick_drink_cache(
 
         if len(pool) < ing_count:
             saturated_buckets += 1
+            recipes_remaining = max(0, recipes_remaining - needed)
             continue
 
         existing_signatures = collect_existing_signatures(dt)
-        needed = target_cap - current_valid
         consecutive_failures = 0
 
         while needed > 0 and consecutive_failures < 2:
+            # Estimate ETA based on running average duration
+            if durations:
+                avg_duration = sum(durations) / len(durations)
+                eta_seconds = int(recipes_remaining * avg_duration)
+            elif created_total > 0:
+                elapsed = time.time() - start_time
+                avg_duration = elapsed / created_total
+                eta_seconds = int(recipes_remaining * avg_duration)
+            else:
+                eta_seconds = None
+
+            pct = min(95, max(5, int((created_total / total_recipes_needed) * 95)))
+            msg = f"Synthesizing {bucket_label} ({created_total}/{total_recipes_needed} recipes created)..."
+            notify(
+                pct,
+                msg,
+                {
+                    'created': created_total,
+                    'total_needed': total_recipes_needed,
+                    'remaining': recipes_remaining,
+                    'eta_seconds': eta_seconds,
+                    'eta_display': format_eta(eta_seconds),
+                    'current_bucket': bucket_label,
+                    'message': msg,
+                }
+            )
+
+            step_t0 = time.time()
             raw_recipe = AIAssistant.generate_single_quick_drink(
                 inventory=inv_context,
                 drink_type=dt,
@@ -374,6 +488,9 @@ def replenish_quick_drink_cache(
                 ingredient_count=ing_count,
                 excluded_signatures=sorted(existing_signatures),
             )
+            step_duration = max(0.1, time.time() - step_t0)
+            durations.append(step_duration)
+
             if not raw_recipe or not isinstance(raw_recipe.get('ingredients'), list):
                 consecutive_failures += 1
                 continue
@@ -409,10 +526,12 @@ def replenish_quick_drink_cache(
             existing_signatures.add(sig)
             created_total += 1
             needed -= 1
+            recipes_remaining = max(0, recipes_remaining - 1)
             consecutive_failures = 0
 
         if consecutive_failures >= 2:
             saturated_buckets += 1
+            recipes_remaining = max(0, recipes_remaining - needed)
 
     summary = (
         f"Created {created_total} cached recipes across {total_buckets} buckets "
@@ -423,16 +542,26 @@ def replenish_quick_drink_cache(
     config.last_summary = summary
     config.save()
 
-    if progress_callback:
-        progress_callback(100, summary)
+    final_telemetry = {
+        'created': created_total,
+        'total_needed': total_recipes_needed,
+        'remaining': 0,
+        'eta_seconds': 0,
+        'eta_display': 'Complete',
+        'current_bucket': 'All buckets complete',
+        'message': summary,
+    }
+    notify(100, summary, final_telemetry)
 
     logger.info(f"QuickCache - Info - {summary}")
     return {
         'created': created_total,
+        'total_needed': total_recipes_needed,
         'total_buckets': total_buckets,
         'skipped_full_buckets': skipped_full_buckets,
         'saturated_buckets': saturated_buckets,
         'summary': summary,
+        'telemetry': final_telemetry,
     }
 
 

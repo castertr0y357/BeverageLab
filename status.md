@@ -1,6 +1,23 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Implemented Real-Time Recipe Counter & Live ETA Telemetry Tracker for Quick Drink Cache Replenishment:
+  - **Telemetry Engine (`quick_cache_service.py` & `views/settings.py`)**:
+    - Pre-scans dynamic complexity buckets to determine `total_recipes_needed` across labs and categories upfront.
+    - Tracks generation durations and computes dynamic, moving-average ETA (`format_eta()`) formatted into human-readable duration strings (e.g., `~45s`, `~2m 15s`, `~1h 05m`).
+    - Reports live telemetry dictionary (`created`, `total_needed`, `remaining`, `eta_seconds`, `eta_display`, `current_bucket`, `message`) through `progress_callback` to `BackgroundExecutionTask.result_data`.
+    - Handles early saturation gracefully by deducting unfulfillable slots from `remaining` so counts never freeze.
+  - **Live Telemetry Dashboard (`settings.html`)**:
+    - Re-architected `#quickCacheProgressContainer` into a 3-column glassmorphic stats card featuring:
+      - Animated progress bar and live percentage badge.
+      - **Created counter**: `X / Y` recipes synthesized.
+      - **Remaining counter**: `Z left` to synthesize.
+      - **Estimated time remaining**: live dynamic ETA readout.
+      - **Active target & status**: displays current lab/category/bucket (e.g., `SODA / Tropical (3-ing, experimental)`).
+    - Updated `runQuickCacheNow()` polling loop to parse real-time telemetry from `/api/tasks/<id>/` and cleanly transition to 100% completion.
+  - **Testing & Verification**:
+    - Added unit tests for `format_eta` and `test_replenish_telemetry_callback` in `test_quick_drink_cache.py`.
+    - All 137 project tests passing with zero failures.
 - [x] Implemented Nightly Quick Drinks Pre-Generation Cache, Anchor-Aware Uniqueness Fingerprinting, Unified Draw & Cycle Engine, and 1-at-a-Time Full Synopsis Pre-Computation:
   - **Models & Migration (`0038_cachedquickdrink_quickdrinkcacheconfiguration_and_more.py`)**:
     - Created `CachedQuickDrink` storing `drink_type`, `mode`, `profile`, `ingredient_count` (`2, 3, 4, 5`), `name`, `description`, `mixologist_notes`, `profile_description`, `ingredients_json`, and canonical `flavor_signature`.

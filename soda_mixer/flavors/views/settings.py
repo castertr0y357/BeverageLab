@@ -591,7 +591,15 @@ def save_quick_cache_config_api(request: HttpRequest) -> JsonResponse:
 def _replenish_quick_cache_task(update_progress):
     """Background task function to replenish Quick Drink cache."""
     from ..quick_cache_service import replenish_quick_drink_cache
-    return replenish_quick_drink_cache(progress_callback=update_progress)
+
+    def cb(progress_pct: int, msg: str, telemetry: Any = None) -> None:
+        data = {'message': msg}
+        if isinstance(telemetry, dict):
+            data.update(telemetry)
+        status = 'SUCCESS' if progress_pct >= 100 else 'RUNNING'
+        update_progress(progress_pct, status=status, result_data=data)
+
+    return replenish_quick_drink_cache(progress_callback=cb)
 
 
 @user_passes_test(lambda u: u.is_staff)

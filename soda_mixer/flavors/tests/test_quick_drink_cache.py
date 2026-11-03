@@ -234,3 +234,48 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         cfg = QuickDrinkCacheConfiguration.get_config()
         self.assertEqual(cfg.schedule_time, '03:00')
         self.assertEqual(cfg.cache_modes, 'EXPERIMENTAL')
+
+    def test_format_eta(self):
+        """Verify ETA helper formats seconds into human-readable strings."""
+        from soda_mixer.flavors.quick_cache_service import format_eta
+        self.assertEqual(format_eta(None), "Calculating...")
+        self.assertEqual(format_eta(0), "Finishing up...")
+        self.assertEqual(format_eta(45), "~45s")
+        self.assertEqual(format_eta(125), "~2m 05s")
+        self.assertEqual(format_eta(3665), "~1h 01m")
+
+    @patch('soda_mixer.flavors.ai_service.AIAssistant.generate_single_quick_drink')
+    def test_replenish_telemetry_callback(self, mock_gen):
+        """Verify progress_callback receives live telemetry dictionary with created and remaining counts."""
+        mock_gen.return_value = {
+            'name': 'Ruby Limeade',
+            'description': 'Bright cherry and tart lime.',
+            'mixologist_notes': '60/40 balance.',
+            'profile_description': 'Crisp and fruity.',
+            'ingredients': [
+                {'name': 'Cherry', 'parts': 60.0},
+                {'name': 'Lime', 'parts': 20.0},
+            ]
+        }
+        reports = []
+        def test_callback(pct, msg, telemetry=None):
+            reports.append((pct, msg, telemetry))
+
+        result = replenish_quick_drink_cache(
+            progress_callback=test_callback,
+            target_lab='SODA',
+            target_profile='Fruity',
+            target_mode='experimental',
+            max_per_bucket=1,
+        )
+        self.assertGreaterEqual(len(reports), 1)
+        # Check last report telemetry
+        last_pct, last_msg, last_telem = reports[-1]
+        self.assertEqual(last_pct, 100)
+        self.assertIsNotNone(last_telem)
+        self.assertIn('created', last_telem)
+        self.assertIn('total_needed', last_telem)
+        self.assertIn('remaining', last_telem)
+        self.assertIn('eta_display', last_telem)
+        self.assertEqual(last_telem['eta_display'], 'Complete')
+        self.assertEqual(last_telem['remaining'], 0)

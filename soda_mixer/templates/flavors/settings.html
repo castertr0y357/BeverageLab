@@ -510,11 +510,61 @@
                         </div>
                     </form>
 
-                    <div id="quickCacheProgressContainer" class="mt-3" style="display: none;">
-                        <div class="progress bg-white bg-opacity-5" style="height: 6px;">
+                    <div id="quickCacheProgressContainer" class="mt-4 p-3 glass-surface rounded border border-white border-opacity-10" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="spinner-grow spinner-grow-sm text-info" id="qcPulseSpinner" role="status"></span>
+                                <span class="readout-label text-info" style="font-size: 0.75rem; letter-spacing: 0.08em;">SYNTHESIS IN PROGRESS</span>
+                            </div>
+                            <span id="qcTrackPct" class="badge bg-info text-dark fw-bold">0%</span>
+                        </div>
+
+                        <div class="progress bg-white bg-opacity-5 mb-3" style="height: 8px;">
                             <div id="quickCacheProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: 0%;"></div>
                         </div>
-                        <div id="quickCacheStatusText" class="text-dim small mt-1" style="font-size: 0.75rem;">Initiating cache replenishment...</div>
+
+                        <!-- 3-Column Telemetry Dashboard -->
+                        <div class="row g-2 text-center mb-2">
+                            <div class="col-4">
+                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                    <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Created</div>
+                                    <div class="mt-1">
+                                        <span id="qcTrackCreated" class="fw-bold text-white fs-5">0</span>
+                                        <span class="text-dim small">/</span>
+                                        <span id="qcTrackTotal" class="text-dim small">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                    <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Remaining</div>
+                                    <div class="mt-1">
+                                        <span id="qcTrackRemaining" class="fw-bold text-info fs-5">0</span>
+                                        <span class="text-dim small">left</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                    <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Est. Remaining</div>
+                                    <div class="mt-1">
+                                        <span id="qcTrackEta" class="fw-bold text-warning fs-5">Calculating...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Bucket and Step Message -->
+                        <div class="d-flex flex-column gap-1 pt-2 border-top border-white border-opacity-5" style="font-size: 0.78rem;">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-dim">Current Bucket:</span>
+                                <span id="qcTrackCurrent" class="text-white fw-bold">Initializing...</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-dim">Status:</span>
+                                <span id="quickCacheStatusText" class="text-dim text-truncate">Preparing synthesis substrate...</span>
+                            </div>
+                        </div>
                     </div>
 
                     {% if quick_cache_config.last_summary %}
@@ -1031,12 +1081,30 @@ function runQuickCacheNow() {
     const btn = document.getElementById('btnRunQuickCacheNow');
     const pContainer = document.getElementById('quickCacheProgressContainer');
     const pBar = document.getElementById('quickCacheProgressBar');
+    const pPct = document.getElementById('qcTrackPct');
     const pText = document.getElementById('quickCacheStatusText');
+    const pulse = document.getElementById('qcPulseSpinner');
+    const trackCreated = document.getElementById('qcTrackCreated');
+    const trackTotal = document.getElementById('qcTrackTotal');
+    const trackRemaining = document.getElementById('qcTrackRemaining');
+    const trackEta = document.getElementById('qcTrackEta');
+    const trackCurrent = document.getElementById('qcTrackCurrent');
 
     btn.disabled = true;
     pContainer.style.display = 'block';
-    pBar.style.width = '5%';
-    pText.innerText = 'Dispatching background Quick Drink cache replenishment...';
+    pBar.style.width = '3%';
+    pBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
+    if (pPct) {
+        pPct.className = 'badge bg-info text-dark fw-bold';
+        pPct.innerText = '0%';
+    }
+    if (trackCreated) trackCreated.innerText = '0';
+    if (trackTotal) trackTotal.innerText = '...';
+    if (trackRemaining) trackRemaining.innerText = '...';
+    if (trackEta) trackEta.innerText = 'Calculating...';
+    if (trackCurrent) trackCurrent.innerText = 'Starting...';
+    if (pText) pText.innerText = 'Dispatching background Quick Drink cache replenishment...';
+    if (pulse) pulse.className = 'spinner-grow spinner-grow-sm text-info';
 
     fetch('{% url "run_quick_cache_now_api" %}', {
         method: 'POST',
@@ -1051,19 +1119,47 @@ function runQuickCacheNow() {
                 .then(tData => {
                     if (tData.progress !== undefined) {
                         pBar.style.width = `${tData.progress}%`;
+                        if (pPct) pPct.innerText = `${tData.progress}%`;
                     }
-                    if (tData.result_data && tData.result_data.message) {
-                        pText.innerText = tData.result_data.message;
+                    if (tData.result_data) {
+                        const rd = tData.result_data;
+                        if (rd.created !== undefined && trackCreated) {
+                            trackCreated.innerText = rd.created;
+                        }
+                        if (rd.total_needed !== undefined && trackTotal) {
+                            trackTotal.innerText = rd.total_needed;
+                        }
+                        if (rd.remaining !== undefined && trackRemaining) {
+                            trackRemaining.innerText = rd.remaining;
+                        }
+                        if (rd.eta_display && trackEta) {
+                            trackEta.innerText = rd.eta_display;
+                        }
+                        if (rd.current_bucket && trackCurrent) {
+                            trackCurrent.innerText = rd.current_bucket;
+                        }
+                        if (rd.message && pText) {
+                            pText.innerText = rd.message;
+                        }
                     }
                     if (tData.status === 'SUCCESS') {
                         clearInterval(interval);
                         pBar.classList.replace('bg-info', 'bg-success');
-                        pText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Cache replenishment complete!</span>';
-                        setTimeout(() => location.reload(), 1500);
+                        if (pPct) {
+                            pPct.className = 'badge bg-success text-dark fw-bold';
+                            pPct.innerText = '100%';
+                        }
+                        if (pulse) pulse.className = 'bi bi-check-circle-fill text-success';
+                        if (trackRemaining) trackRemaining.innerText = '0';
+                        if (trackEta) trackEta.innerText = 'Complete';
+                        pText.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Cache replenishment complete!</span>';
+                        setTimeout(() => location.reload(), 2000);
                     } else if (tData.status === 'FAILURE') {
                         clearInterval(interval);
                         pBar.classList.replace('bg-info', 'bg-danger');
-                        pText.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle-fill"></i> ${tData.error_message || 'Replenishment failed'}</span>`;
+                        if (pPct) pPct.className = 'badge bg-danger text-white fw-bold';
+                        if (pulse) pulse.className = 'bi bi-x-circle-fill text-danger';
+                        pText.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> ${tData.error_message || 'Replenishment failed'}</span>`;
                         btn.disabled = false;
                     }
                 })
@@ -1071,7 +1167,7 @@ function runQuickCacheNow() {
                     clearInterval(interval);
                     btn.disabled = false;
                 });
-            }, 1500);
+            }, 1200);
         } else {
             pContainer.style.display = 'none';
             btn.disabled = false;
