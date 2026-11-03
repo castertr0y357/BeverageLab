@@ -62,7 +62,7 @@
                             </div>
                             <p class="text-dim small mb-3">Trigger an immediate snapshot to the active storage target ({{ backup_config.get_storage_type_display }}).</p>
                             <div id="runNowProgressContainer" class="mb-3" style="display: none;">
-                                <div class="progress bg-white bg-opacity-5" style="height: 6px;">
+                                <div class="progress mb-2 border border-white border-opacity-10" style="height: 6px; background: rgba(0, 0, 0, 0.5);">
                                     <div id="runNowProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: 0%;"></div>
                                 </div>
                                 <div id="runNowStatusText" class="text-dim small mt-1" style="font-size: 0.75rem;">Initiating...</div>
@@ -85,7 +85,7 @@
                                 <input class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white mb-2" type="file" id="backupFile" accept=".gz,.sql,.enc" required>
                                 <input class="form-control form-control-sm bg-dark border-white border-opacity-10 text-white mb-3" type="password" id="importPassphrase" placeholder="Passphrase (if encrypted)">
                                 <div id="importStatus" class="mb-3" style="display: none;">
-                                    <div class="progress bg-white bg-opacity-5" style="height: 4px;">
+                                    <div class="progress mb-2 border border-white border-opacity-10" style="height: 6px; background: rgba(0, 0, 0, 0.5);">
                                         <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning w-100"></div>
                                     </div>
                                 </div>
@@ -519,24 +519,24 @@
                             <span id="qcTrackPct" class="badge bg-info text-dark fw-bold">0%</span>
                         </div>
 
-                        <div class="progress bg-white bg-opacity-5 mb-3" style="height: 8px;">
+                        <div class="progress mb-3 border border-white border-opacity-10" style="height: 10px; background: rgba(0, 0, 0, 0.5);">
                             <div id="quickCacheProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: 0%;"></div>
                         </div>
 
                         <!-- 3-Column Telemetry Dashboard -->
                         <div class="row g-2 text-center mb-2">
                             <div class="col-4">
-                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                <div class="p-2 rounded border border-white border-opacity-10" style="background: rgba(0, 0, 0, 0.45);">
                                     <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Created</div>
                                     <div class="mt-1">
-                                        <span id="qcTrackCreated" class="fw-bold text-white fs-5">0</span>
+                                        <span id="qcTrackCreated" class="fw-bold text-success fs-5">0</span>
                                         <span class="text-dim small">/</span>
                                         <span id="qcTrackTotal" class="text-dim small">0</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-4">
-                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                <div class="p-2 rounded border border-white border-opacity-10" style="background: rgba(0, 0, 0, 0.45);">
                                     <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Remaining</div>
                                     <div class="mt-1">
                                         <span id="qcTrackRemaining" class="fw-bold text-info fs-5">0</span>
@@ -545,7 +545,7 @@
                                 </div>
                             </div>
                             <div class="col-4">
-                                <div class="p-2 rounded bg-white bg-opacity-5 border border-white border-opacity-5">
+                                <div class="p-2 rounded border border-white border-opacity-10" style="background: rgba(0, 0, 0, 0.45);">
                                     <div class="text-dim small text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.05em;">Est. Remaining</div>
                                     <div class="mt-1">
                                         <span id="qcTrackEta" class="fw-bold text-warning fs-5">Calculating...</span>

@@ -1,6 +1,11 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Fixed High-Contrast Dark Theming for Cache Replenishment Progress & Telemetry Cards:
+  - Fixed an issue where `.bg-white bg-opacity-5` fell back to opaque solid white (`#ffffff`) in Bootstrap 5, causing the white text counter (`qcTrackCreated`) inside the "CREATED" card to be invisible on white background while the status line was visible.
+  - Styled telemetry cards with deep dark glassmorphic backgrounds (`background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.1);`).
+  - Styled the progress bar track with a dark background (`rgba(0, 0, 0, 0.5)`) and gave `qcTrackCreated` a bright green accent (`text-success`), so the live created count (`X / Y`) is crisp, bold, and readable against the dark background.
+  - Verified with all 138 automated tests passing.
 - [x] Resolved Quick Drink Cache Pre-Generation Output Schema Routing Defect:
   - **Root Cause Analysis**:
     - During background cache replenishment, `AIAssistant.generate_single_quick_drink()` prompt includes `RAW JSON DATA ONLY`.
