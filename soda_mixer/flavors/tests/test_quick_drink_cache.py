@@ -11,7 +11,7 @@ from soda_mixer.flavors.models import (
 from soda_mixer.flavors.quick_cache_service import (
     compute_flavor_signature, BUCKET_TARGETS, replenish_quick_drink_cache,
     draw_quick_drinks, ensure_recipe_primary_ingredient, get_recipe_primary_category,
-    sanitize_card_description
+    sanitize_card_description, generate_fallback_card_description
 )
 
 User = get_user_model()
@@ -345,3 +345,53 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
             sanitize_card_description("A velvety blend of espresso and vanilla."),
             "A velvety blend of espresso and vanilla."
         )
+
+    def test_generate_fallback_card_description_by_complexity_tier(self):
+        """Verify dynamic sensory descriptions are synthesized when a recipe has no description."""
+        # 2 ingredients
+        two_ings = [
+            {'name': 'Blackberry [Monin]', 'parts': 60.0, 'is_primary': True},
+            {'name': 'Lemon', 'parts': 20.0, 'is_primary': False},
+        ]
+        desc_2 = generate_fallback_card_description('Test Drink', two_ings, 'SODA')
+        self.assertIn('blackberry', desc_2)
+        self.assertIn('lemon', desc_2)
+        self.assertTrue(desc_2.endswith('.'))
+
+        # 4 ingredients with Oxford comma
+        four_ings = [
+            {'name': 'Blackberry', 'parts': 60.0, 'is_primary': True},
+            {'name': 'Ginger Beer', 'parts': 30.0, 'is_primary': False},
+            {'name': 'Cinnamon', 'parts': 15.0, 'is_primary': False},
+            {'name': 'Vanilla', 'parts': 10.0, 'is_primary': False},
+        ]
+        desc_4 = generate_fallback_card_description('Bubble gum', four_ings, 'SODA')
+        self.assertIn('anchored by blackberry and ginger beer', desc_4)
+        self.assertIn('accented with cinnamon and vanilla', desc_4)
+
+        # Coffee mode
+        coffee_ings = [
+            {'name': 'Espresso', 'parts': 60.0, 'is_primary': True},
+            {'name': 'Caramel', 'parts': 20.0, 'is_primary': False},
+        ]
+        desc_coffee = generate_fallback_card_description('Caramel Shot', coffee_ings, 'COFFEE')
+        self.assertIn('pairing bold espresso with smooth caramel', desc_coffee)
+
+    def test_draw_quick_drinks_backfills_empty_existing_recipe_description(self):
+        """Verify that an existing recipe with an empty description gets a synthesized blurb in Quick Drinks
+        and its database record is backfilled so it is never displayed blank."""
+        empty_recipe = Recipe.objects.create(name="Blank Bubble Gum", drink_type="SODA", description="")
+        RecipeIngredient.objects.create(recipe=empty_recipe, ingredient=self.cherry, amount=60.0, is_primary=True)
+        RecipeIngredient.objects.create(recipe=empty_recipe, ingredient=self.lime, amount=20.0, is_primary=False)
+        ensure_recipe_primary_ingredient(empty_recipe)
+
+        result = draw_quick_drinks(drink_type='SODA', profile='Fruity', mode='experimental', count=5)
+        matched_item = next((item for item in result['items'] if item['id'] == str(empty_recipe.uuid)), None)
+        self.assertIsNotNone(matched_item)
+        self.assertTrue(len(matched_item['description']) > 15)
+        self.assertIn('cherry', matched_item['description'].lower())
+        self.assertIn('lime', matched_item['description'].lower())
+
+        # Check DB model backfill
+        empty_recipe.refresh_from_db()
+        self.assertEqual(empty_recipe.description, matched_item['description'])

@@ -114,6 +114,73 @@ def sanitize_card_description(raw_desc: Optional[str]) -> str:
     return result
 
 
+def generate_fallback_card_description(
+    name: str,
+    ingredients: List[Dict[str, Any]],
+    drink_type: str = 'SODA'
+) -> str:
+    """Generate a high-signal 1-to-2 sentence sensory menu blurb for a recipe
+    that has an empty description, ensuring all cards in Quick Drinks have consistent visual formatting.
+    """
+    dt = normalize_drink_type(drink_type)
+    if not ingredients:
+        return f"A balanced, handcrafted {dt.lower()} synthesis."
+
+    # Sort: primary first, then descending amount/parts
+    sorted_ings = sorted(
+        ingredients,
+        key=lambda i: (1 if i.get('is_primary') else 0, float(i.get('parts', i.get('amount', 0.0)) or 0.0)),
+        reverse=True
+    )
+    names: List[str] = []
+    for item in sorted_ings:
+        raw_n = str(item.get('name') or '').strip()
+        cleaned = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', raw_n).strip().lower()
+        if cleaned and cleaned not in names:
+            names.append(cleaned)
+
+    if not names:
+        return f"A balanced, handcrafted {dt.lower()} synthesis."
+
+    dom = names[0]
+    sec = names[1] if len(names) > 1 else None
+    accents = names[2:] if len(names) > 2 else []
+
+    if len(names) == 1:
+        if dt == 'COFFEE':
+            return f"A pure, focused coffee craft highlighting rich {dom}. Smooth and aromatic."
+        elif dt == 'SLUSHIE':
+            return f"An ice-cold, frost-blended slushie centered on vibrant {dom}. Crisp and invigorating."
+        return f"A crisp, focused soda highlighting vibrant {dom}. Refreshing and effervescent."
+
+    if len(names) == 2:
+        if dt == 'COFFEE':
+            return f"A balanced brew pairing bold {dom} with smooth {sec}. Deep and comforting."
+        elif dt == 'SLUSHIE':
+            return f"A refreshing frozen blend of vibrant {dom} balanced by {sec}. Crisp and ultra-chilled."
+        return f"A balanced soda synthesis of rich {dom} lifted by bright {sec}. Clean and harmonious."
+
+    if len(names) == 3:
+        third = accents[0]
+        if dt == 'COFFEE':
+            return f"An artisanal roast blending {dom} and {sec}, balanced with delicate notes of {third}. Rich and velvety."
+        elif dt == 'SLUSHIE':
+            return f"A frosty infusion of {dom} and {sec}, chilled with a splash of {third}. Bright and rejuvenating."
+        return f"A vibrant fusion of {dom} and {sec}, rounded out with notes of {third}. Crisp and satisfying."
+
+    # 4+ ingredients
+    if len(accents) == 2:
+        accents_str = f"{accents[0]} and {accents[1]}"
+    else:
+        accents_str = f"{', '.join(accents[:-1])}, and {accents[-1]}"
+
+    if dt == 'COFFEE':
+        return f"A multi-layered coffee formulation anchored by {dom} and {sec}, enriched with {accents_str}. Deeply aromatic."
+    elif dt == 'SLUSHIE':
+        return f"A frost-blended elixir combining {dom} and {sec}, layered with {accents_str}. Vibrant and ice-cold."
+    return f"A complex, layered compound anchored by {dom} and {sec}, accented with {accents_str}. A sophisticated signature blend."
+
+
 def compute_flavor_signature(
     ingredients: List[Dict[str, Any]],
     drink_type: str = 'SODA'
@@ -703,6 +770,11 @@ def draw_quick_drinks(
             bucket_key = 3
 
         short_desc = sanitize_card_description(r.description)
+        if not short_desc:
+            short_desc = generate_fallback_card_description(r.name, ings_payload, dt)
+            if not r.description:
+                Recipe.objects.filter(id=r.id, description__in=['', None]).update(description=short_desc)
+
         item_dict = {
             'id': str(r.uuid),
             'uuid': str(r.uuid),
@@ -710,8 +782,8 @@ def draw_quick_drinks(
             'badge_label': 'EXISTING RECIPE',
             'name': r.name,
             'description': short_desc,
-            'full_description': r.description or '',
-            'profile_description': r.description or '',
+            'full_description': r.description or short_desc,
+            'profile_description': r.description or short_desc,
             'mixologist_notes': '',
             'rating': r.rating,
             'drink_type': dt,
@@ -767,15 +839,16 @@ def draw_quick_drinks(
         if dt == 'COFFEE' and bucket_key < 3:
             bucket_key = 3
 
+        cqd_desc = sanitize_card_description(cqd.description) or generate_fallback_card_description(cqd.name, enriched_ings, dt)
         item_dict = {
             'id': str(cqd.uuid),
             'uuid': str(cqd.uuid),
             'source_type': 'cached',
             'badge_label': 'CACHED AI',
             'name': cqd.name,
-            'description': cqd.description or '',
+            'description': cqd_desc,
             'mixologist_notes': cqd.mixologist_notes or '',
-            'profile_description': cqd.profile_description or '',
+            'profile_description': cqd.profile_description or cqd_desc,
             'rating': 0,
             'drink_type': dt,
             'ingredient_count': bucket_key,

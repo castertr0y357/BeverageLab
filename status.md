@@ -1,16 +1,18 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
-- [x] Distilled Existing Recipe Descriptions on Quick Drinks Cards for Visual Consistency:
-  - **Issue**: Saved recipes (`EXISTING RECIPE`) in the Quick Drinks view (`/lab/soda/quick/`, etc.) displayed raw, multi-paragraph AI sensory reports (`FLAVOR SYNERGY & AROMA: ... THE TASTING EXPERIENCE: ... OVERALL IMPRESSION: ... AI Mixologist Notes: ...`), contrasting awkwardly with the clean 1-to-2 sentence menu blurbs on cached AI cards (`CACHED AI - X ING`).
-  - **Sanitization Helper (`sanitize_card_description` in `quick_cache_service.py`)**:
-    - If an `OVERALL IMPRESSION:` section is present, extracts the text directly (as it represents the author's polished, concise 1-2 sentence sensory summary).
-    - If `OVERALL IMPRESSION:` is absent, strips standard report prefixes (`FLAVOR SYNERGY & AROMA:`, `THE TASTING EXPERIENCE:`, etc.), removes any following technical `AI Mixologist Notes`, and caps the blurb cleanly at the first 1-2 sentences with proper punctuation.
-    - Preserves the full, unadulterated sensory notes in `full_description` and `profile_description` (and on the recipe detail page `/recipes/<uuid>/`), while passing the concise 1-2 sentence blurb to `item['description']` for menu card rendering.
-  - **Test Suite (`test_quick_drink_cache.py`)**:
-    - Added unit tests: `test_sanitize_card_description_overall_impression_extraction`, `test_sanitize_card_description_without_overall_impression`, and `test_sanitize_card_description_plain_and_empty`.
-    - Verified that existing recipes drawn via `/api/quick-drinks/draw/` return the distilled description on `description` and full text on `full_description`.
-    - Re-built containers and verified all 141 tests pass with zero failures.
+- [x] Distilled Existing Recipe Descriptions & Synthesized Fallback Sensory Blurbs on Quick Drinks Cards:
+  - **Issue**:
+    1. Saved recipes with full AI sensory reports (`FLAVOR SYNERGY & AROMA: ...`) displayed multi-paragraph text on Quick Drinks cards.
+    2. Earlier saved recipes (e.g. *Bubble gum*, *Watermelon refresher*) had an empty or null `description` in the database, rendering cards with completely blank descriptions.
+  - **Sanitization & Dynamic Fallback Engine (`quick_cache_service.py`)**:
+    - `sanitize_card_description`: Extracts the 1-2 sentence `OVERALL IMPRESSION:` section if present, or strips sensory headers and caps at 2 clean sentences.
+    - `generate_fallback_card_description`: Dynamically synthesizes a high-signal, mixology-grade 1-to-2 sentence sensory blurb from the recipe's ingredients (accounting for dominant anchor, secondary modifiers, accents, and lab type `SODA`, `COFFEE`, `SLUSHIE`) whenever a recipe has no description.
+    - Updated `draw_quick_drinks` to generate the fallback blurb when `short_desc` is empty and backfill `Recipe.description` in the database, guaranteeing no card in Quick Drinks is ever blank.
+  - **Test Suite & Verification (`test_quick_drink_cache.py`)**:
+    - Added unit tests: `test_generate_fallback_card_description_by_complexity_tier` and `test_draw_quick_drinks_backfills_empty_existing_recipe_description`.
+    - Backfilled all 9 existing recipes lacking descriptions in the database (*Bubble gum*, *Watermelon refresher*, etc.).
+    - Rebuilt containers and verified all 143 automated tests pass with zero failures.
 - [x] Fixed High-Contrast Dark Theming for Cache Replenishment Progress & Telemetry Cards:
   - Fixed an issue where `.bg-white bg-opacity-5` fell back to opaque solid white (`#ffffff`) in Bootstrap 5, causing the white text counter (`qcTrackCreated`) inside the "CREATED" card to be invisible on white background while the status line was visible.
   - Styled telemetry cards with deep dark glassmorphic backgrounds (`background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.1);`).
