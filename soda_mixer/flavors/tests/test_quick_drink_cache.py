@@ -279,3 +279,15 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         self.assertIn('eta_display', last_telem)
         self.assertEqual(last_telem['eta_display'], 'Complete')
         self.assertEqual(last_telem['remaining'], 0)
+
+    def test_single_quick_drink_schema_structure(self):
+        """Verify the structured output JSON schema for single quick drinks requires all sensory fields."""
+        from soda_mixer.flavors.ai_service.prompts import AIPromptsMixin
+        schema = AIPromptsMixin.get_single_quick_drink_json_schema()
+        self.assertEqual(schema['type'], 'object')
+        self.assertIn('name', schema['properties'])
+        self.assertIn('description', schema['properties'])
+        self.assertIn('mixologist_notes', schema['properties'])
+        self.assertIn('profile_description', schema['properties'])
+        self.assertIn('ingredients', schema['properties'])
+        self.assertFalse(schema.get('additionalProperties', True))

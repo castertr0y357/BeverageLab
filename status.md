@@ -1,6 +1,17 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Resolved Quick Drink Cache Pre-Generation Output Schema Routing Defect:
+  - **Root Cause Analysis**:
+    - During background cache replenishment, `AIAssistant.generate_single_quick_drink()` prompt includes `RAW JSON DATA ONLY`.
+    - In `soda_mixer/flavors/ai_service/providers.py` (`_call_ollama`, `_call_openai`, `_call_gemini`, and streaming methods), `[SINGLE QUICK DRINK CACHE REQUEST]` was not mapped to its dedicated JSON schema. Because the user prompt contained `RAW JSON`, it fell into `is_json_request`, which forced Ollama/Gemini into the ingredient suggestion schema (`chemical_analysis`, `suggestions`, `rebalancing`).
+    - Consequently, the model returned suggestions and rebalancing metrics rather than a recipe object (`name`, `description`, `mixologist_notes`, `profile_description`, `ingredients`). `generate_single_quick_drink()` returned `None`, causing all 99 buckets to fail twice and saturate immediately with 0 recipes stored.
+  - **Resolution**:
+    - Added `AIPromptsMixin.get_single_quick_drink_json_schema()` in `prompts.py` requiring all recipe and sensory notes properties (`name`, `description`, `mixologist_notes`, `profile_description`, `ingredients`) with `additionalProperties: False`.
+    - Updated `_call_openai`, `_call_ollama`, `_call_gemini`, `_call_openai_stream`, `_call_ollama_stream`, and `_call_gemini_stream` in `providers.py` to check `is_single_quick_cache_request` first and pass the dedicated schema.
+    - Updated `_extract_json()` in `providers.py` to defensively strip `<think>.*?</think>` tags.
+    - Added unit test `test_single_quick_drink_schema_structure` in `test_quick_drink_cache.py`.
+    - Verified live generation with Ollama (`gemma4:e4b`): successfully generated and cached full recipes with sensory notes into `CachedQuickDrink` vault, and verified `draw_quick_drinks` blends them into 5-drink cards. All 138 automated tests pass.
 - [x] Implemented Real-Time Recipe Counter & Live ETA Telemetry Tracker for Quick Drink Cache Replenishment:
   - **Telemetry Engine (`quick_cache_service.py` & `views/settings.py`)**:
     - Pre-scans dynamic complexity buckets to determine `total_recipes_needed` across labs and categories upfront.

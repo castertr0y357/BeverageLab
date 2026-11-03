@@ -155,6 +155,32 @@ class AIPromptsMixin:
         }
 
     @classmethod
+    def get_single_quick_drink_json_schema(cls, enable_thinking=False):
+        return {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "mixologist_notes": {"type": "string"},
+                "profile_description": {"type": "string"},
+                "ingredients": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "parts": {"type": "number"}
+                        },
+                        "required": ["name", "parts"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            "required": ["name", "description", "mixologist_notes", "profile_description", "ingredients"],
+            "additionalProperties": False
+        }
+
+    @classmethod
     def get_recipe_list_json_schema(cls, enable_thinking=False):
         return {
             "type": "array",
