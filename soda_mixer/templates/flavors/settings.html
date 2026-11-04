@@ -638,7 +638,7 @@
                                     </td>
                                     <td>
                                         <span class="text-info fw-bold small">{{ ht.cached_count }}</span>
-                                        <span class="text-dim small">/ {{ ht.target_pool_size }}/lab</span>
+                                        <span class="text-dim small">/ {{ ht.total_target_pool }} ({{ ht.target_pool_size }}/lab)</span>
                                         {% if ht.saved_recipe_count > 0 %}
                                         <span class="badge bg-success bg-opacity-10 text-success ms-1" style="font-size: 0.65rem;" title="Official promoted recipes tagged with this holiday">
                                             +{{ ht.saved_recipe_count }} saved

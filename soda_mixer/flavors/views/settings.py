@@ -56,6 +56,7 @@ def settings_view(request: HttpRequest) -> HttpResponse:
     holiday_themes = list(HolidayTheme.objects.all())
     for ht in holiday_themes:
         ht.cached_count = CachedQuickDrink.objects.filter(holiday_theme=ht).count()
+        ht.total_target_pool = ht.target_pool_size * 3
         ht.saved_recipe_count = Recipe.objects.filter(holiday_theme=ht).count()
         ht.is_active_now = ht.is_currently_active()
     return render(request, 'flavors/settings.html', {

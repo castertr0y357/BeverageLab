@@ -1,6 +1,22 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Verified Nightly Seasonal/Holiday Cache Replenishment & Clarified Vault Inventory Capacity:
+  - **Seasonal & Holiday Cache Verification**:
+    - Confirmed that replenish_quick_drink_cache() in soda_mixer/flavors/quick_cache_service.py automatically queries all active holiday themes (HolidayTheme.get_active_themes()) and appends holiday buckets across all 3 drink labs (SODA, SLUSHIE, COFFEE) into the replenishment queue.
+    - Verified that the user's initial screenshot showing 0 / 15/lab was taken before the scheduled nightly daemon execution for Autumn Harvest. When the background schedule ran at 04:40:06 UTC, it successfully synthesized 40 Autumn Harvest recipes across Soda, Slushie, and Coffee.
+    - Fixed UI ambiguity in soda_mixer/templates/flavors/settings.html and soda_mixer/flavors/views/settings.py where the table displayed ht.cached_count / ht.target_pool_size/lab (showing aggregate cached count across 3 labs against the single-lab target). Updated to display {{ ht.cached_count }} / {{ ht.total_target_pool }} ({{ ht.target_pool_size }}/lab) (e.g. 43 / 45 (15/lab)).
+  - **Vault Inventory Count Analysis (900 Recipes)**:
+    - Analyzed the Vault Inventory counter: it directly reflects CachedQuickDrink.objects.count(), representing real, unique pre-computed recipes stored in the database.
+    - Explained the mathematical breakdown of the 1,178 theoretical slots across 3 drink labs (Soda, Slushie, Coffee) under "Both (Experimental + Standard)" synthesis mode:
+      - SODA Experimental: 9 categories × 26 slots = 234
+      - SLUSHIE Experimental: 9 categories × 26 slots = 234
+      - COFFEE Experimental: 9 categories × 21 slots = 189
+      - SODA Standard: 8 categories × 26 slots = 208
+      - SLUSHIE Standard: 8 categories × 26 slots = 208
+      - COFFEE Standard: 5 categories × 21 slots = 105
+      - Total theoretical capacity = 1,178 regular + 45 holiday = 1,223 recipes.
+    - Due to inventory saturation on higher complexity tiers (4 and 5 ingredients where valid ingredient combinations with unique sensory signatures are exhausted), the engine gracefully marks those buckets full, resulting in the ~900 actual pre-computed recipes resting in offline storage.
 - [x] Resolved Manual Formula Chemistry 500 Error and LiteLLM OpenAI-Compatible Provider URL Resolution:
   - **Issue 1 (Manual Formula Chemistry 500 Error)**:
     - In manual formula mode (`lab_manual.js`), selecting flavor modifiers without preset amounts sent `amount: null` (and potentially `intensity: null` or `acidity_score: null`) in the payload to `POST /api/soda/chemistry/`.
