@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (synthesisData) {
+        if (synthesisData.ingredients && Array.isArray(synthesisData.ingredients)) {
+            synthesisData.ingredients.forEach(i => {
+                if (i.name) i.name = i.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+            });
+        }
         window.currentIsSavedRecipe = !!synthesisData.is_saved_recipe;
         if (synthesisData.source_mix_id) {
             window.currentSynopsisMixId = synthesisData.source_mix_id;
@@ -529,7 +534,7 @@ function populateSynopsis(data, chemistryData = null) {
                     <div class="glass-card p-3 ingredient-card border-white w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center ${isPrimary ? 'border-primary glow-primary border-opacity-50' : 'border-opacity-25'}">
                         <div class='small text-lab-accent fw-bold mb-2' style='letter-spacing: 1px; font-size: 0.65rem;'>${role}</div>
                         ${isPrimary ? '<div class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 mx-auto mb-2" style="font-size: 0.6rem;"><i class="bi bi-star-fill me-1"></i>PRIMARY ANCHOR</div>' : ''}
-                        <h5 class='fw-black mb-1'>${ing.name}</h5>
+                        <h5 class='fw-black mb-1'>${(ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim()}</h5>
                         ${ing.category ? `<div class="mb-2"><span class="badge-fizz bg-${ing.category.toLowerCase().trim()}">${ing.category}</span></div>` : ''}
                         <div class='text-lab-accent fw-bold mt-auto pt-2'>${Math.round(volumeMl)}ml / ${formattedImperial} ${percentage !== null && percentage !== undefined ? `<br/><span class="small opacity-75 text-dim mt-1 d-block">(${percentage}%)</span>` : ''}</div>
                     </div>

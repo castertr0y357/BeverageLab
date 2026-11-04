@@ -1,5 +1,6 @@
 """Coffee Chemistry Engine API view."""
 
+import re
 import json
 import logging
 from typing import Dict, Any, List, Set, Union, Optional
@@ -59,7 +60,10 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
         modifier_inputs = []
         has_seen_dairy = False
 
-        for idx, ing in enumerate(ingredients_input):
+        for idx, raw_ing in enumerate(ingredients_input):
+            ing = dict(raw_ing)
+            if 'name' in ing:
+                ing['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(ing['name'])).strip()
             pstate = str(ing.get('physical_state') or '').upper()
             mfunc = str(ing.get('mixology_function') or '').upper()
             itype = str(ing.get('ingredient_type') or ing.get('type') or '').upper()

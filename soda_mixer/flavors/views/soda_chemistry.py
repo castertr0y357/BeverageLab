@@ -1,5 +1,6 @@
 """Soda Chemistry Engine API view."""
 
+import re
 import json
 import logging
 from typing import Dict, Any, List
@@ -97,7 +98,10 @@ class SodaChemistryEngine(BaseChemistryEngine):
                 is_flavor_modifier = (itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not is_dry)
                 
             if is_flavor_modifier:
-                flavor_modifiers.append(ing)
+                clean_name = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(ing.get('name') or '')).strip()
+                ing_copy = dict(ing)
+                ing_copy['name'] = clean_name or ing.get('name', 'Syrup')
+                flavor_modifiers.append(ing_copy)
 
         total_ingredients_count = len(flavor_modifiers)
 

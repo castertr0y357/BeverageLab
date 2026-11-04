@@ -36,16 +36,19 @@ function generateVibeDrink() {
                 recipe.ingredients.forEach(ing => {
                     let matchedId = null;
                     let matchedCategory = null;
+                    const cleanNameRaw = (ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+                    const cleanName = cleanNameRaw.toLowerCase();
+                    let matchedDbIng = null;
                     const dataScript = document.getElementById('ingredients-data');
                     if (dataScript) {
                         try {
                             const allIngredients = JSON.parse(dataScript.textContent);
-                            const cleanName = ing.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
                             for (let dbIng of allIngredients) {
-                                const dbCleanName = dbIng.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                                const dbCleanName = (dbIng.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
                                 if (dbCleanName === cleanName) {
                                     matchedId = dbIng.id;
                                     matchedCategory = dbIng.category;
+                                    matchedDbIng = dbIng;
                                     break;
                                 }
                             }
@@ -53,21 +56,22 @@ function generateVibeDrink() {
                             console.error("Error parsing ingredients data", e);
                         }
                     }
+                    const displayName = matchedDbIng ? matchedDbIng.name : cleanNameRaw;
                     if (matchedCategory) {
                         badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex flex-column align-items-center gap-1" style="background: rgba(255,255,255,0.03); min-width: 80px;">
-                            <span style="font-size: 0.85rem;">${ing.name}</span>
+                            <span style="font-size: 0.85rem;">${displayName}</span>
                             <span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75 w-100 text-center" style="font-size: 0.6rem; padding: 0.2rem 0.4rem; border-radius: 4px; letter-spacing: 0.5px;">${matchedCategory.toUpperCase()}</span>
                         </div>`;
                     } else {
                         badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.03); min-width: 80px; font-size: 0.85rem;">
-                            <span>${ing.name}</span>
+                            <span>${displayName}</span>
                         </div>`;
                     }
                     
                     if (matchedId) {
-                        mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                        mappedIds.push({id: matchedId, name: displayName, amount: ing.amount});
                     } else {
-                        mappedIds.push({name: ing.name, amount: ing.amount});
+                        mappedIds.push({name: displayName, amount: ing.amount});
                     }
                 });
             }

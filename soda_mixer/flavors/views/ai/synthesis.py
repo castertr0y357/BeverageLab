@@ -1,3 +1,4 @@
+import re
 import json
 import logging
 import random
@@ -504,10 +505,15 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
                 in_stock_pool = list(Ingredient.objects.filter(is_in_inventory=True))
                 for index, recipe in enumerate(stream):
                     recipe['index'] = index
+                    for ing in recipe.get('ingredients', []):
+                        raw_name = ing.get('name', '')
+                        ing['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(raw_name)).strip()
                     # Also persist live-generated recipes into CachedQuickDrink if profile is present
                     if profile:
                         try:
                             resolved_ings = resolve_generated_ingredients(recipe.get('ingredients', []), in_stock_pool, drink_type)
+                            if resolved_ings:
+                                recipe['ingredients'] = resolved_ings
                             sig, actual_count, _ = compute_flavor_signature(resolved_ings, drink_type)
                             if sig and not CachedQuickDrink.objects.filter(drink_type=drink_type, flavor_signature=sig).exists():
                                 bucket_cnt = max(2, min(5, actual_count or len(resolved_ings)))

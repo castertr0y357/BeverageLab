@@ -1,6 +1,22 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Prevent Ingredient Brand Leakage in AI Prompts, Chemistry Engines, and Synopsis Cards:
+  - **Root Cause**:
+    - `AIAssistant.get_static_ingredients_context()` previously formatted inventory items as `- {name} [{brand}] (...)`. Because mixology prompt instructions instructed the LLM to 'USE THE EXACT NOMENCLATURE from the Inventory Registry', models echoed `[Monin]` as part of the ingredient's literal name.
+    - `ing_display = f"{db_ing.brand} {db_ing.name}"` in `generation.py` injected brand prefixes into compound prompts.
+    - Front-end mapping (`lab_quick.js`, `lab_vibe.js`, `lab_manual.js`, `synopsis.js`) preserved the raw LLM string instead of the database model's clean ingredient name, rendering cards like `Spiced Brown Sugar [Monin]`.
+  - **Backend Hardening**:
+    - In `core.py`, shifted brand metadata inside the parenthetical metadata (`({state_str} | Brand: {brand} | ...)`), keeping the line header strictly `- {name} (`.
+    - In `generation.py`, sanitized `ing_display = db_ing.name` and added regex stripping `\s*[\[\(].*?[\]\)]\s*` across `stream_quick_recommendations`, `stream_vibe_drink`, and `generate_single_quick_drink`.
+    - In `soda_chemistry.py`, `coffee_chemistry.py`, and `engines/base.py`, sanitized incoming ingredient and modifier names in `BaseChemistryEngine.__init__` and `SodaChemistryEngine.process`.
+    - In `views/ai/synthesis.py`, sanitized streaming and resolved ingredients before storage in `CachedQuickDrink`.
+  - **Frontend Normalization**:
+    - In `lab_quick.js`, `lab_vibe.js`, and `lab_manual.js`, used matched database/DOM card ingredient name (`displayName` / `matchedCardName`) for badge rendering and `mappedIds` payload dispatching.
+    - In `synopsis.js`, sanitized ingredient names upon initialization and in card heading rendering (`${(ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim()}`).
+  - **Testing & Verification**:
+    - Added unit tests `test_get_static_ingredients_context_brand_formatting` in `test_ai_service.py` and `test_soda_chemistry_cleans_brand_in_ingredient_names` in `test_soda_chemistry.py`.
+    - Verified all 150 automated tests pass with 0 errors. Rebuilt and restarted containers.
 - [x] Implemented Date-Aware Seasonal & Holiday Themes for Quick Drinks & Nightly Pre-Generation Cache:
   - **Models & Migration (`0039_holidaytheme_cachedquickdrink_holiday_theme_and_more.py`)**:
     - Created `HolidayTheme` model with date windows (`start_month`, `start_day`, `end_month`, `end_day`), year-boundary wrap support (e.g., Dec 1 – Jan 5), `is_enabled`, `force_active` preview toggle, `target_pool_size` (default `15`), `flavor_directives`, `icon_class`, and `accent_color`.

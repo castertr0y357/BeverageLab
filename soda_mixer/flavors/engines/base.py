@@ -1,5 +1,6 @@
 """Base recommendation engine class."""
 
+import re
 from typing import List, Dict, Any, Optional, Set, Union
 from django.db.models import Avg, QuerySet
 from ..models import Ingredient, Recipe, RecipeIngredient
@@ -86,7 +87,13 @@ class BaseEngine:
 class BaseChemistryEngine:
     """Base chemistry engine that provides common utilities for processing ingredients."""
     def __init__(self, ingredients_input: List[Dict[str, Any]]):
-        self.ingredients_input = ingredients_input
+        sanitized_inputs = []
+        for raw_ing in (ingredients_input or []):
+            ing_copy = dict(raw_ing)
+            if 'name' in ing_copy:
+                ing_copy['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(ing_copy['name'])).strip()
+            sanitized_inputs.append(ing_copy)
+        self.ingredients_input = sanitized_inputs
         self.modifiers = []
         self.bases = []
         self.fillers = []

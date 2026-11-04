@@ -102,7 +102,8 @@ function resolveIngredientsWithDomMetadata(rawIngredients) {
         let matchedCategory = ing.category || null;
         let matchedDbIng = null;
 
-        const cleanName = (ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+        const cleanNameRaw = (ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+        const cleanName = cleanNameRaw.toLowerCase();
         for (let dbIng of allIngredients) {
             const dbCleanName = (dbIng.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
             if ((matchedId && dbIng.id === matchedId) || dbCleanName === cleanName) {
@@ -113,14 +114,16 @@ function resolveIngredientsWithDomMetadata(rawIngredients) {
             }
         }
 
+        const displayName = matchedDbIng ? matchedDbIng.name : cleanNameRaw;
+
         if (matchedCategory) {
             badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex flex-column align-items-center gap-1" style="background: rgba(255,255,255,0.03); min-width: 80px;">
-                <span style="font-size: 0.85rem;">${ing.name}</span>
+                <span style="font-size: 0.85rem;">${displayName}</span>
                 <span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75 w-100 text-center" style="font-size: 0.6rem; padding: 0.2rem 0.4rem; border-radius: 4px; letter-spacing: 0.5px;">${matchedCategory.toUpperCase()}</span>
             </div>`;
         } else {
             badgesHtml += `<div class="badge border border-white border-opacity-10 text-white fw-normal p-2 d-inline-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.03); min-width: 80px;">
-                <span style="font-size: 0.85rem;">${ing.name}</span>
+                <span style="font-size: 0.85rem;">${displayName}</span>
             </div>`;
         }
 
@@ -128,7 +131,7 @@ function resolveIngredientsWithDomMetadata(rawIngredients) {
         if (matchedId && matchedDbIng) {
             mappedIds.push({
                 id: matchedId,
-                name: ing.name,
+                name: matchedDbIng.name,
                 amount: amountVal,
                 is_primary: !!ing.is_primary,
                 isPrimary: !!ing.is_primary,
@@ -144,7 +147,7 @@ function resolveIngredientsWithDomMetadata(rawIngredients) {
         } else {
             mappedIds.push({
                 id: matchedId,
-                name: ing.name,
+                name: displayName,
                 amount: amountVal,
                 is_primary: !!ing.is_primary,
                 isPrimary: !!ing.is_primary,

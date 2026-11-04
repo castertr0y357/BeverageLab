@@ -57,7 +57,7 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
             
             registry = []
             for ing in ingredients:
-                brand_str = f" [{ing.brand}]" if ing.brand else ""
+                brand_meta = f" | Brand: {ing.brand}" if ing.brand else ""
                 notes_str = f" | Profile: {ing.flavor_notes}" if ing.flavor_notes else ""
                 ai_notes_str = f" | Sensory: {ing.ai_notes}" if ing.ai_notes else ""
                 fav_str = " | *FAVORITE*" if ing.favorite else ""
@@ -66,12 +66,12 @@ class AIAssistant(AIPromptsMixin, AIProvidersMixin, AIWarmingMixin, AIAnalysisMi
                 if ing.physical_state == 'SOLID_EXTRACTABLE':
                     decaf_str = "Decaf" if ing.is_decaf else "Regular"
                     registry.append(
-                        f"- {ing.name}{brand_str} ({state_str} | Roast: {ing.roast_level} | {decaf_str} | Origin: {ing.origin or 'Unknown'}"
+                        f"- {ing.name} ({state_str}{brand_meta} | Roast: {ing.roast_level} | {decaf_str} | Origin: {ing.origin or 'Unknown'}"
                         f"{notes_str}{ai_notes_str}{fav_str})"
                     )
                 else:
                     registry.append(
-                        f"- {ing.name}{brand_str} ({state_str} | Category: {ing.category}"
+                        f"- {ing.name} ({state_str}{brand_meta} | Category: {ing.category}"
                         f"{notes_str}{ai_notes_str}{fav_str})"
                     )
             return "\n".join(registry)

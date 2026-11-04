@@ -4014,14 +4014,17 @@ function updateSelectedArea(isDone = false) {
                     let matchedId = null;
                     let matchedCategory = null;
                     const allCards = document.querySelectorAll('.select-ingredient-btn');
-                    const cleanName = ing.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                    const cleanNameRaw = (ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+                    const cleanName = cleanNameRaw.toLowerCase();
+                    let matchedCardName = cleanNameRaw;
                     console.log(`[QuickDrinks Match] LLM Output: "${ing.name}" -> Cleaned: "${cleanName}"`);
                     for (let c of allCards) {
                         if (c.dataset.name) {
-                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
-                            if (cardCleanName === cleanName) {
+                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+                            if (cardCleanName.toLowerCase() === cleanName) {
                                 matchedId = c.dataset.id;
                                 matchedCategory = c.dataset.category;
+                                matchedCardName = cardCleanName;
                                 console.log(`[QuickDrinks Match] Found match! Card data-name: "${c.dataset.name}" -> ID: ${matchedId}`);
                                 break;
                             }
@@ -4033,15 +4036,15 @@ function updateSelectedArea(isDone = false) {
                     }
                     
                     if (matchedCategory) {
-                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1"><span class="me-1">${ing.name}</span><span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75" style="font-size: 0.55rem; padding: 0.15rem 0.3rem;">${matchedCategory.toUpperCase()}</span></span>`;
+                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1"><span class="me-1">${matchedCardName}</span><span class="badge-fizz bg-${matchedCategory.toLowerCase().trim()} opacity-75" style="font-size: 0.55rem; padding: 0.15rem 0.3rem;">${matchedCategory.toUpperCase()}</span></span>`;
                     } else {
-                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1">${ing.name}</span>`;
+                        badgesHtml += `<span class="badge border border-white border-opacity-10 text-white fw-normal px-2 py-1">${matchedCardName}</span>`;
                     }
                     
                     if (matchedId) {
-                        mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                        mappedIds.push({id: matchedId, name: matchedCardName, amount: ing.amount});
                     } else {
-                        mappedIds.push({name: ing.name, amount: ing.amount});
+                        mappedIds.push({name: matchedCardName, amount: ing.amount});
                     }
                 });
             }
@@ -4133,24 +4136,26 @@ function updateSelectedArea(isDone = false) {
             const mappedIds = [];
             if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
                 recipe.ingredients.forEach(ing => {
-                    badgesHtml += `<span class="badge bg-dark border border-white border-opacity-10 text-white fw-normal">${ing.name} - ${ing.amount}</span>`;
-                    
                     let matchedId = null;
                     const allCards = document.querySelectorAll('.select-ingredient-btn');
-                    const cleanName = ing.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
+                    const cleanNameRaw = (ing.name || '').replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+                    const cleanName = cleanNameRaw.toLowerCase();
+                    let matchedCardName = cleanNameRaw;
                     for (let c of allCards) {
                         if (c.dataset.name) {
-                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim().toLowerCase();
-                            if (cardCleanName === cleanName) {
+                            const cardCleanName = c.dataset.name.replace(/\s*[\[\(].*?[\]\)]\s*/g, '').trim();
+                            if (cardCleanName.toLowerCase() === cleanName) {
                                 matchedId = c.dataset.id;
+                                matchedCardName = cardCleanName;
                                 break;
                             }
                         }
                     }
+                    badgesHtml += `<span class="badge bg-dark border border-white border-opacity-10 text-white fw-normal">${matchedCardName} - ${ing.amount}</span>`;
                     if (matchedId) {
-                        mappedIds.push({id: matchedId, name: ing.name, amount: ing.amount});
+                        mappedIds.push({id: matchedId, name: matchedCardName, amount: ing.amount});
                     } else {
-                        mappedIds.push({name: ing.name, amount: ing.amount});
+                        mappedIds.push({name: matchedCardName, amount: ing.amount});
                     }
                 });
             }

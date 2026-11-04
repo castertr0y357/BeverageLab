@@ -196,3 +196,30 @@ class SodaChemistryEngineTest(TestCase):
         
         grapefruit_fb = next(m for m in modifiers_fallback if 'Grapefruit' in m['name'])
         self.assertAlmostEqual(grapefruit_fb['volume_ml'], 72.0)
+
+
+    def test_soda_chemistry_cleans_brand_in_ingredient_names(self) -> None:
+        """Verify that brand tags in square brackets or parentheses are stripped from ingredient names."""
+        response = self.client.post(
+            reverse('soda_chemistry_api'),
+            data=json.dumps({
+                'sweetness_style': 'CRAFT',
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Spiced Brown Sugar [Monin]', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 1, 'bitterness': 1, 'amount': 4.0},
+                    {'name': 'Cinnamon [Monin]', 'type': 'SODA_SYRUP', 'intensity': 4, 'acidity': 1, 'bitterness': 2, 'amount': 2.0},
+                    {'name': 'Desert Pear (Monin)', 'type': 'SODA_SYRUP', 'intensity': 3, 'acidity': 2, 'bitterness': 1, 'amount': 1.5}
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        modifiers = data['ingredients']['modifiers']
+        names = [m['name'] for m in modifiers]
+        self.assertIn('Spiced Brown Sugar', names)
+        self.assertIn('Cinnamon', names)
+        self.assertIn('Desert Pear', names)
+        for name in names:
+            self.assertNotIn('[Monin]', name)
+            self.assertNotIn('(Monin)', name)

@@ -38,7 +38,7 @@ class AIGenerationMixin:
                     db_ing = Ingredient.objects.filter(Q(name__iexact=cleaned_name) | Q(brand__iexact=cleaned_name)).first()
                 
                 if db_ing:
-                    ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
+                    ing_display = db_ing.name
                     profile_part = f", Profile: {db_ing.flavor_notes}" if db_ing.flavor_notes else ""
                     sensory_part = f", Sensory: {db_ing.ai_notes}" if db_ing.ai_notes else ""
                     if db_ing.ingredient_type == 'COFFEE_BEAN':
@@ -100,7 +100,7 @@ class AIGenerationMixin:
                     db_ing = Ingredient.objects.filter(Q(name__iexact=cleaned_name) | Q(brand__iexact=cleaned_name)).first()
                 
                 if db_ing:
-                    ing_display = f"{db_ing.brand} {db_ing.name}" if db_ing.brand else db_ing.name
+                    ing_display = db_ing.name
                     profile_part = f", Profile: {db_ing.flavor_notes}" if db_ing.flavor_notes else ""
                     sensory_part = f", Sensory: {db_ing.ai_notes}" if db_ing.ai_notes else ""
                     if db_ing.ingredient_type == 'COFFEE_BEAN':
@@ -525,6 +525,8 @@ Inventory Registry: See context.
                                 obj = json.loads(obj_str)
                                 if 'name' in obj and 'ingredients' in obj:
                                     for ing in obj.get('ingredients', []):
+                                        raw_name = ing.get('name', '')
+                                        ing['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(raw_name)).strip()
                                         if 'parts' in ing and 'amount' not in ing:
                                             ing['amount'] = ing['parts']
                                     
@@ -615,6 +617,8 @@ Rules:
                             obj = json.loads(match.group(0))
                             if 'name' in obj and 'ingredients' in obj:
                                 for ing in obj.get('ingredients', []):
+                                    raw_name = ing.get('name', '')
+                                    ing['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(raw_name)).strip()
                                     if 'parts' in ing and 'amount' not in ing:
                                         ing['amount'] = ing['parts']
                                 yield obj
@@ -714,6 +718,8 @@ Rules:
             parsed = parsed[0]
         if isinstance(parsed, dict) and 'name' in parsed and 'ingredients' in parsed:
             for ing in parsed.get('ingredients', []):
+                raw_name = ing.get('name', '')
+                ing['name'] = re.sub(r'\s*[\[\(].*?[\]\)]\s*', '', str(raw_name)).strip()
                 if 'parts' in ing and 'amount' not in ing:
                     ing['amount'] = ing['parts']
             return parsed

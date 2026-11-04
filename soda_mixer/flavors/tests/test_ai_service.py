@@ -459,3 +459,17 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         ing.refresh_from_db()
         self.assertTrue(ing.is_dry)
 
+
+
+    def test_get_static_ingredients_context_brand_formatting(self) -> None:
+        """Verify that ingredient brand is not rendered in square brackets attached to the name."""
+        Ingredient.all_objects.filter(name="Spiced Brown Sugar Test").delete()
+        ing = Ingredient.objects.create(
+            name="Spiced Brown Sugar Test",
+            brand="Monin",
+            category="sweet",
+            is_in_inventory=True
+        )
+        context = AIAssistant.get_static_ingredients_context()
+        self.assertIn("- Spiced Brown Sugar Test (State: SYRUP | Function: SWEETENER | Brand: Monin | Category: sweet)", context)
+        self.assertNotIn("Spiced Brown Sugar Test [Monin]", context)
