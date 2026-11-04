@@ -9,19 +9,72 @@ from django.utils import timezone
 
 from .models import (
     Ingredient, Recipe, RecipeIngredient, MixHistory,
-    CachedQuickDrink, QuickDrinkCacheConfiguration
+    CachedQuickDrink, QuickDrinkCacheConfiguration, HolidayTheme
 )
 from .ai_service import AIAssistant
 
 logger = logging.getLogger(__name__)
 
 # Dynamic bucket targets per (drink_type, ingredient_count)
-# Designed to support 5 full cycles of 5 drinks without repeats
+# Designed to support 5 full cycles of 5 drinks without repeats (26 for Soda/Slushie, 21 for Coffee)
 BUCKET_TARGETS: Dict[str, Dict[int, int]] = {
     'SODA': {2: 5, 3: 8, 4: 8, 5: 5},
     'SLUSHIE': {2: 5, 3: 8, 4: 8, 5: 5},
     'COFFEE': {3: 8, 4: 8, 5: 5},
 }
+
+# Holiday & Seasonal bucket targets per (drink_type, ingredient_count)
+# Designed to support 3 full cycles of 5 drinks (15 total recipes per lab)
+HOLIDAY_BUCKET_TARGETS: Dict[str, Dict[int, int]] = {
+    'SODA': {2: 3, 3: 5, 4: 4, 5: 3},
+    'SLUSHIE': {2: 3, 3: 5, 4: 4, 5: 3},
+    'COFFEE': {3: 6, 4: 5, 5: 4},
+}
+
+
+def get_holiday_bucket_targets(drink_type: str, target_pool_size: int = 15) -> Dict[int, int]:
+    """Return complexity bucket targets for a holiday theme totaling `target_pool_size` (default 15)."""
+    dt = normalize_drink_type(drink_type)
+    base_map = dict(HOLIDAY_BUCKET_TARGETS.get(dt, HOLIDAY_BUCKET_TARGETS['SODA']))
+    base_total = sum(base_map.values())
+    target = max(1, int(target_pool_size or 15))
+    if target == base_total:
+        return base_map
+
+    scaled: Dict[int, int] = {}
+    keys = sorted(base_map.keys())
+    allocated = 0
+    for k in keys[:-1]:
+        share = max(0, round((base_map[k] / base_total) * target))
+        scaled[k] = share
+        allocated += share
+    scaled[keys[-1]] = max(0, target - allocated)
+    return scaled
+
+
+def prune_inactive_holiday_cache() -> int:
+    """Remove CachedQuickDrink entries belonging to holiday themes that are no longer active.
+    Official saved Recipe records are never pruned.
+    """
+    active_ids = {t.id for t in HolidayTheme.get_active_themes()}
+    active_profile_keys = {f"holiday:{t.slug}".lower() for t in HolidayTheme.get_active_themes()}
+
+    stale_qs = CachedQuickDrink.objects.filter(holiday_theme__isnull=False).exclude(holiday_theme_id__in=active_ids)
+    deleted_fk, _ = stale_qs.delete()
+
+    # Also clean any orphaned holiday:<slug> profile entries
+    orphan_ids = [
+        c.id for c in CachedQuickDrink.objects.filter(profile__istartswith='holiday:')
+        if (c.profile or '').strip().lower() not in active_profile_keys
+    ]
+    deleted_orphans = 0
+    if orphan_ids:
+        deleted_orphans, _ = CachedQuickDrink.objects.filter(id__in=orphan_ids).delete()
+
+    total_pruned = deleted_fk + deleted_orphans
+    if total_pruned > 0:
+        logger.info(f"QuickCache - Info - Pruned {total_pruned} expired seasonal/holiday cached quick drinks.")
+    return total_pruned
 
 # Structural terms in Coffee Lab excluded from flavor anchor calculation
 COFFEE_STRUCTURAL_TERMS = (
@@ -473,16 +526,45 @@ def replenish_quick_drink_cache(
     in_stock_all = list(Ingredient.objects.filter(is_in_inventory=True))
     in_stock_ids = {ing.id for ing in in_stock_all}
 
-    # Build work list of buckets: (dt, mode, profile, ing_count, cap)
-    work_buckets: List[Tuple[str, str, str, int, int]] = []
+    pruned_holidays = 0
+    if not target_profile:
+        pruned_holidays = prune_inactive_holiday_cache()
+
+    # Build work list of buckets: (dt, mode, profile_key, ing_count, cap, holiday_obj_or_none)
+    work_buckets: List[Tuple[str, str, str, int, int, Optional[HolidayTheme]]] = []
+    active_holidays = HolidayTheme.get_active_themes() if not target_profile else []
+
     for mode in modes:
         for dt in labs:
-            categories = [target_profile.strip().title()] if target_profile else get_available_categories_for_lab(dt, mode)
-            bucket_Spec = BUCKET_TARGETS.get(dt, BUCKET_TARGETS['SODA'])
-            for cat in categories:
-                for ing_count, cap in bucket_Spec.items():
-                    effective_cap = min(cap, max_per_bucket) if max_per_bucket else cap
-                    work_buckets.append((dt, mode, cat, ing_count, effective_cap))
+            if target_profile:
+                tp_clean = target_profile.strip()
+                if tp_clean.lower().startswith('holiday:'):
+                    slug_part = tp_clean.split(':', 1)[1].strip().lower()
+                    ht = HolidayTheme.objects.filter(slug__iexact=slug_part).first()
+                    if ht:
+                        h_spec = get_holiday_bucket_targets(dt, ht.target_pool_size)
+                        for ing_count, cap in h_spec.items():
+                            effective_cap = min(cap, max_per_bucket) if max_per_bucket else cap
+                            work_buckets.append((dt, mode, f"holiday:{ht.slug}", ing_count, effective_cap, ht))
+                else:
+                    bucket_Spec = BUCKET_TARGETS.get(dt, BUCKET_TARGETS['SODA'])
+                    cat = tp_clean.title()
+                    for ing_count, cap in bucket_Spec.items():
+                        effective_cap = min(cap, max_per_bucket) if max_per_bucket else cap
+                        work_buckets.append((dt, mode, cat, ing_count, effective_cap, None))
+            else:
+                categories = get_available_categories_for_lab(dt, mode)
+                bucket_Spec = BUCKET_TARGETS.get(dt, BUCKET_TARGETS['SODA'])
+                for cat in categories:
+                    for ing_count, cap in bucket_Spec.items():
+                        effective_cap = min(cap, max_per_bucket) if max_per_bucket else cap
+                        work_buckets.append((dt, mode, cat, ing_count, effective_cap, None))
+                # Also schedule active holiday/seasonal theme buckets (15-recipe pool)
+                for ht in active_holidays:
+                    h_spec = get_holiday_bucket_targets(dt, ht.target_pool_size)
+                    for ing_count, cap in h_spec.items():
+                        effective_cap = min(cap, max_per_bucket) if max_per_bucket else cap
+                        work_buckets.append((dt, mode, f"holiday:{ht.slug}", ing_count, effective_cap, ht))
 
     total_buckets = len(work_buckets)
     created_total = 0
@@ -509,7 +591,7 @@ def replenish_quick_drink_cache(
     # Pre-scan buckets to determine total recipes needed
     bucket_plan: List[Dict[str, Any]] = []
     total_recipes_needed = 0
-    for dt, mode, cat, ing_count, target_cap in work_buckets:
+    for dt, mode, cat, ing_count, target_cap, holiday_obj in work_buckets:
         current_valid = count_in_stock_cached_drinks(dt, mode, cat, ing_count, in_stock_ids)
         needed = max(0, target_cap - current_valid)
         total_recipes_needed += needed
@@ -521,6 +603,7 @@ def replenish_quick_drink_cache(
             'target_cap': target_cap,
             'current_valid': current_valid,
             'needed': needed,
+            'holiday_obj': holiday_obj,
         })
 
     recipes_remaining = total_recipes_needed
@@ -560,7 +643,9 @@ def replenish_quick_drink_cache(
         ing_count = item['ing_count']
         target_cap = item['target_cap']
         needed = item['needed']
-        bucket_label = f"{dt} / {cat} ({ing_count}-ing, {mode})"
+        holiday_obj: Optional[HolidayTheme] = item.get('holiday_obj')
+        display_cat = f"Holiday: {holiday_obj.name}" if holiday_obj else cat
+        bucket_label = f"{dt} / {display_cat} ({ing_count}-ing, {mode})"
 
         if needed <= 0:
             skipped_full_buckets += 1
@@ -615,9 +700,10 @@ def replenish_quick_drink_cache(
                 inventory=inv_context,
                 drink_type=dt,
                 mode=mode,
-                profile=cat,
+                profile=holiday_obj.name if holiday_obj else cat,
                 ingredient_count=ing_count,
                 excluded_signatures=sorted(existing_signatures),
+                holiday_directives=holiday_obj.flavor_directives if holiday_obj else None,
             )
             step_duration = max(0.1, time.time() - step_t0)
             durations.append(step_duration)
@@ -646,6 +732,7 @@ def replenish_quick_drink_cache(
                 drink_type=dt,
                 mode=mode,
                 profile=cat,
+                holiday_theme=holiday_obj,
                 ingredient_count=bucket_count,
                 name=str(raw_recipe.get('name') or 'Synthesized Elixir').strip()[:120],
                 description=str(raw_recipe.get('description') or '').strip(),
@@ -691,6 +778,7 @@ def replenish_quick_drink_cache(
         'total_buckets': total_buckets,
         'skipped_full_buckets': skipped_full_buckets,
         'saturated_buckets': saturated_buckets,
+        'pruned_holidays': pruned_holidays,
         'summary': summary,
         'telemetry': final_telemetry,
     }
@@ -705,11 +793,17 @@ def draw_quick_drinks(
 ) -> Dict[str, Any]:
     """Draw up to `count` drinks combining Existing Saved Recipes and CachedQuickDrink
     using the complexity distribution rules, cycling cleanly through unseen items first.
+    Supports both standard flavor categories and `holiday:<slug>` seasonal spotlights.
     """
     dt = normalize_drink_type(drink_type)
     profile_clean = (profile or '').strip()
     mode_clean = (mode or 'experimental').strip().lower()
     exclude_set = set(exclude_ids or set())
+
+    holiday_obj: Optional[HolidayTheme] = None
+    if profile_clean.lower().startswith('holiday:'):
+        slug_part = profile_clean.split(':', 1)[1].strip().lower()
+        holiday_obj = HolidayTheme.objects.filter(slug__iexact=slug_part).first()
 
     in_stock_map: Dict[int, Ingredient] = {
         ing.id: ing for ing in Ingredient.objects.filter(is_in_inventory=True)
@@ -720,7 +814,7 @@ def draw_quick_drinks(
 
     # 1. Gather matching in-stock Official Saved Recipes
     db_drink_types = ['SLUSHIE', 'CRYO'] if dt == 'SLUSHIE' else [dt]
-    recipes_qs = Recipe.objects.filter(drink_type__in=db_drink_types).prefetch_related(
+    recipes_qs = Recipe.objects.filter(drink_type__in=db_drink_types).select_related('holiday_theme').prefetch_related(
         'recipe_ingredients__ingredient', 'categories'
     )
     for r in recipes_qs:
@@ -730,9 +824,14 @@ def draw_quick_drinks(
         if not all(ri.ingredient and ri.ingredient.id in in_stock_map for ri in rings):
             continue
 
-        # Check if recipe matches profile via primary ingredient category or RecipeCategory tag
+        # Check if recipe matches profile (or holiday theme)
         matched = False
-        if not profile_clean:
+        if holiday_obj is not None:
+            if r.holiday_theme_id == holiday_obj.id:
+                matched = True
+            elif any(cat.name.strip().lower() == holiday_obj.name.lower() for cat in r.categories.all()):
+                matched = True
+        elif not profile_clean:
             matched = True
         else:
             p_lower = profile_clean.lower()
@@ -790,19 +889,27 @@ def draw_quick_drinks(
             'ingredient_count': bucket_key,
             'flavor_signature': sig,
             'ingredients': ings_payload,
+            'holiday_theme_id': str(r.holiday_theme.uuid) if r.holiday_theme else (str(holiday_obj.uuid) if holiday_obj else None),
+            'holiday_theme_name': r.holiday_theme.name if r.holiday_theme else (holiday_obj.name if holiday_obj else None),
         }
         pool_by_bucket[bucket_key].append(item_dict)
         all_candidates.append(item_dict)
 
     # 2. Gather matching in-stock CachedQuickDrink records
-    cached_qs = CachedQuickDrink.objects.filter(drink_type=dt, mode=mode_clean)
-    if profile_clean:
+    cached_qs = CachedQuickDrink.objects.filter(drink_type=dt, mode=mode_clean).select_related('holiday_theme')
+    if holiday_obj is not None:
+        from django.db.models import Q
+        cached_qs = cached_qs.filter(Q(holiday_theme=holiday_obj) | Q(profile__iexact=f"holiday:{holiday_obj.slug}"))
+    elif profile_clean:
         cached_qs = cached_qs.filter(profile__iexact=profile_clean)
 
     # Fallback: if no cached drinks for requested mode, also check the other mode before claiming empty
     if not cached_qs.exists():
-        alt_qs = CachedQuickDrink.objects.filter(drink_type=dt)
-        if profile_clean:
+        alt_qs = CachedQuickDrink.objects.filter(drink_type=dt).select_related('holiday_theme')
+        if holiday_obj is not None:
+            from django.db.models import Q
+            alt_qs = alt_qs.filter(Q(holiday_theme=holiday_obj) | Q(profile__iexact=f"holiday:{holiday_obj.slug}"))
+        elif profile_clean:
             alt_qs = alt_qs.filter(profile__iexact=profile_clean)
         cached_qs = alt_qs
 
@@ -840,6 +947,7 @@ def draw_quick_drinks(
             bucket_key = 3
 
         cqd_desc = sanitize_card_description(cqd.description) or generate_fallback_card_description(cqd.name, enriched_ings, dt)
+        eff_holiday = cqd.holiday_theme or holiday_obj
         item_dict = {
             'id': str(cqd.uuid),
             'uuid': str(cqd.uuid),
@@ -854,6 +962,8 @@ def draw_quick_drinks(
             'ingredient_count': bucket_key,
             'flavor_signature': cqd.flavor_signature,
             'ingredients': enriched_ings,
+            'holiday_theme_id': str(eff_holiday.uuid) if eff_holiday else None,
+            'holiday_theme_name': eff_holiday.name if eff_holiday else None,
         }
         pool_by_bucket[bucket_key].append(item_dict)
         all_candidates.append(item_dict)

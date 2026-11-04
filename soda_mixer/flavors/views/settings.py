@@ -12,8 +12,9 @@ from typing import Dict, Any, Tuple
 from django.conf import settings
 from django.core.management import call_command
 from django.db import connections
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -21,7 +22,7 @@ from django.contrib.auth.decorators import user_passes_test
 
 from ..models import (
     SystemConfiguration, LLMProvider, BackupConfiguration, BackupRecord,
-    QuickDrinkCacheConfiguration, CachedQuickDrink
+    QuickDrinkCacheConfiguration, CachedQuickDrink, HolidayTheme, Recipe
 )
 from ..tasks_registry import submit_task
 
@@ -51,12 +52,19 @@ def settings_view(request: HttpRequest) -> HttpResponse:
     cached_drinks_count = CachedQuickDrink.objects.count()
     backup_records = BackupRecord.objects.all().order_by('-created_at')[:50]
     providers = LLMProvider.objects.all().order_by('name')
+    HolidayTheme.ensure_default_themes()
+    holiday_themes = list(HolidayTheme.objects.all())
+    for ht in holiday_themes:
+        ht.cached_count = CachedQuickDrink.objects.filter(holiday_theme=ht).count()
+        ht.saved_recipe_count = Recipe.objects.filter(holiday_theme=ht).count()
+        ht.is_active_now = ht.is_currently_active()
     return render(request, 'flavors/settings.html', {
         'config': config,
         'backup_config': backup_config,
         'quick_cache_config': quick_cache_config,
         'cached_drinks_count': cached_drinks_count,
         'quick_cache_mode_choices': QuickDrinkCacheConfiguration.MODE_CHOICES,
+        'holiday_themes': holiday_themes,
         'backup_records': backup_records,
         'storage_choices': BackupConfiguration.STORAGE_CHOICES,
         'weekday_choices': BackupConfiguration.WEEKDAY_CHOICES,
@@ -617,4 +625,141 @@ def run_quick_cache_now_api(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         logger.error(f"QuickCacheRunNow - Error - Failed to dispatch replenishment task: {e}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_holiday_theme_api(request: HttpRequest) -> JsonResponse:
+    """Create or update a HolidayTheme entry from Settings."""
+    try:
+        data = json.loads(request.body)
+        name = str(data.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'error': 'Holiday name is required.'}, status=400)
+
+        try:
+            start_month = int(data.get('start_month', 1))
+            start_day = int(data.get('start_day', 1))
+            end_month = int(data.get('end_month', 1))
+            end_day = int(data.get('end_day', 1))
+            target_pool_size = max(4, min(60, int(data.get('target_pool_size', 15))))
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'Invalid numeric date or pool size values.'}, status=400)
+
+        if not (1 <= start_month <= 12 and 1 <= end_month <= 12 and 1 <= start_day <= 31 and 1 <= end_day <= 31):
+            return JsonResponse({'error': 'Months must be 1-12 and days 1-31.'}, status=400)
+
+        icon_class = str(data.get('icon_class') or 'bi-stars').strip() or 'bi-stars'
+        accent_color = str(data.get('accent_color') or '#f59e0b').strip() or '#f59e0b'
+        flavor_directives = str(data.get('flavor_directives') or '').strip()
+        is_enabled = bool(data.get('is_enabled', True))
+        force_active = bool(data.get('force_active', False))
+
+        holiday_uuid = data.get('uuid')
+        if holiday_uuid:
+            holiday = get_object_or_404(HolidayTheme, uuid=holiday_uuid)
+            holiday.name = name
+            holiday.start_month = start_month
+            holiday.start_day = start_day
+            holiday.end_month = end_month
+            holiday.end_day = end_day
+            holiday.icon_class = icon_class
+            holiday.accent_color = accent_color
+            holiday.target_pool_size = target_pool_size
+            holiday.flavor_directives = flavor_directives
+            holiday.is_enabled = is_enabled
+            holiday.force_active = force_active
+            holiday.save()
+        else:
+            base_slug = slugify(name) or 'holiday-theme'
+            slug = base_slug
+            counter = 2
+            while HolidayTheme.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            holiday = HolidayTheme.objects.create(
+                name=name,
+                slug=slug,
+                start_month=start_month,
+                start_day=start_day,
+                end_month=end_month,
+                end_day=end_day,
+                icon_class=icon_class,
+                accent_color=accent_color,
+                target_pool_size=target_pool_size,
+                flavor_directives=flavor_directives,
+                is_enabled=is_enabled,
+                force_active=force_active,
+            )
+
+        from ..quick_cache_service import prune_inactive_holiday_cache
+        prune_inactive_holiday_cache()
+
+        logger.info(f"HolidayConfig - Info - Saved holiday theme '{holiday.name}' ({holiday.slug})")
+        return JsonResponse({
+            'status': 'success',
+            'uuid': str(holiday.uuid),
+            'slug': holiday.slug,
+            'name': holiday.name,
+            'date_window_display': holiday.date_window_display,
+            'is_active_now': holiday.is_currently_active(),
+            'message': f"Holiday theme '{holiday.name}' saved."
+        })
+    except Exception as e:
+        logger.error(f"HolidayConfig - Error - Failed to save holiday theme: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@csrf_exempt
+@require_http_methods(["POST"])
+def toggle_holiday_theme_api(request: HttpRequest, uuid: Any) -> JsonResponse:
+    """Toggle is_enabled or force_active on a HolidayTheme."""
+    try:
+        holiday = get_object_or_404(HolidayTheme, uuid=uuid)
+        data = json.loads(request.body) if request.body else {}
+        if 'is_enabled' in data:
+            holiday.is_enabled = bool(data['is_enabled'])
+        if 'force_active' in data:
+            holiday.force_active = bool(data['force_active'])
+        holiday.save()
+
+        from ..quick_cache_service import prune_inactive_holiday_cache
+        pruned = prune_inactive_holiday_cache()
+
+        logger.info(
+            f"HolidayConfig - Info - Updated holiday '{holiday.name}' "
+            f"(enabled={holiday.is_enabled}, force_active={holiday.force_active}, pruned={pruned})"
+        )
+        return JsonResponse({
+            'status': 'success',
+            'uuid': str(holiday.uuid),
+            'is_enabled': holiday.is_enabled,
+            'force_active': holiday.force_active,
+            'is_active_now': holiday.is_currently_active(),
+            'pruned_cached_drinks': pruned,
+        })
+    except Exception as e:
+        logger.error(f"HolidayConfig - Error - Failed to toggle holiday {uuid}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@csrf_exempt
+@require_http_methods(["POST"])
+def delete_holiday_theme_api(request: HttpRequest, uuid: Any) -> JsonResponse:
+    """Delete a HolidayTheme and its cached quick drinks (preserving promoted official recipes)."""
+    try:
+        holiday = get_object_or_404(HolidayTheme, uuid=uuid)
+        name = holiday.name
+        CachedQuickDrink.objects.filter(holiday_theme=holiday).delete()
+        CachedQuickDrink.objects.filter(profile=f"holiday:{holiday.slug}").delete()
+        holiday.delete()
+        logger.info(f"HolidayConfig - Info - Deleted holiday theme '{name}'")
+        return JsonResponse({'status': 'success', 'message': f"Holiday theme '{name}' deleted."})
+    except Exception as e:
+        logger.error(f"HolidayConfig - Error - Failed to delete holiday {uuid}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
 

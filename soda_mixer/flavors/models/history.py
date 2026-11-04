@@ -20,6 +20,15 @@ class MixHistory(SoftDeleteModel):
     sweetness_style = models.CharField(max_length=20, blank=True, null=True)
     bottle_scale = models.FloatField(blank=True, null=True)
     source_cached_drink_uuid = models.UUIDField(blank=True, null=True, db_index=True)
+    holiday_theme = models.ForeignKey(
+        'HolidayTheme',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='mix_entries',
+        db_index=True,
+        help_text="Optional seasonal/holiday theme carried from Quick Drinks to Recipe promotion."
+    )
     mixed_at = models.DateTimeField(auto_now_add=True)
     promoted_recipe = models.OneToOneField(
         Recipe,

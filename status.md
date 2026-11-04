@@ -1,6 +1,21 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Implemented Date-Aware Seasonal & Holiday Themes for Quick Drinks & Nightly Pre-Generation Cache:
+  - **Models & Migration (`0039_holidaytheme_cachedquickdrink_holiday_theme_and_more.py`)**:
+    - Created `HolidayTheme` model with date windows (`start_month`, `start_day`, `end_month`, `end_day`), year-boundary wrap support (e.g., Dec 1 – Jan 5), `is_enabled`, `force_active` preview toggle, `target_pool_size` (default `15`), `flavor_directives`, `icon_class`, and `accent_color`.
+    - Seeded 6 default seasonal & holiday themes: *Spooky Synthesis* (Oct 1 – Nov 1), *Autumn Harvest* (Nov 2 – Nov 30), *Winter Wonderland* (Dec 1 – Jan 5), *Valentine's Reserve* (Feb 1 – Feb 15), *Emerald Alchemy* (Mar 1 – Mar 20), and *Summer Solstice* (May 15 – Aug 31).
+    - Added nullable `holiday_theme` ForeignKey (`on_delete=SET_NULL`) to `Recipe`, `CachedQuickDrink`, and `MixHistory`.
+  - **15-Recipe Holiday Pool, Auto-Pruning & Promotion Tagging (`quick_cache_service.py` & `generation.py`)**:
+    - Added `HOLIDAY_BUCKET_TARGETS` (`{2: 3, 3: 5, 4: 4, 5: 3}` = 15 for `SODA`/`SLUSHIE` and `{3: 6, 4: 5, 5: 4}` = 15 for `COFFEE`) and `get_holiday_bucket_targets()` scaling proportionally if a custom `target_pool_size` is configured.
+    - Updated `replenish_quick_drink_cache()` to automatically prune expired holiday cache entries (`prune_inactive_holiday_cache()`) and replenish active holidays using positive `SEASONAL & HOLIDAY THEME DIRECTIVES`.
+    - Updated `draw_quick_drinks()`, `save_mix_to_history_api`, `create_recipe`, and `promote_mix_to_recipe_api` so promoting a holiday Quick Drink automatically tags the saved `Recipe` with that `HolidayTheme`, preserving it across years and cycling it back in whenever that holiday is active.
+  - **Quick Drinks Spotlight & Settings Calendar UI (`quick_drinks_old.html` & `settings.html`)**:
+    - Added the **Seasonal & Holiday Spotlight** section above standard category cards in Quick Drinks whenever one or more holidays are active.
+    - Added the **Seasonal & Holiday Calendar** management table and modal under **Settings -> Quick Drinks Cache** with full CRUD (`save_holiday_theme_api`, `toggle_holiday_theme_api`, `delete_holiday_theme_api`), date window editors, Enabled toggle, and Force Preview toggle.
+  - **Testing & Verification**:
+    - Added 5 unit/integration tests in `test_quick_drink_cache.py` covering date windows & year wrap, 15-recipe bucket allocation, inactive holiday pruning, promotion tagging, and Settings CRUD APIs.
+    - Rebuilt containers and verified all 148 automated tests pass with zero failures.
 - [x] Distilled Existing Recipe Descriptions & Synthesized Fallback Sensory Blurbs on Quick Drinks Cards:
   - **Issue**:
     1. Saved recipes with full AI sensory reports (`FLAVOR SYNERGY & AROMA: ...`) displayed multi-paragraph text on Quick Drinks cards.

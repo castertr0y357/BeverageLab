@@ -89,4 +89,7 @@ urlpatterns = [
     path('settings/backup/<uuid:uuid>/delete/', views.delete_backup_record_api, name='delete_backup_record_api'),
     path('settings/quick-cache/config/', views.save_quick_cache_config_api, name='save_quick_cache_config_api'),
     path('settings/quick-cache/run-now/', views.run_quick_cache_now_api, name='run_quick_cache_now_api'),
+    path('api/settings/holidays/save/', views.save_holiday_theme_api, name='save_holiday_theme_api'),
+    path('api/settings/holidays/<uuid:uuid>/toggle/', views.toggle_holiday_theme_api, name='toggle_holiday_theme_api'),
+    path('api/settings/holidays/<uuid:uuid>/delete/', views.delete_holiday_theme_api, name='delete_holiday_theme_api'),
 ]

@@ -574,6 +574,130 @@
                     </div>
                     {% endif %}
                 </div>
+
+                <!-- Seasonal & Holiday Calendar Management -->
+                <div class="glass-surface p-4 border-white border-opacity-10 mt-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-white border-opacity-5 flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-calendar2-heart text-lab-accent fs-4"></i>
+                            <div>
+                                <h5 class="mb-0 text-white">SEASONAL &amp; HOLIDAY CALENDAR</h5>
+                                <small class="text-dim">Automatically activates seasonal Quick Drink spotlights and caches 15 recipes per lab during each date window.</small>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openHolidayModal()">
+                            <i class="bi bi-plus-lg me-1"></i> Add Holiday Theme
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0 align-middle" style="background: transparent;">
+                            <thead>
+                                <tr class="text-dim border-bottom border-white border-opacity-10" style="font-size: 0.78rem;">
+                                    <th>HOLIDAY THEME</th>
+                                    <th>DATE WINDOW</th>
+                                    <th>STATUS</th>
+                                    <th>POOL / SAVED</th>
+                                    <th>ENABLED</th>
+                                    <th>FORCE PREVIEW</th>
+                                    <th class="text-end">ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ht in holiday_themes %}
+                                <tr class="border-bottom border-white border-opacity-5">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+                                                  style="width: 32px; height: 32px; background: {{ ht.accent_color }}; color: #fff;">
+                                                <i class="bi {{ ht.icon_class }}"></i>
+                                            </span>
+                                            <div>
+                                                <div class="text-white fw-bold small">{{ ht.name }}</div>
+                                                <div class="text-dim text-truncate" style="max-width: 240px; font-size: 0.72rem;" title="{{ ht.flavor_directives }}">
+                                                    {{ ht.flavor_directives|default:"Seasonal mixology profile" }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-dark border border-white border-opacity-10 text-white font-monospace">
+                                            {{ ht.date_window_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if ht.is_active_now %}
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">
+                                            <i class="bi bi-broadcast me-1"></i>ACTIVE NOW
+                                        </span>
+                                        {% elif not ht.is_enabled %}
+                                        <span class="badge bg-secondary bg-opacity-25 text-dim">DISABLED</span>
+                                        {% else %}
+                                        <span class="badge bg-dark border border-white border-opacity-10 text-dim">DORMANT</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-info fw-bold small">{{ ht.cached_count }}</span>
+                                        <span class="text-dim small">/ {{ ht.target_pool_size }}/lab</span>
+                                        {% if ht.saved_recipe_count > 0 %}
+                                        <span class="badge bg-success bg-opacity-10 text-success ms-1" style="font-size: 0.65rem;" title="Official promoted recipes tagged with this holiday">
+                                            +{{ ht.saved_recipe_count }} saved
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch m-0">
+                                            <input class="form-check-input" type="checkbox"
+                                                   {% if ht.is_enabled %}checked{% endif %}
+                                                   onchange="toggleHolidayFlag('{{ ht.uuid }}', 'is_enabled', this.checked)">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch m-0">
+                                            <input class="form-check-input" type="checkbox"
+                                                   {% if ht.force_active %}checked{% endif %}
+                                                   title="Force this holiday active outside its calendar dates"
+                                                   onchange="toggleHolidayFlag('{{ ht.uuid }}', 'force_active', this.checked)">
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-light border-0 edit-holiday-btn"
+                                                    title="Edit Holiday"
+                                                    data-uuid="{{ ht.uuid }}"
+                                                    data-name="{{ ht.name }}"
+                                                    data-start-month="{{ ht.start_month }}"
+                                                    data-start-day="{{ ht.start_day }}"
+                                                    data-end-month="{{ ht.end_month }}"
+                                                    data-end-day="{{ ht.end_day }}"
+                                                    data-icon="{{ ht.icon_class }}"
+                                                    data-color="{{ ht.accent_color }}"
+                                                    data-pool="{{ ht.target_pool_size }}"
+                                                    data-directives="{{ ht.flavor_directives }}"
+                                                    data-enabled="{{ ht.is_enabled|yesno:'true,false' }}"
+                                                    data-force="{{ ht.force_active|yesno:'true,false' }}"
+                                                    onclick="editHolidayFromBtn(this)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger border-0"
+                                                    title="Delete Holiday"
+                                                    onclick="deleteHolidayTheme('{{ ht.uuid }}', '{{ ht.name|escapejs }}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-dim small">
+                                        No seasonal or holiday themes configured.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             
         </div>
@@ -685,6 +809,79 @@
                 <div class="modal-footer border-white border-opacity-5">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abort</button>
                     <button type="submit" class="btn btn-primary px-4 fw-bold text-dark" id="submitProviderBtn">Apply Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Holiday Theme Modal -->
+<div class="modal fade" id="holidayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content glass-surface border-white border-opacity-10">
+            <div class="modal-header border-white border-opacity-5">
+                <h5 class="modal-title text-white"><i class="bi bi-calendar2-heart text-lab-accent me-2"></i>SEASONAL &amp; HOLIDAY THEME</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="holidayForm" onsubmit="saveHolidayTheme(event)">
+                <div class="modal-body p-4">
+                    <input type="hidden" id="holidayUuid" value="">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="readout-label mb-1 d-block">Holiday / Season Name</label>
+                            <input type="text" id="hName" class="form-control bg-dark border-white border-opacity-10 text-white" placeholder="e.g. Autumn Harvest" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">Bootstrap Icon</label>
+                            <input type="text" id="hIcon" class="form-control bg-dark border-white border-opacity-10 text-white" value="bi-stars" placeholder="bi-snow2">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">Accent Color</label>
+                            <input type="color" id="hColor" class="form-control form-control-color bg-dark border-white border-opacity-10 w-100" value="#f59e0b">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">Start Month (1–12)</label>
+                            <input type="number" id="hStartMonth" class="form-control bg-dark border-white border-opacity-10 text-white" min="1" max="12" value="10" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">Start Day (1–31)</label>
+                            <input type="number" id="hStartDay" class="form-control bg-dark border-white border-opacity-10 text-white" min="1" max="31" value="1" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">End Month (1–12)</label>
+                            <input type="number" id="hEndMonth" class="form-control bg-dark border-white border-opacity-10 text-white" min="1" max="12" value="10" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="readout-label mb-1 d-block">End Day (1–31)</label>
+                            <input type="number" id="hEndDay" class="form-control bg-dark border-white border-opacity-10 text-white" min="1" max="31" value="31" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="readout-label mb-1 d-block">Target Pool Size (Per Lab)</label>
+                            <input type="number" id="hPoolSize" class="form-control bg-dark border-white border-opacity-10 text-white" min="4" max="60" value="15" required>
+                            <div class="form-text text-dim">Default 15 cached recipes per lab.</div>
+                        </div>
+                        <div class="col-md-8 d-flex align-items-center gap-4 pt-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="hEnabled" checked>
+                                <label class="text-white small ms-2">Enabled on Calendar</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="hForceActive">
+                                <label class="text-white small ms-2">Force Active Now (Preview)</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="readout-label mb-1 d-block">AI Mixology &amp; Flavor Directives</label>
+                            <textarea id="hDirectives" class="form-control bg-dark border-white border-opacity-10 text-white" rows="3" placeholder="Describe the seasonal aromas, tasting notes, and ingredient directions for the AI mixologist..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-white border-opacity-5">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold text-dark" id="btnSaveHoliday">Save Holiday Theme</button>
                 </div>
             </form>
         </div>
@@ -1447,6 +1644,131 @@ async function fetchProviderModels() {
         label.innerText = 'Fetch Models';
         btn.disabled = false;
     }
+}
+
+// Seasonal & Holiday Calendar Management Logic
+let holidayModalInstance = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const hmEl = document.getElementById('holidayModal');
+    if (hmEl) {
+        holidayModalInstance = new bootstrap.Modal(hmEl);
+    }
+});
+
+function openHolidayModal() {
+    document.getElementById('holidayUuid').value = '';
+    document.getElementById('holidayForm').reset();
+    document.getElementById('hIcon').value = 'bi-stars';
+    document.getElementById('hColor').value = '#f59e0b';
+    document.getElementById('hPoolSize').value = '15';
+    document.getElementById('hEnabled').checked = true;
+    document.getElementById('hForceActive').checked = false;
+    if (holidayModalInstance) holidayModalInstance.show();
+}
+
+function editHolidayFromBtn(btn) {
+    document.getElementById('holidayUuid').value = btn.dataset.uuid || '';
+    document.getElementById('hName').value = btn.dataset.name || '';
+    document.getElementById('hStartMonth').value = btn.dataset.startMonth || 1;
+    document.getElementById('hStartDay').value = btn.dataset.startDay || 1;
+    document.getElementById('hEndMonth').value = btn.dataset.endMonth || 1;
+    document.getElementById('hEndDay').value = btn.dataset.endDay || 1;
+    document.getElementById('hIcon').value = btn.dataset.icon || 'bi-stars';
+    document.getElementById('hColor').value = btn.dataset.color || '#f59e0b';
+    document.getElementById('hPoolSize').value = btn.dataset.pool || 15;
+    document.getElementById('hDirectives').value = btn.dataset.directives || '';
+    document.getElementById('hEnabled').checked = btn.dataset.enabled === 'true';
+    document.getElementById('hForceActive').checked = btn.dataset.force === 'true';
+    if (holidayModalInstance) holidayModalInstance.show();
+}
+
+function saveHolidayTheme(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveHoliday');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+    const payload = {
+        uuid: document.getElementById('holidayUuid').value || null,
+        name: document.getElementById('hName').value,
+        start_month: parseInt(document.getElementById('hStartMonth').value, 10),
+        start_day: parseInt(document.getElementById('hStartDay').value, 10),
+        end_month: parseInt(document.getElementById('hEndMonth').value, 10),
+        end_day: parseInt(document.getElementById('hEndDay').value, 10),
+        icon_class: document.getElementById('hIcon').value,
+        accent_color: document.getElementById('hColor').value,
+        target_pool_size: parseInt(document.getElementById('hPoolSize').value, 10),
+        flavor_directives: document.getElementById('hDirectives').value,
+        is_enabled: document.getElementById('hEnabled').checked,
+        force_active: document.getElementById('hForceActive').checked
+    };
+
+    fetch('{% url "save_holiday_theme_api" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (data.status === 'success') {
+            if (holidayModalInstance) holidayModalInstance.hide();
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to save holiday theme.');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert('Communication error saving holiday theme.');
+    });
+}
+
+function toggleHolidayFlag(uuid, field, checked) {
+    const payload = {};
+    payload[field] = checked;
+    fetch(`/api/settings/holidays/${uuid}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to update holiday status.');
+        }
+    })
+    .catch(() => alert('Communication error updating holiday status.'));
+}
+
+function deleteHolidayTheme(uuid, name) {
+    if (!confirm(`Delete holiday theme '${name}' and clear its temporary cached drinks? (Official saved recipes will be preserved)`)) {
+        return;
+    }
+    fetch(`/api/settings/holidays/${uuid}/delete/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to delete holiday theme.');
+        }
+    })
+    .catch(() => alert('Communication error deleting holiday theme.'));
 }
 </script>
 {% endblock %}

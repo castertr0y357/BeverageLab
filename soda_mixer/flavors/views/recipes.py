@@ -15,12 +15,30 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from ..models import (
     Ingredient, Recipe, RecipeIngredient, RecipeCategory,
-    SystemConfiguration, MixHistory, MixHistoryIngredient, CachedQuickDrink
+    SystemConfiguration, MixHistory, MixHistoryIngredient, CachedQuickDrink,
+    HolidayTheme
 )
 from ..quick_cache_service import ensure_recipe_primary_ingredient
 from ..tasks_registry import submit_task
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_holiday_theme(raw_val: Any) -> Any:
+    """Resolve a HolidayTheme from a UUID string, integer PK, or slug."""
+    if not raw_val:
+        return None
+    val_str = str(raw_val).strip()
+    if not val_str:
+        return None
+    try:
+        u_obj = uuid.UUID(val_str)
+        return HolidayTheme.objects.filter(uuid=u_obj).first()
+    except (ValueError, TypeError):
+        pass
+    if val_str.isdigit():
+        return HolidayTheme.objects.filter(id=int(val_str)).first()
+    return HolidayTheme.objects.filter(slug__iexact=val_str).first()
 
 
 def create_recipe(request: HttpRequest) -> HttpResponse:
@@ -84,11 +102,19 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
 
         ensure_recipe_primary_ingredient(recipe)
 
+        explicit_holiday = _resolve_holiday_theme(
+            request.POST.get('holiday_theme') or request.POST.get('holiday_theme_id')
+        )
+        if explicit_holiday:
+            recipe.holiday_theme = explicit_holiday
+
         cached_uuid_to_scrub = request.POST.get('source_cached_drink_id')
         source_mix_id = request.POST.get('source_mix_id')
         if source_mix_id:
             try:
-                mix = MixHistory.objects.get(uuid=source_mix_id)
+                mix = MixHistory.objects.select_related('holiday_theme').get(uuid=source_mix_id)
+                if not recipe.holiday_theme and mix.holiday_theme:
+                    recipe.holiday_theme = mix.holiday_theme
                 if not cached_uuid_to_scrub and mix.source_cached_drink_uuid:
                     cached_uuid_to_scrub = str(mix.source_cached_drink_uuid)
                 mix.delete()
@@ -98,10 +124,17 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
 
         if cached_uuid_to_scrub:
             try:
-                CachedQuickDrink.objects.filter(uuid=cached_uuid_to_scrub).delete()
-                logger.info(f"RecipeCreation - Info - Scrubbed promoted CachedQuickDrink {cached_uuid_to_scrub} from cache pool")
+                cqd_obj = CachedQuickDrink.objects.select_related('holiday_theme').filter(uuid=cached_uuid_to_scrub).first()
+                if cqd_obj:
+                    if not recipe.holiday_theme and cqd_obj.holiday_theme:
+                        recipe.holiday_theme = cqd_obj.holiday_theme
+                    cqd_obj.delete()
+                    logger.info(f"RecipeCreation - Info - Scrubbed promoted CachedQuickDrink {cached_uuid_to_scrub} from cache pool")
             except Exception as e:
                 logger.warning(f"RecipeCreation - Warning - Could not scrub CachedQuickDrink {cached_uuid_to_scrub}: {e}")
+
+        if recipe.holiday_theme_id:
+            recipe.save(update_fields=['holiday_theme'])
 
         logger.info(f"RecipeCreation - Info - Successfully created recipe {recipe.name} (ID: {recipe.id})")
         return redirect('recipe_detail', uuid=recipe.uuid)
@@ -110,6 +143,7 @@ def create_recipe(request: HttpRequest) -> HttpResponse:
     return render(request, 'flavors/create_recipe.html', {
         'ingredients': ingredients,
         'all_categories': RecipeCategory.objects.all(),
+        'all_holidays': HolidayTheme.objects.all(),
     })
 
 
@@ -128,6 +162,10 @@ def edit_recipe(request: HttpRequest, uuid: str) -> HttpResponse:
         recipe.drink_type = drink_type
         recipe.brew_method = request.POST.get('brew_method', recipe.brew_method)
         recipe.grind_size = request.POST.get('grind_size', recipe.grind_size)
+        if 'holiday_theme' in request.POST or 'holiday_theme_id' in request.POST:
+            recipe.holiday_theme = _resolve_holiday_theme(
+                request.POST.get('holiday_theme') or request.POST.get('holiday_theme_id')
+            )
         
         # Numeric coffee fields
         for field in ['water_temp_c', 'brew_time_sec', 'total_water_g']:
@@ -182,6 +220,7 @@ def edit_recipe(request: HttpRequest, uuid: str) -> HttpResponse:
         'recipe': recipe,
         'ingredients': ingredients,
         'all_categories': RecipeCategory.objects.all(),
+        'all_holidays': HolidayTheme.objects.all(),
     })
 
 
@@ -349,6 +388,14 @@ def save_mix_to_history_api(request: HttpRequest) -> JsonResponse:
                 mix.source_cached_drink_uuid = uuid.UUID(str(data.get('source_cached_drink_id')))
             except (ValueError, TypeError):
                 pass
+        if data.get('holiday_theme_id') or data.get('holiday_theme'):
+            resolved_ht = _resolve_holiday_theme(data.get('holiday_theme_id') or data.get('holiday_theme'))
+            if resolved_ht:
+                mix.holiday_theme = resolved_ht
+        if not mix.holiday_theme and mix.source_cached_drink_uuid:
+            cqd = CachedQuickDrink.objects.select_related('holiday_theme').filter(uuid=mix.source_cached_drink_uuid).first()
+            if cqd and cqd.holiday_theme:
+                mix.holiday_theme = cqd.holiday_theme
         mix.save()
 
         # If ingredients were passed, synchronize them
@@ -417,8 +464,15 @@ def promote_mix_to_recipe_api(request: HttpRequest, uuid: str) -> JsonResponse:
         recipe = Recipe.objects.create(
             name=name, 
             description=description,
-            drink_type=mix.drink_type
+            drink_type=mix.drink_type,
+            holiday_theme=mix.holiday_theme
         )
+
+        if not recipe.holiday_theme and mix.source_cached_drink_uuid:
+            cqd = CachedQuickDrink.objects.select_related('holiday_theme').filter(uuid=mix.source_cached_drink_uuid).first()
+            if cqd and cqd.holiday_theme:
+                recipe.holiday_theme = cqd.holiday_theme
+                recipe.save(update_fields=['holiday_theme'])
 
         for mi in mix.mix_ingredients.all():
             if mi.ingredient:

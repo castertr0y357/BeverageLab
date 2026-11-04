@@ -74,6 +74,15 @@ class Recipe(SoftDeleteModel):
         help_text="User rating from 0 to 5 stars"
     )
     categories = models.ManyToManyField(RecipeCategory, blank=True, related_name='recipes')
+    holiday_theme = models.ForeignKey(
+        'HolidayTheme',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='recipes',
+        db_index=True,
+        help_text="Optional seasonal/holiday theme this recipe belongs to."
+    )
     
     # Coffee-specific brew details
     brew_method = models.CharField(max_length=20, choices=BREW_METHOD_CHOICES, blank=True, null=True)
@@ -184,7 +193,16 @@ class CachedQuickDrink(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
     drink_type = models.CharField(max_length=10, choices=DRINK_TYPE_CHOICES, default='SODA', db_index=True)
     mode = models.CharField(max_length=20, choices=MODE_CHOICES, default='experimental', db_index=True)
-    profile = models.CharField(max_length=50, db_index=True, help_text="Category profile (e.g. Fruity, Sweet, Citrus)")
+    profile = models.CharField(max_length=80, db_index=True, help_text="Category profile (e.g. Fruity, Sweet, or holiday:winter-wonderland)")
+    holiday_theme = models.ForeignKey(
+        'HolidayTheme',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='cached_drinks',
+        db_index=True,
+        help_text="Associated HolidayTheme if this cached drink was generated for a seasonal spotlight."
+    )
     ingredient_count = models.IntegerField(db_index=True, help_text="Total ingredient count bucket (2, 3, 4, or 5)")
     name = models.CharField(max_length=120)
     description = models.TextField(blank=True, default='', help_text="Short 20-30 word menu blurb")

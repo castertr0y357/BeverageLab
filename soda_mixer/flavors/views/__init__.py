@@ -28,7 +28,8 @@ from .settings import (
     save_backup_config_api, test_backup_storage_api, run_backup_now_api,
     download_backup_file, restore_backup_record_api, delete_backup_record_api,
     metrics_view, debug_logging_toggle_api,
-    save_quick_cache_config_api, run_quick_cache_now_api
+    save_quick_cache_config_api, run_quick_cache_now_api,
+    save_holiday_theme_api, toggle_holiday_theme_api, delete_holiday_theme_api
 )
 from .coffee_chemistry import coffee_chemistry_api
 from .soda_chemistry import soda_chemistry_api
@@ -57,5 +58,6 @@ __all__ = [
     'download_backup_file', 'restore_backup_record_api', 'delete_backup_record_api',
     'metrics_view', 'debug_logging_toggle_api',
     'save_quick_cache_config_api', 'run_quick_cache_now_api',
+    'save_holiday_theme_api', 'toggle_holiday_theme_api', 'delete_holiday_theme_api',
     'task_status_api'
 ]

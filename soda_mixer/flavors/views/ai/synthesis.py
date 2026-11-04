@@ -10,7 +10,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpRe
 from django.db.models import Q
 from ...models import (
     Ingredient, Recipe, RecipeIngredient, RecipeCategory,
-    SystemConfiguration, LLMProvider, BackgroundExecutionTask, CachedQuickDrink
+    SystemConfiguration, LLMProvider, BackgroundExecutionTask, CachedQuickDrink,
+    HolidayTheme
 )
 from ...quick_cache_service import (
     draw_quick_drinks, compute_flavor_signature, resolve_generated_ingredients,
@@ -484,11 +485,19 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
                     if ings:
                         existing_recipes_data.append({'name': er.name, 'ingredients': ings})
 
+                holiday_obj = None
+                effective_profile_prompt = profile
+                if profile and profile.strip().lower().startswith('holiday:'):
+                    slug_part = profile.strip().split(':', 1)[1].strip().lower()
+                    holiday_obj = HolidayTheme.objects.filter(slug__iexact=slug_part).first()
+                    if holiday_obj:
+                        effective_profile_prompt = f"{holiday_obj.name} ({holiday_obj.flavor_directives})"
+
                 stream = AIAssistant.stream_quick_recommendations(
                     inventory_context, 
                     drink_type=drink_type, 
                     mode=mode, 
-                    profile=profile,
+                    profile=effective_profile_prompt,
                     existing_recipes=existing_recipes_data
                 )
                 
@@ -504,10 +513,12 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
                                 bucket_cnt = max(2, min(5, actual_count or len(resolved_ings)))
                                 if drink_type == 'COFFEE' and bucket_cnt < 3:
                                     bucket_cnt = 3
+                                cache_profile_key = f"holiday:{holiday_obj.slug}" if holiday_obj else profile.strip().title()
                                 cqd = CachedQuickDrink.objects.create(
                                     drink_type=drink_type,
                                     mode=mode.lower(),
-                                    profile=profile.strip().title(),
+                                    profile=cache_profile_key,
+                                    holiday_theme=holiday_obj,
                                     ingredient_count=bucket_cnt,
                                     name=str(recipe.get('name') or 'Synthesized Elixir')[:120],
                                     description=str(recipe.get('description') or ''),
@@ -515,6 +526,9 @@ def ai_quick_recommendations_api(request: HttpRequest) -> HttpResponse:
                                     flavor_signature=sig,
                                 )
                                 recipe['cached_uuid'] = str(cqd.uuid)
+                                if holiday_obj:
+                                    recipe['holiday_theme_id'] = str(holiday_obj.uuid)
+                                    recipe['holiday_theme_name'] = holiday_obj.name
                         except Exception as cache_err:
                             logger.warning(f"ai_quick_recommendations_api - Could not cache streamed recipe: {cache_err}")
                     yield f"event: recipe\ndata: {json.dumps(recipe)}\n\n"

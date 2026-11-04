@@ -48,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const cachedField = document.getElementById('sourceCachedDrinkIdField');
             if (cachedField) cachedField.value = synthesisData.source_cached_drink_id;
         }
+        if (synthesisData.holiday_theme_id) {
+            window.currentHolidayThemeId = synthesisData.holiday_theme_id;
+            const holidayField = document.getElementById('holidayThemeIdField');
+            if (holidayField) holidayField.value = synthesisData.holiday_theme_id;
+        }
         // Inject Lab Theme
         if (synthesisData.drink_type) {
             const dt = synthesisData.drink_type.toUpperCase();
@@ -135,6 +140,7 @@ function syncSynopsisToHistory(additionalData = {}) {
         drink_size_oz: synopsisCoffeeSize,
         sweetness_style: synopsisSweetnessStyle,
         bottle_scale: synopsisBottleScale,
+        holiday_theme_id: window.currentHolidayThemeId || document.getElementById('holidayThemeIdField')?.value || null,
         ...additionalData
     };
 

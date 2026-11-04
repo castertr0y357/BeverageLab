@@ -4,7 +4,8 @@ from .recipes import Recipe, RecipeCategory, RecipeIngredient, CachedQuickDrink
 from .history import MixHistory, MixHistoryIngredient
 from .config import (
     LLMProvider, SystemConfiguration, BackgroundExecutionTask,
-    BackupConfiguration, BackupRecord, QuickDrinkCacheConfiguration
+    BackupConfiguration, BackupRecord, QuickDrinkCacheConfiguration,
+    HolidayTheme, DEFAULT_HOLIDAY_THEMES
 )
 
 __all__ = [
@@ -22,4 +23,6 @@ __all__ = [
     'BackupConfiguration',
     'BackupRecord',
     'QuickDrinkCacheConfiguration',
+    'HolidayTheme',
+    'DEFAULT_HOLIDAY_THEMES',
 ]

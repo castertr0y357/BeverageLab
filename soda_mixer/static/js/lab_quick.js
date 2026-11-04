@@ -1,10 +1,12 @@
 // Quick Drinks Unified Vault & Cycle Logic (Existing Saved Recipes + Nightly Cached AI Pool)
 const currentLabMode = window.CURRENT_LAB || "soda";
 window.currentProfile = null;
+window.currentProfileDisplay = null;
 window.seenQuickDrinkIds = new Set();
 
-function selectProfile(profile) {
+function selectProfile(profile, displayTitle = null) {
     window.currentProfile = profile;
+    window.currentProfileDisplay = displayTitle || profile.replace(/^holiday:/i, '').replace(/-/g, ' ');
     window.seenQuickDrinkIds = new Set();
     const profilesContainer = document.getElementById('quickProfilesContainer');
     const aiContainer = document.getElementById('aiQuickContainer');
@@ -23,8 +25,9 @@ function drawQuickDrinksFromPool(profile) {
     const list = document.getElementById('quickDrinksList');
     const subtext = document.getElementById('quickDrinksPoolSubtext');
 
-    if (existingCatName) existingCatName.innerText = profile;
-    if (aiCatName) aiCatName.innerText = profile;
+    const labelText = window.currentProfileDisplay || profile;
+    if (existingCatName) existingCatName.innerText = labelText;
+    if (aiCatName) aiCatName.innerText = labelText;
 
     const params = new URLSearchParams({
         lab_mode: currentLabMode,
@@ -195,6 +198,7 @@ function buildQuickDrinkCard(item, index) {
 
     const metaPayload = {
         cached_uuid: item.source_type === 'cached' ? (item.uuid || item.cached_uuid || null) : null,
+        holiday_theme_id: item.holiday_theme_id || null,
         description: item.description || '',
         mixologist_notes: item.mixologist_notes || '',
         profile_description: item.profile_description || ''
@@ -395,6 +399,7 @@ function selectGeneratedDrink(btnElement) {
         profile_description: metaData.profile_description || '',
         skip_ai: hasPrecomputedNotes,
         source_cached_drink_id: metaData.cached_uuid || null,
+        holiday_theme_id: metaData.holiday_theme_id || null,
         drink_type: currentLabMode,
         coffee_style: (currentLabMode === "COFFEE" || currentLabMode === "coffee") ? "HOT" : "",
         coffee_base_type: (currentLabMode === "COFFEE" || currentLabMode === "coffee") ? "ESPRESSO" : "",

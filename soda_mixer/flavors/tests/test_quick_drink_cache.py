@@ -1,3 +1,4 @@
+import datetime
 import json
 from unittest.mock import patch
 from django.test import TestCase, Client
@@ -6,11 +7,13 @@ from django.contrib.auth import get_user_model
 
 from soda_mixer.flavors.models import (
     Ingredient, Recipe, RecipeIngredient, MixHistory, MixHistoryIngredient,
-    CachedQuickDrink, QuickDrinkCacheConfiguration
+    CachedQuickDrink, QuickDrinkCacheConfiguration, HolidayTheme
 )
 from soda_mixer.flavors.quick_cache_service import (
-    compute_flavor_signature, BUCKET_TARGETS, replenish_quick_drink_cache,
-    draw_quick_drinks, ensure_recipe_primary_ingredient, get_recipe_primary_category,
+    compute_flavor_signature, BUCKET_TARGETS, HOLIDAY_BUCKET_TARGETS,
+    get_holiday_bucket_targets, prune_inactive_holiday_cache,
+    replenish_quick_drink_cache, draw_quick_drinks,
+    ensure_recipe_primary_ingredient, get_recipe_primary_category,
     sanitize_card_description, generate_fallback_card_description
 )
 
@@ -395,3 +398,174 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         # Check DB model backfill
         empty_recipe.refresh_from_db()
         self.assertEqual(empty_recipe.description, matched_item['description'])
+
+    def test_holiday_theme_date_window_and_year_wrap(self):
+        """Verify HolidayTheme.is_currently_active() handles standard windows, year-boundary wrapping, and force_active."""
+        HolidayTheme.ensure_default_themes()
+        spooky = HolidayTheme.objects.get(slug='spooky-synthesis')
+        winter = HolidayTheme.objects.get(slug='winter-wonderland')
+
+        # Spooky Synthesis: Oct 1 - Nov 1
+        self.assertTrue(spooky.is_currently_active(datetime.date(2026, 10, 31)))
+        self.assertTrue(spooky.is_currently_active(datetime.date(2026, 11, 1)))
+        self.assertFalse(spooky.is_currently_active(datetime.date(2026, 11, 5)))
+
+        # Winter Wonderland: Dec 1 - Jan 5 (wraps across year boundary)
+        self.assertTrue(winter.is_currently_active(datetime.date(2026, 12, 25)))
+        self.assertTrue(winter.is_currently_active(datetime.date(2027, 1, 3)))
+        self.assertFalse(winter.is_currently_active(datetime.date(2026, 11, 25)))
+        self.assertFalse(winter.is_currently_active(datetime.date(2027, 1, 10)))
+
+        # force_active overrides out-of-season date
+        winter.force_active = True
+        winter.save()
+        self.assertTrue(winter.is_currently_active(datetime.date(2026, 7, 15)))
+
+        # Disabling overrides force_active
+        winter.is_enabled = False
+        winter.save()
+        self.assertFalse(winter.is_currently_active(datetime.date(2026, 12, 25)))
+
+    def test_holiday_bucket_targets_sum_to_15(self):
+        """Verify holiday bucket targets allocate 15 recipes per lab across complexity tiers."""
+        soda_buckets = get_holiday_bucket_targets('SODA', 15)
+        coffee_buckets = get_holiday_bucket_targets('COFFEE', 15)
+        self.assertEqual(soda_buckets, {2: 3, 3: 5, 4: 4, 5: 3})
+        self.assertEqual(sum(soda_buckets.values()), 15)
+        self.assertEqual(coffee_buckets, {3: 6, 4: 5, 5: 4})
+        self.assertEqual(sum(coffee_buckets.values()), 15)
+
+    def test_prune_inactive_holiday_cache_preserves_promoted_recipes(self):
+        """Verify expired holiday CachedQuickDrinks are pruned while promoted official Recipes remain intact."""
+        HolidayTheme.ensure_default_themes()
+        spooky = HolidayTheme.objects.get(slug='spooky-synthesis')
+        spooky.is_enabled = False  # Make it inactive
+        spooky.save()
+
+        active_ht = HolidayTheme.objects.get(slug='autumn-harvest')
+        active_ht.is_enabled = True
+        active_ht.force_active = True
+        active_ht.save()
+
+        c_expired = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='holiday:spooky-synthesis',
+            holiday_theme=spooky, ingredient_count=2, name='Expired Spooky Drink',
+            flavor_signature='cherry::lime',
+            ingredients_json=[{'id': self.cherry.id, 'name': 'Cherry', 'parts': 60.0, 'is_primary': True}]
+        )
+        c_active = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='holiday:autumn-harvest',
+            holiday_theme=active_ht, ingredient_count=2, name='Active Harvest Drink',
+            flavor_signature='mango::lime',
+            ingredients_json=[{'id': self.mango.id, 'name': 'Mango', 'parts': 60.0, 'is_primary': True}]
+        )
+        official_spooky = Recipe.objects.create(
+            name='Official Spooky Elixir', drink_type='SODA', holiday_theme=spooky
+        )
+
+        pruned = prune_inactive_holiday_cache()
+        self.assertEqual(pruned, 1)
+        self.assertFalse(CachedQuickDrink.objects.filter(id=c_expired.id).exists())
+        self.assertTrue(CachedQuickDrink.objects.filter(id=c_active.id).exists())
+        self.assertTrue(Recipe.objects.filter(id=official_spooky.id, holiday_theme=spooky).exists())
+
+    def test_holiday_promotion_tags_recipe_and_cycles_in_holiday_draw(self):
+        """Verify promoting a holiday CachedQuickDrink via MixHistory automatically tags the Recipe with that HolidayTheme
+        and includes it in subsequent holiday Quick Drink draws."""
+        HolidayTheme.ensure_default_themes()
+        autumn = HolidayTheme.objects.get(slug='autumn-harvest')
+        autumn.force_active = True
+        autumn.save()
+
+        c_holiday = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='holiday:autumn-harvest',
+            holiday_theme=autumn, ingredient_count=2, name='Harvest Cherry Spice',
+            description='Warm autumn cherry.', flavor_signature='cherry::vanilla',
+            ingredients_json=[
+                {'id': self.cherry.id, 'name': 'Cherry', 'parts': 60.0, 'is_primary': True},
+                {'id': self.vanilla.id, 'name': 'Vanilla', 'parts': 20.0, 'is_primary': False},
+            ]
+        )
+
+        # Save to MixHistory referencing the cached drink
+        save_resp = self.client.post(
+            reverse('save_mix_to_history_api'),
+            data=json.dumps({
+                'drink_type': 'SODA',
+                'name': 'Harvest Cherry Spice',
+                'source_cached_drink_id': str(c_holiday.uuid),
+                'ingredients': [
+                    {'id': self.cherry.id, 'amount': 60.0, 'is_primary': True},
+                    {'id': self.vanilla.id, 'amount': 20.0, 'is_primary': False},
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(save_resp.status_code, 200)
+        mix_id = save_resp.json()['mix_id']
+        mix_obj = MixHistory.objects.get(uuid=mix_id)
+        self.assertEqual(mix_obj.holiday_theme, autumn)
+
+        # Promote to Recipe
+        promote_resp = self.client.post(reverse('create_recipe'), {
+            'name': 'Harvest Cherry Reserve',
+            'drink_type': 'SODA',
+            'description': 'Warm autumn cherry.',
+            'source_mix_id': mix_id,
+            f'amount_{self.cherry.id}': 60.0,
+            f'is_primary_{self.cherry.id}': 'true',
+            f'amount_{self.vanilla.id}': 20.0,
+        })
+        self.assertEqual(promote_resp.status_code, 302)
+        self.assertFalse(CachedQuickDrink.objects.filter(uuid=c_holiday.uuid).exists())
+
+        promoted_recipe = Recipe.objects.get(name='Harvest Cherry Reserve')
+        self.assertEqual(promoted_recipe.holiday_theme, autumn)
+
+        # Drawing for 'holiday:autumn-harvest' should return the promoted official recipe
+        draw_res = draw_quick_drinks(drink_type='SODA', profile='holiday:autumn-harvest', mode='experimental')
+        self.assertEqual(draw_res['total_pool_size'], 1)
+        self.assertEqual(draw_res['items'][0]['name'], 'Harvest Cherry Reserve')
+        self.assertEqual(draw_res['items'][0]['source_type'], 'existing')
+        self.assertEqual(draw_res['items'][0]['holiday_theme_id'], str(autumn.uuid))
+
+    def test_holiday_settings_crud_apis(self):
+        """Verify creating, toggling, and deleting a HolidayTheme via Settings API endpoints."""
+        create_resp = self.client.post(
+            reverse('save_holiday_theme_api'),
+            data=json.dumps({
+                'name': 'New Year Sparkle',
+                'start_month': 12,
+                'start_day': 28,
+                'end_month': 1,
+                'end_day': 3,
+                'icon_class': 'bi-stars',
+                'accent_color': '#eab308',
+                'target_pool_size': 15,
+                'flavor_directives': 'Effervescent champagne-inspired citrus and elderflower notes.',
+                'is_enabled': True,
+                'force_active': True,
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        h_uuid = create_resp.json()['uuid']
+        ht = HolidayTheme.objects.get(uuid=h_uuid)
+        self.assertEqual(ht.slug, 'new-year-sparkle')
+        self.assertTrue(ht.force_active)
+
+        # Toggle force_active off
+        toggle_resp = self.client.post(
+            reverse('toggle_holiday_theme_api', args=[h_uuid]),
+            data=json.dumps({'force_active': False}),
+            content_type='application/json'
+        )
+        self.assertEqual(toggle_resp.status_code, 200)
+        ht.refresh_from_db()
+        self.assertFalse(ht.force_active)
+
+        # Delete holiday
+        del_resp = self.client.post(reverse('delete_holiday_theme_api', args=[h_uuid]))
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertFalse(HolidayTheme.objects.filter(uuid=h_uuid).exists())
+

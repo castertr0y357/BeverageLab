@@ -1,28 +1,32 @@
 """Views for the laboratory environments (MPA)."""
 
 import json
-from django.shortcuts import render, redirect
+import logging
+
+from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
-from ..models import Ingredient
+from django.shortcuts import redirect, render
+
+from ..models import HolidayTheme, Ingredient
+
+logger = logging.getLogger(__name__)
+
 
 def lab_dispatcher(request: HttpRequest, lab_type: str) -> HttpResponse:
     """Renders the lab with no mode selected, prompting the user to choose one."""
     return lab_view(request, lab_type, mode='select')
 
+
 def lab_view(request: HttpRequest, lab_type: str, mode: str) -> HttpResponse:
     """Renders the specific lab mode."""
-    # Ensure lab_type and mode are valid
     valid_labs = ['soda', 'coffee', 'cryo']
     valid_modes = ['manual', 'quick', 'vibe', 'select']
-    
+
     if lab_type.lower() not in valid_labs or mode.lower() not in valid_modes:
         return redirect('dashboard')
-        
-    # Get all active ingredients
+
     ingredients = list(Ingredient.objects.filter(is_in_inventory=True))
-    
-    # Calculate multibrand names in active inventory
-    from django.db.models import Count
+
     multibrand_qs = Ingredient.objects.filter(is_in_inventory=True).values('name').annotate(
         brand_count=Count('brand', distinct=True)
     ).filter(brand_count__gt=1)
@@ -30,10 +34,10 @@ def lab_view(request: HttpRequest, lab_type: str, mode: str) -> HttpResponse:
 
     for ing in ingredients:
         ing.show_brand = ing.name.lower() in multibrand_names
-        
+
     ingredient_dicts = [{
-        'id': ing.id, 
-        'name': ing.name, 
+        'id': ing.id,
+        'name': ing.name,
         'category': ing.category,
         'ingredient_type': ing.ingredient_type,
         'physical_state': ing.physical_state,
@@ -43,33 +47,41 @@ def lab_view(request: HttpRequest, lab_type: str, mode: str) -> HttpResponse:
         'acidity': ing.acidity,
         'bitterness': ing.bitterness
     } for ing in ingredients]
-    
+
     context = {
         'lab_type': lab_type.upper(),
         'mode': mode.lower(),
         'ingredients': ingredients,
         'ingredients_json': json.dumps(ingredient_dicts),
     }
-    
+
     if mode.lower() == 'quick':
         lab_system = 'SLUSHIE' if lab_type.upper() == 'CRYO' else lab_type.upper()
         active_lab_ingredients = [ing for ing in ingredients if lab_system in ing.compatible_systems]
         excluded_categories = {'Coffee', 'Dairy'}
-        available_categories = sorted(set(ing.category.title() for ing in active_lab_ingredients if ing.category and ing.category.title() not in excluded_categories))
+        available_categories = sorted(
+            set(
+                ing.category.title()
+                for ing in active_lab_ingredients
+                if ing.category and ing.category.title() not in excluded_categories
+            )
+        )
         context['available_categories'] = available_categories
-    
-    # Render the specific lab mode template
+        try:
+            HolidayTheme.ensure_default_themes()
+            context['active_holidays'] = HolidayTheme.get_active_themes()
+        except Exception as e:
+            logger.warning(f"LabView - Warning - Could not load active holiday themes: {e}")
+            context['active_holidays'] = []
+
     template_name = f'flavors/lab_{mode}.html'
     return render(request, template_name, context)
 
-import logging
-logger = logging.getLogger(__name__)
 
 def synopsis_view(request: HttpRequest) -> HttpResponse:
     """Renders the generic synopsis review page."""
     prefill_data = None
     if request.method == 'POST':
-        # When coming from manual or AI builder, frontend posts the selected setup here
         recipe_data_str = request.POST.get('recipe_data')
         if recipe_data_str:
             try:

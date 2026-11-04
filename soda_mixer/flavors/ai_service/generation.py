@@ -632,7 +632,8 @@ Rules:
         mode: str = 'experimental',
         profile: str = 'Fruity',
         ingredient_count: int = 3,
-        excluded_signatures: Optional[List[str]] = None
+        excluded_signatures: Optional[List[str]] = None,
+        holiday_directives: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Generate a single Quick Drink recipe for a specific bucket (1-at-a-time for small local models),
         including full pre-generated mixologist_notes and profile_description.
@@ -643,20 +644,24 @@ Rules:
             drink_type = 'SLUSHIE'
 
         seed = random.randint(10000, 99999)
+        is_holiday = bool(holiday_directives)
 
         if drink_type == 'COFFEE':
             modifier_count = max(1, ingredient_count - 2)
+            lead_desc = f'matching the "{profile}" seasonal theme' if is_holiday else f'featuring the "{profile}" profile'
             mode_rules = f"""2. Exact Ingredient Count: Include exactly {ingredient_count} total ingredients:
    - 1 coffee bean base (State: SOLID_EXTRACTABLE) at 18.0 parts
    - 1 genuine dairy or plant milk base (Function: VOLUME_BASE, State: LIQUID) at 50.0 parts
-   - {modifier_count} flavor modifier(s) featuring the "{profile}" profile with distinct parts (e.g., 25.0 parts for the primary flavor lead, 10.0 to 15.0 parts for secondary accents)."""
+   - {modifier_count} flavor modifier(s) {lead_desc} with distinct parts (e.g., 25.0 parts for the primary flavor lead, 10.0 to 15.0 parts for secondary accents)."""
         elif drink_type == 'SLUSHIE':
-            mode_rules = f"""2. Exact Ingredient Count: Include between {ingredient_count} total ingredients from the Inventory Registry.
-   - Assign the largest 'parts' value (e.g. 5.0) to a "{profile}" ingredient so it serves as the unmistakable primary flavor lead.
+            lead_desc = f'matching the "{profile}" seasonal theme' if is_holiday else f'from the "{profile}" category'
+            mode_rules = f"""2. Exact Ingredient Count: Include exactly {ingredient_count} total ingredients from the Inventory Registry.
+   - Assign the largest 'parts' value (e.g. 5.0) to a primary ingredient {lead_desc} so it serves as the unmistakable primary flavor lead.
    - Assign smaller 'parts' values (e.g. 2.0, 1.0, 0.5) to the remaining {ingredient_count - 1} complementary ingredient(s)."""
         else:
+            lead_desc = f'matching the "{profile}" seasonal theme' if is_holiday else f'from the "{profile}" category'
             mode_rules = f"""2. Exact Ingredient Count: Include exactly {ingredient_count} total ingredients from the Inventory Registry.
-   - Assign the largest 'parts' value (e.g. 5.0 or 60.0) to a "{profile}" ingredient so it serves as the unmistakable primary flavor lead.
+   - Assign the largest 'parts' value (e.g. 5.0 or 60.0) to a primary ingredient {lead_desc} so it serves as the unmistakable primary flavor lead.
    - Assign smaller 'parts' values (e.g. 2.0, 1.0, 0.5) to the remaining {ingredient_count - 1} complementary ingredient(s)."""
 
         avoid_block = ""
@@ -670,9 +675,21 @@ Rules:
                 + "\n"
             )
 
+        if is_holiday:
+            task_line = (
+                f'Task: Act as a master mixologist. Create 1 distinct, festive {drink_type} recipe '
+                f'celebrating the "{profile}" holiday/seasonal theme using ONLY the ingredients in the Inventory Registry.\n\n'
+                f'SEASONAL & HOLIDAY THEME DIRECTIVES:\n{holiday_directives}\n'
+            )
+        else:
+            task_line = (
+                f'Task: Act as a master mixologist. Create 1 distinct, creative {drink_type} recipe '
+                f'featuring the "{profile}" flavor category using ONLY the ingredients in the Inventory Registry.'
+            )
+
         prompt = f"""[SINGLE QUICK DRINK CACHE REQUEST] — RAW JSON DATA ONLY. [NO PREAMBLE]. [SEED: {seed}]
 
-Task: Act as a master mixologist. Create 1 distinct, creative {drink_type} recipe featuring the "{profile}" flavor category using ONLY the ingredients in the Inventory Registry.
+{task_line}
 {avoid_block}
 OUTPUT FORMAT:
 Output a single JSON object with this exact structure:

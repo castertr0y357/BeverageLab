@@ -10,6 +10,34 @@
 </div>
 
 <div id="quickProfilesContainer" class="mb-4">
+    {% if active_holidays %}
+    <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <span class="badge rounded-pill px-3 py-1 fw-bold text-uppercase" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); letter-spacing: 1px; font-size: 0.7rem;">
+                <i class="bi bi-calendar2-heart text-lab-accent me-1"></i> Seasonal &amp; Holiday Spotlight
+            </span>
+        </div>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 justify-content-center">
+            {% for holiday in active_holidays %}
+            <div class="col">
+                <button type="button" class="w-100 glass-card p-4 text-center cursor-pointer profile-card h-100 d-flex flex-column justify-content-center align-items-center bg-transparent position-relative overflow-hidden"
+                     onclick="selectProfile('holiday:{{ holiday.slug }}', '{{ holiday.name|escapejs }}')"
+                     style="transition: all 0.2s ease; cursor: pointer; border: 1px solid {{ holiday.accent_color }}; box-shadow: 0 0 24px -8px {{ holiday.accent_color }};">
+                    <span class="badge position-absolute top-0 end-0 m-2 fw-bold" style="background: {{ holiday.accent_color }}; color: #111; font-size: 0.62rem;">
+                        {{ holiday.date_window_display }}
+                    </span>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center mb-3 shadow-sm border border-white border-opacity-25"
+                         style="width: 60px; height: 60px; background: {{ holiday.accent_color }};">
+                        <i class="bi {{ holiday.icon_class }} fs-2" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.45)); color: #fff;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-1 text-white" style="letter-spacing: 0.5px;">{{ holiday.name }}</h5>
+                    <span class="small text-dim" style="font-size: 0.75rem;">Seasonal Limited Synthesis</span>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 justify-content-center">
         {% for category in available_categories %}
         <div class="col">
