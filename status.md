@@ -1,6 +1,12 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Removed Inaccurate Ingredient Amounts from Historical Archives Spec Cards:
+  - **Issue**: Historical Archive (`/history/`) cards displayed rough auto-logged amounts and volume units (e.g. `4ml • SWEET`, `3ml • SPICE`) under each ingredient in the Molecular Specs section, which were not scaled or accurate to actual target batch formulations.
+  - **Resolution**:
+    - In `soda_mixer/templates/flavors/mix_history.html`, removed the amount and volume unit display (`{{ mi.amount|floatformat:... }}ml/g/oz`) and bullet separator, displaying strictly the clean ingredient category (e.g. `SWEET`, `SPICE`) while preserving the underlying JSON payload in the Index form for seamless recipe promotion.
+    - Added unit test `test_mix_history_list_does_not_render_ingredient_amounts` in `test_archive_and_discovery.py`.
+    - Verified all 151 automated tests pass with zero failures. Rebuilt containers and verified stack health.
 - [x] Prevent Ingredient Brand Leakage in AI Prompts, Chemistry Engines, and Synopsis Cards:
   - **Root Cause**:
     - `AIAssistant.get_static_ingredients_context()` previously formatted inventory items as `- {name} [{brand}] (...)`. Because mixology prompt instructions instructed the LLM to 'USE THE EXACT NOMENCLATURE from the Inventory Registry', models echoed `[Monin]` as part of the ingredient's literal name.

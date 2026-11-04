@@ -95,6 +95,26 @@ class ArchivePromotionScrubbingTests(TestCase):
         self.assertFalse(MixHistory.objects.filter(uuid=mix.uuid).exists())
         self.assertTrue(Recipe.objects.filter(name='Promoted Formula').exists())
 
+    def test_mix_history_list_does_not_render_ingredient_amounts(self):
+        mix = MixHistory.objects.create(drink_type='SODA', name='Historical Elixir')
+        MixHistoryIngredient.objects.create(mix=mix, ingredient=self.ing1, amount=25.0, is_primary=True)
+        MixHistoryIngredient.objects.create(mix=mix, ingredient=self.ing2, amount=10.0, is_primary=False)
+
+        resp = self.client.get(reverse('mix_history_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Historical Elixir')
+        self.assertContains(resp, 'Lemon Syrup')
+        self.assertContains(resp, 'CITRUS')
+        self.assertContains(resp, 'Vanilla Syrup')
+        self.assertContains(resp, 'SWEET')
+        # Inaccurate amounts and unit tags must not be rendered in the archive specs
+        self.assertNotContains(resp, '25ml')
+        self.assertNotContains(resp, '10ml')
+        self.assertNotContains(resp, '25.0g')
+        self.assertNotContains(resp, '10.0g')
+        self.assertNotContains(resp, '25.0oz')
+        self.assertNotContains(resp, '10.0oz')
+
 
 class UnifiedSynopsisAndDiscoveryTests(TestCase):
     def setUp(self):
