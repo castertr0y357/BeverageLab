@@ -223,3 +223,54 @@ class SodaChemistryEngineTest(TestCase):
         for name in names:
             self.assertNotIn('[Monin]', name)
             self.assertNotIn('(Monin)', name)
+
+    def test_soda_chemistry_handles_none_and_missing_amounts(self) -> None:
+        """Verify that ingredients with amount=None, missing amount, or invalid strings do not cause 500 errors."""
+        response = self.client.post(
+            reverse('soda_chemistry_api'),
+            data=json.dumps({
+                'sweetness_style': 'CRAFT',
+                'bottle_scale': 1.0,
+                'ingredients': [
+                    {'name': 'Blackberry Syrup', 'type': 'SODA_SYRUP', 'amount': None, 'intensity': None},
+                    {'name': 'Vanilla Syrup', 'type': 'SODA_SYRUP', 'amount': 'invalid'},
+                    {'name': 'Lime Syrup', 'type': 'SODA_SYRUP'}  # Missing amount completely
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        modifiers = data['ingredients']['modifiers']
+        self.assertEqual(len(modifiers), 3)
+        # All modifiers should have allocated volumes summing to budget (120ml)
+        total_vol = sum(m['volume_ml'] for m in modifiers)
+        self.assertAlmostEqual(total_vol, 120.0, places=1)
+
+    def test_soda_chemistry_handles_null_bottle_scale_and_scores(self) -> None:
+        """Verify null bottle_scale, acidity_score, and bitterness_score fallback safely."""
+        response = self.client.post(
+            reverse('soda_chemistry_api'),
+            data=json.dumps({
+                'sweetness_style': None,
+                'bottle_scale': None,
+                'ingredients': [
+                    {
+                        'id': 101,
+                        'name': 'Raspberry Syrup',
+                        'type': 'SODA_SYRUP',
+                        'intensity': None,
+                        'acidity_score': None,
+                        'bitterness_score': None,
+                        'sweetness_score': None,
+                        'amount': None
+                    }
+                ]
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['recipe_validation'], 'Pass')
+        self.assertEqual(data['drink_metrics']['bottle_scale'], 1.0)

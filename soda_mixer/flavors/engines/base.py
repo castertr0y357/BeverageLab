@@ -84,6 +84,30 @@ class BaseEngine:
             'bitterness': round(bitter, 1)
         }
 
+def safe_float(val: Any, default: float = 0.0) -> float:
+    """Safely convert a value to float, falling back to default on None or parsing errors."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        import math
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return f
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(val: Any, default: int = 0) -> int:
+    """Safely convert a value to int, falling back to default on None or parsing errors."""
+    if val is None:
+        return default
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
 class BaseChemistryEngine:
     """Base chemistry engine that provides common utilities for processing ingredients."""
     def __init__(self, ingredients_input: List[Dict[str, Any]]):
@@ -123,9 +147,13 @@ class BaseChemistryEngine:
                 orig = {'sweetness': 1, 'acidity': 1, 'bitterness': 1}
                 
             if orig:
-                sweet = float(orig.get('sweetness_score', orig.get('sweetness', 3.0)))
-                acid = float(orig.get('acidity_score', orig.get('acidity', 2.0)))
-                bitter = float(orig.get('bitterness_score', orig.get('bitterness', 1.0)))
+                sweet_val = orig.get('sweetness_score') if orig.get('sweetness_score') is not None else orig.get('sweetness')
+                acid_val = orig.get('acidity_score') if orig.get('acidity_score') is not None else orig.get('acidity')
+                bitter_val = orig.get('bitterness_score') if orig.get('bitterness_score') is not None else orig.get('bitterness')
+
+                sweet = safe_float(sweet_val, 3.0)
+                acid = safe_float(acid_val, 2.0)
+                bitter = safe_float(bitter_val, 1.0)
                 
                 weighted_sweetness += sweet * vol
                 weighted_acidity += acid * vol

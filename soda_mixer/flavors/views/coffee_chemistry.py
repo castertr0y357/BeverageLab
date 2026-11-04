@@ -10,7 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 logger = logging.getLogger(__name__)
 
-from ..engines.base import BaseChemistryEngine
+from ..engines.base import BaseChemistryEngine, safe_float, safe_int
 
 class CoffeeChemistryEngine(BaseChemistryEngine):
     def __init__(self, ingredients_input, drink_category, cup_size_oz, espresso_hot_mode):
@@ -129,13 +129,15 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
         # Blending Ratios
         total_proportion = 0.0
         for c in coffee_inputs:
-            ratio = float(c.get('ratio', c.get('amount', 0.0)))
+            ratio_val = c.get('ratio') if c.get('ratio') is not None else c.get('amount')
+            ratio = safe_float(ratio_val, 0.0)
             total_proportion += ratio
 
         ratios = []
         if total_proportion > 0.0:
             for c in coffee_inputs:
-                ratio = float(c.get('ratio', c.get('amount', 0.0)))
+                ratio_val = c.get('ratio') if c.get('ratio') is not None else c.get('amount')
+                ratio = safe_float(ratio_val, 0.0)
                 ratios.append(ratio / total_proportion)
         else:
             # Equal ratio fallback
@@ -152,16 +154,15 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
             ratio = ratios[idx]
             
             # Read scores resiliently
-            body = float(c.get('body_intensity', c.get('intensity', 3.0)))
-            acidity = float(c.get('acidity_score', c.get('acidity', 3.0)))
+            body_val = c.get('body_intensity') if c.get('body_intensity') is not None else c.get('intensity')
+            body = safe_float(body_val, 3.0)
+            acidity_val = c.get('acidity_score') if c.get('acidity_score') is not None else c.get('acidity')
+            acidity = safe_float(acidity_val, 3.0)
             
-            bitter_raw = c.get('bitterness_score')
-            if bitter_raw is None:
-                bitter_raw = c.get('bitterness')
-            if not bitter_raw or float(bitter_raw) == 0.0:
-                bitter = 4.0  # Sensible default for coffee beans if stripped
-            else:
-                bitter = float(bitter_raw)
+            bitter_raw = c.get('bitterness_score') if c.get('bitterness_score') is not None else c.get('bitterness')
+            bitter = safe_float(bitter_raw, 4.0)
+            if bitter <= 0.0:
+                bitter = 4.0
             
             
             calculated_body += ratio * body
@@ -216,12 +217,13 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
         has_modifier_amounts = False
         combined_swe = 0.0
         for m in modified_list:
-            swe = float(m.get('sweetness_score', m.get('sweetness', 3.0)))
+            swe_val = m.get('sweetness_score') if m.get('sweetness_score') is not None else m.get('sweetness')
+            swe = safe_float(swe_val, 3.0)
             combined_swe += swe
             
             amt = m.get('amount')
             if amt is not None:
-                amt_val = float(amt)
+                amt_val = safe_float(amt, 0.0)
                 if amt_val > 4.0:
                     amt_val = amt_val / 29.5735
                 requested_modifier_total += amt_val
@@ -255,21 +257,21 @@ class CoffeeChemistryEngine(BaseChemistryEngine):
         # Proportional Modifier Distribution based on parts
         flavor_modifiers_output = []
         if modified_list:
-            total_mod_parts = sum(float(m.get('amount', 1.0)) for m in modified_list)
+            total_mod_parts = sum(safe_float(m.get('amount'), 1.0) or 1.0 for m in modified_list)
             if total_mod_parts <= 0:
                 total_mod_parts = 1.0
 
             dominant_idx = 0
             max_amt = -1
             for idx, m in enumerate(modified_list):
-                amt = float(m.get('amount', 1.0))
+                amt = safe_float(m.get('amount'), 1.0) or 1.0
                 if amt > max_amt:
                     max_amt = amt
                     dominant_idx = idx
 
             for idx, m in enumerate(modified_list):
                 name = m.get('name', 'Syrup')
-                amt = float(m.get('amount', 1.0))
+                amt = safe_float(m.get('amount'), 1.0) or 1.0
                 mod_share = amt / total_mod_parts
                 vol = mod_share * modifier_budget
                 
@@ -662,10 +664,10 @@ def coffee_chemistry_api(request):
         logger.warning(f"CoffeeChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.coffee"})
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    drink_category = data.get("drink_category", "Hot Coffee").strip()
-    cup_size_oz = float(data.get("cup_size_oz", 12.0))
+    drink_category = str(data.get("drink_category") or "Hot Coffee").strip()
+    cup_size_oz = safe_float(data.get("cup_size_oz"), 12.0)
     ingredients_input = data.get("ingredients", [])
-    espresso_hot_mode = data.get("espresso_hot_mode", "shots").strip().lower()
+    espresso_hot_mode = str(data.get("espresso_hot_mode") or "shots").strip().lower()
 
     try:
         engine = CoffeeChemistryEngine(ingredients_input, drink_category, cup_size_oz, espresso_hot_mode)

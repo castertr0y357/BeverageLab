@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from ..engines.base import BaseChemistryEngine
+from ..engines.base import BaseChemistryEngine, safe_float, safe_int
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +130,18 @@ class CryoChemistryEngine(BaseChemistryEngine):
 
         # Determine initial modifier budget for the solver's starting point
         initial_budget_ml = 140.0 * self.bottle_scale
-        total_parts = sum(float(ing.get('amount', 1.0)) or 1.0 for ing in modifiers)
+        total_parts = sum(safe_float(ing.get('amount'), 1.0) or 1.0 for ing in modifiers)
         if total_parts <= 0:
             total_parts = 1.0
 
         for ing in modifiers:
             name = ing.get('name', 'Syrup')
             itype = ing.get('ingredient_type', ing.get('type', 'SODA_SYRUP'))
-            sweetness = int(ing.get('sweetness_score', ing.get('sweetness', 3)))
+            sweetness_val = ing.get('sweetness_score') if ing.get('sweetness_score') is not None else ing.get('sweetness')
+            sweetness = safe_int(sweetness_val, 3)
             
             is_user_overridden = ing.get('isUserOverridden', False) or ing.get('is_user_overridden', False)
-            amt = float(ing.get('amount', 1.0))
+            amt = safe_float(ing.get('amount'), 1.0) or 1.0
             
             if is_solitary and not is_user_overridden:
                 filler_name = filler_ing.get('name', 'Water')
@@ -172,7 +173,7 @@ class CryoChemistryEngine(BaseChemistryEngine):
                     scaled_amt = required_vol
             else:
                 # Distribute initial budget proportionally by parts
-                amt = float(ing.get('amount', 1.0)) or 1.0
+                amt = safe_float(ing.get('amount'), 1.0) or 1.0
                 scaled_amt = (amt / total_parts) * initial_budget_ml
 
             # Apply Cryo-Sweetness Tax
@@ -306,7 +307,8 @@ class CryoChemistryEngine(BaseChemistryEngine):
             if not orig and item.get('id') == 'virtual_water':
                 orig = {'sweetness': 1}
             if orig:
-                sweet = float(orig.get('sweetness_score', orig.get('sweetness', 3.0)))
+                sweet_val = orig.get('sweetness_score') if orig.get('sweetness_score') is not None else orig.get('sweetness')
+                sweet = safe_float(sweet_val, 3.0)
                 if sweet >= 4.0:
                     sweet += 0.5
                 weighted_sweetness += sweet * vol
@@ -353,7 +355,7 @@ def cryo_chemistry_api(request: HttpRequest) -> JsonResponse:
         logger.warning(f"CryoChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.cryo"})
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    bottle_scale = float(data.get('bottle_scale', 1.0))
+    bottle_scale = safe_float(data.get('bottle_scale'), 1.0)
     ingredients_input = data.get('ingredients', [])
 
     try:

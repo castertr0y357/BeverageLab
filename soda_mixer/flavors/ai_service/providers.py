@@ -26,6 +26,29 @@ class AIProvidersMixin:
             return base_url
 
     @classmethod
+    def _resolve_openai_chat_url(cls, provider: LLMProvider) -> str:
+        """Resolve the chat completions endpoint for OpenAI-compatible providers."""
+        base = cls._resolve_base_url(provider, "https://api.openai.com/v1").rstrip('/')
+        if base.endswith('/chat/completions'):
+            return base
+        if base.endswith('/v1'):
+            return f"{base}/chat/completions"
+        return f"{base}/v1/chat/completions"
+
+    @classmethod
+    def _resolve_openai_models_url(cls, provider: LLMProvider) -> str:
+        """Resolve the models list endpoint for OpenAI-compatible providers."""
+        base = cls._resolve_base_url(provider, "https://api.openai.com/v1").rstrip('/')
+        if base.endswith('/models'):
+            return base
+        if base.endswith('/chat/completions'):
+            base = base[:-len('/chat/completions')].rstrip('/')
+        if base.endswith('/v1'):
+            return f"{base}/models"
+        return f"{base}/v1/models"
+
+
+    @classmethod
     def get_default_provider(cls) -> Optional[LLMProvider]:
             """Get the default LLM provider configured in the system."""
             config = SystemConfiguration.get_config()
@@ -139,7 +162,7 @@ class AIProvidersMixin:
 
     @classmethod
     def _list_openai_models(cls, provider: LLMProvider) -> List[str]:
-            url = cls._resolve_base_url(provider, "https://api.openai.com/v1").rstrip('/') + "/models"
+            url = cls._resolve_openai_models_url(provider)
             headers = {"Authorization": f"Bearer {provider.api_key}"} if provider.api_key else {}
             if provider.provider_type == 'CLAUDE':
                 headers = {
@@ -170,7 +193,7 @@ class AIProvidersMixin:
 
     @classmethod
     def _call_openai(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> str:
-            url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
+            url = cls._resolve_openai_chat_url(provider)
             headers = {
                 "Authorization": f"Bearer {provider.api_key}",
                 "Content-Type": "application/json"
@@ -412,7 +435,7 @@ class AIProvidersMixin:
 
     @classmethod
     def _call_openai_stream(cls, provider: LLMProvider, messages: List[Dict[str, str]], mode: str = "standard") -> Generator[str, None, None]:
-            url = cls._resolve_base_url(provider, "https://api.openai.com/v1/chat/completions")
+            url = cls._resolve_openai_chat_url(provider)
             headers = {
                 "Authorization": f"Bearer {provider.api_key}",
                 "Content-Type": "application/json"

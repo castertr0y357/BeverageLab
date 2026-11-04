@@ -473,3 +473,59 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
         context = AIAssistant.get_static_ingredients_context()
         self.assertIn("- Spiced Brown Sugar Test (State: SYRUP | Function: SWEETENER | Brand: Monin | Category: sweet)", context)
         self.assertNotIn("Spiced Brown Sugar Test [Monin]", context)
+
+    def test_resolve_openai_chat_url_variations(self) -> None:
+        """Verify that OpenAI chat URL resolution correctly appends /v1/chat/completions."""
+        p = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p), "https://litellm.castertr0y357.net/v1/chat/completions")
+
+        p_slash = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net/")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p_slash), "https://litellm.castertr0y357.net/v1/chat/completions")
+
+        p_v1 = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net/v1")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p_v1), "https://litellm.castertr0y357.net/v1/chat/completions")
+
+        p_full = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net/v1/chat/completions")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p_full), "https://litellm.castertr0y357.net/v1/chat/completions")
+
+        p_chat = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net/chat/completions")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p_chat), "https://litellm.castertr0y357.net/chat/completions")
+
+        p_empty = LLMProvider(provider_type="OPENAI", base_url="")
+        self.assertEqual(AIAssistant._resolve_openai_chat_url(p_empty), "https://api.openai.com/v1/chat/completions")
+
+    def test_resolve_openai_models_url_variations(self) -> None:
+        """Verify that OpenAI models URL resolution handles base_url variations."""
+        p = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net")
+        self.assertEqual(AIAssistant._resolve_openai_models_url(p), "https://litellm.castertr0y357.net/v1/models")
+
+        p_v1 = LLMProvider(provider_type="CUSTOM", base_url="https://api.openai.com/v1")
+        self.assertEqual(AIAssistant._resolve_openai_models_url(p_v1), "https://api.openai.com/v1/models")
+
+        p_full = LLMProvider(provider_type="CUSTOM", base_url="https://litellm.castertr0y357.net/chat/completions")
+        self.assertEqual(AIAssistant._resolve_openai_models_url(p_full), "https://litellm.castertr0y357.net/v1/models")
+
+    @patch('requests.request')
+    def test_ai_chat_with_custom_litellm_provider(self, mock_request: MagicMock) -> None:
+        """Verify that custom LiteLLM provider correctly requests /v1/chat/completions."""
+        litellm_provider = LLMProvider.objects.create(
+            name="Test LiteLLM",
+            provider_type="CUSTOM",
+            base_url="https://litellm.castertr0y357.net",
+            api_key="sk-litellm-test",
+            default_model="gemma4:e4b",
+            is_enabled=True
+        )
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "LiteLLM response"}}]
+        }
+        mock_request.return_value = mock_response
+
+        res = AIAssistant._call_openai(litellm_provider, [{"role": "user", "content": "hi"}])
+        self.assertEqual(res, "LiteLLM response")
+        # Verify call target url
+        call_args = mock_request.call_args
+        self.assertEqual(call_args[0][0], "POST")
+        self.assertEqual(call_args[0][1], "https://litellm.castertr0y357.net/v1/chat/completions")

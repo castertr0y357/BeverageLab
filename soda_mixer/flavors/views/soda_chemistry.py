@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, List
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_http_methods
-from ..engines.base import BaseChemistryEngine
+from ..engines.base import BaseChemistryEngine, safe_float, safe_int
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class SodaChemistryEngine(BaseChemistryEngine):
                     is_flavor_modifier = (itype in ['SODA_SYRUP', 'ADDITIVE', 'OTHER'] and not is_dry)
                     
                 if is_flavor_modifier:
-                    baseline_sum += float(ing.get('amount', 0.0))
+                    baseline_sum += safe_float(ing.get('amount'), 0.0)
             
             unscaled_sum = baseline_sum / self.bottle_scale
             if unscaled_sum <= 110.0:
@@ -150,7 +150,7 @@ class SodaChemistryEngine(BaseChemistryEngine):
         rem_accents = []
         for ing in remaining_modifiers:
             name = ing.get('name', 'Syrup')
-            intensity = int(ing.get('intensity', 3))
+            intensity = safe_int(ing.get('intensity'), 3)
             classification = classify_soda_ingredient(name, intensity)
             if classification in ['DELICATE', 'BLENDER']:
                 rem_blenders.append(ing)
@@ -160,14 +160,14 @@ class SodaChemistryEngine(BaseChemistryEngine):
         N_accent = len(rem_accents)
         N_blender = len(rem_blenders)
 
-        total_parts = sum(float(ing.get('amount', 1.0)) for ing in flavor_modifiers)
+        total_parts = sum(safe_float(ing.get('amount'), 1.0) or 1.0 for ing in flavor_modifiers)
         if total_parts <= 0:
             total_parts = 1.0  # Fallback to prevent division by zero
 
         modifiers_output = []
         total_calculated_volume = 0.0
 
-        p_amt = float(primary_base_ing.get('amount', 1.0))
+        p_amt = safe_float(primary_base_ing.get('amount'), 1.0) or 1.0
         p_share = p_amt / total_parts
         p_vol = p_share * syrup_budget_ml
         modifiers_output.append({
@@ -180,7 +180,7 @@ class SodaChemistryEngine(BaseChemistryEngine):
         total_calculated_volume += p_vol
 
         for ing in rem_blenders:
-            b_amt = float(ing.get('amount', 1.0))
+            b_amt = safe_float(ing.get('amount'), 1.0) or 1.0
             b_share = b_amt / total_parts
             b_vol = b_share * syrup_budget_ml
             modifiers_output.append({
@@ -193,7 +193,7 @@ class SodaChemistryEngine(BaseChemistryEngine):
             total_calculated_volume += b_vol
 
         for ing in rem_accents:
-            a_amt = float(ing.get('amount', 1.0))
+            a_amt = safe_float(ing.get('amount'), 1.0) or 1.0
             a_share = a_amt / total_parts
             a_vol = a_share * syrup_budget_ml
             modifiers_output.append({
@@ -209,7 +209,7 @@ class SodaChemistryEngine(BaseChemistryEngine):
         
         # Override calculated sweetness based on baseline_sweetness + acidity
         sweetness_score = baseline_sweetness
-        accent_acidity_scores = [float(ing.get('acidity_score', ing.get('acidity', 3.0))) for ing in rem_accents]
+        accent_acidity_scores = [safe_float(ing.get('acidity_score') if ing.get('acidity_score') is not None else ing.get('acidity'), 3.0) for ing in rem_accents]
         if len(accent_acidity_scores) > 0:
             avg_accent_acidity = sum(accent_acidity_scores) / len(accent_acidity_scores)
             if avg_accent_acidity >= 4.0:
@@ -267,8 +267,8 @@ def soda_chemistry_api(request: HttpRequest) -> JsonResponse:
         logger.warning(f"SodaChemistry - Warning - Invalid JSON payload: {e}", extra={"action": "chemistry.soda"})
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    sweetness_style = data.get('sweetness_style', '').strip().upper()
-    bottle_scale = float(data.get('bottle_scale', 1.0))
+    sweetness_style = str(data.get('sweetness_style') or '').strip().upper()
+    bottle_scale = safe_float(data.get('bottle_scale'), 1.0)
     ingredients_input = data.get('ingredients', [])
 
     try:

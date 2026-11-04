@@ -221,6 +221,9 @@ function getChemistryAlignedIngredient(ing, idx) {
                         const ingCopy = { ...ing };
                         ingCopy.ingredient_type = ing.type || ing.ingredient_type;
                         ingCopy.is_primary = ing.isPrimary || false;
+                        if (ingCopy.amount === null || ingCopy.amount === undefined || isNaN(ingCopy.amount)) {
+                            ingCopy.amount = 1.0;
+                        }
                         return ingCopy;
                     })
                 })
@@ -247,6 +250,9 @@ function getChemistryAlignedIngredient(ing, idx) {
                     ingredients: selectedIngredients.map((ing) => {
                         const ingCopy = { ...ing };
                         ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                        if (ingCopy.amount === null || ingCopy.amount === undefined || isNaN(ingCopy.amount)) {
+                            ingCopy.amount = 1.0;
+                        }
                         return ingCopy;
                     })
                 })
@@ -1596,6 +1602,9 @@ function cancelInFlightLLMCalls() {
                     const ingCopy = { ...ing };
                     ingCopy.ingredient_type = ing.type || ing.ingredient_type;
                     ingCopy.is_primary = ing.isPrimary || false;
+                    if (ingCopy.amount === null || ingCopy.amount === undefined || isNaN(ingCopy.amount)) {
+                        ingCopy.amount = 1.0;
+                    }
                     return ingCopy;
                 });
 
@@ -1794,6 +1803,9 @@ function cancelInFlightLLMCalls() {
                 const mappedIngredients = selectedIngredients.map((ing) => {
                     const ingCopy = { ...ing };
                     ingCopy.ingredient_type = ing.type || ing.ingredient_type;
+                    if (ingCopy.amount === null || ingCopy.amount === undefined || isNaN(ingCopy.amount)) {
+                        ingCopy.amount = 1.0;
+                    }
                     return ingCopy;
                 });
 

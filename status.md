@@ -1,6 +1,28 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Resolved Manual Formula Chemistry 500 Error and LiteLLM OpenAI-Compatible Provider URL Resolution:
+  - **Issue 1 (Manual Formula Chemistry 500 Error)**:
+    - In manual formula mode (`lab_manual.js`), selecting flavor modifiers without preset amounts sent `amount: null` (and potentially `intensity: null` or `acidity_score: null`) in the payload to `POST /api/soda/chemistry/`.
+    - In `soda_chemistry.py`, expressions like `float(ing.get('amount', 1.0))` evaluated to `float(None)` because the `'amount'` key existed in the dictionary with value `None`, triggering `TypeError: float() argument must be a string or a real number, not 'NoneType'` and a `500 Internal Server Error`.
+    - Similar vulnerability existed across `coffee_chemistry.py`, `cryo_chemistry.py`, and `BaseChemistryEngine.calculate_metrics`.
+  - **Issue 2 (LiteLLM Communication 405 Client Error)**:
+    - When configuring a custom LLM provider with `base_url = "https://litellm.castertr0y357.net"`, `AIProvidersMixin._resolve_base_url` returned the root domain without appending `/v1/chat/completions` or `/chat/completions`.
+    - Calls to `_call_openai` and `_call_openai_stream` made a `POST` request directly to `https://litellm.castertr0y357.net/`, causing `405 Client Error: Method Not Allowed for url: https://litellm.castertr0y357.net/`.
+  - **Resolution**:
+    - **Safe Conversion Primitives**: Added `safe_float(val, default)` and `safe_int(val, default)` in `soda_mixer/flavors/engines/base.py` to resiliently handle `None`, empty strings, NaN, infinity, or malformed values.
+    - **Chemistry Engine Hardening**:
+      - Updated `soda_chemistry.py` to use `safe_float` and `safe_int` across `total_parts`, primary/blender/accent amounts, sweetness styles, and bottle scale calculation.
+      - Hardened `coffee_chemistry.py` and `cryo_chemistry.py` against `None` amounts, ratios, intensities, and sensory scores.
+      - Updated `lab_manual.js` to ensure `amount` defaults to `1.0` if `null`, `undefined`, or `NaN` during wizard updates and synthesis dispatch.
+    - **LiteLLM / OpenAI Provider Endpoint Normalization**:
+      - Implemented `_resolve_openai_chat_url(cls, provider)` and `_resolve_openai_models_url(cls, provider)` in `soda_mixer/flavors/ai_service/providers.py` to automatically resolve bare domains, `/v1` endpoints, or explicit completion paths to canonical `/v1/chat/completions` and `/v1/models` routes.
+      - Updated `_call_openai`, `_call_openai_stream`, and `_list_openai_models` to use these helpers.
+  - **Testing & Verification**:
+    - Added unit tests in `test_soda_chemistry.py` verifying `/api/soda/chemistry/` succeeds with `amount: None`, `intensity: None`, missing fields, and null bottle scales.
+    - Added unit tests in `test_ai_service.py` verifying `_resolve_openai_chat_url`, `_resolve_openai_models_url`, and custom LiteLLM provider completions.
+    - Verified all 156 tests in the test suite pass with 0 failures and 0 errors.
+    - Rebuilt and restarted containers via `nerdctl compose down; nerdctl compose up -d --build`. Live logs confirmed successful LLM signal and KV cache preheat from LiteLLM.
 - [x] Removed Inaccurate Ingredient Amounts from Historical Archives Spec Cards:
   - **Issue**: Historical Archive (`/history/`) cards displayed rough auto-logged amounts and volume units (e.g. `4ml • SWEET`, `3ml • SPICE`) under each ingredient in the Molecular Specs section, which were not scaled or accurate to actual target batch formulations.
   - **Resolution**:
