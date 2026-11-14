@@ -166,6 +166,13 @@ def ai_bulk_analyze_task(update_progress: Callable[..., None]) -> None:
                             else:
                                 match.flavor_notes = str(notes_val or '')
 
+                        if 'physical_state' in res and res.get('physical_state'):
+                            match.physical_state = str(res.get('physical_state')).strip().upper()
+                        if 'mixology_function' in res and res.get('mixology_function'):
+                            match.mixology_function = str(res.get('mixology_function')).strip().upper()
+                        if not match.description and res.get('description'):
+                            match.description = str(res.get('description')).strip()
+
                         match.ai_notes = res.get('ai_notes', match.ai_notes)
                         match.save()
                         total_analyzed += 1

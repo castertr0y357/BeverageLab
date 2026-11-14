@@ -154,6 +154,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'mozilla_django_oidc',
     'soda_mixer.flavors.apps.FlavorsConfig',
 ]
 
@@ -199,6 +200,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
         'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
         'PORT': os.environ.get('DATABASE_PORT', '5432'),
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -262,8 +264,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication Protocol Configuration
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# OpenID Connect (Authentik) Configuration
+OIDC_ENABLED = os.environ.get('OIDC_ENABLED', 'False').lower() in ('true', '1', 't')
+OIDC_ADMIN_GROUP = os.environ.get('OIDC_ADMIN_GROUP', 'authentik Admins')
+OIDC_REQUIRED_GROUP = os.environ.get('OIDC_REQUIRED_GROUP', '')
+
+if OIDC_ENABLED:
+    AUTHENTICATION_BACKENDS = [
+        'soda_mixer.flavors.oidc.AuthentikOIDCBackend',
+    ]
+    OIDC_RP_CLIENT_ID = os.environ.get('OIDC_RP_CLIENT_ID', '')
+    OIDC_RP_CLIENT_SECRET = os.environ.get('OIDC_RP_CLIENT_SECRET', '')
+    OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ.get('OIDC_OP_AUTHORIZATION_ENDPOINT', 'https://auth.castertr0y357.net/application/o/authorize/')
+    OIDC_OP_TOKEN_ENDPOINT = os.environ.get('OIDC_OP_TOKEN_ENDPOINT', 'https://auth.castertr0y357.net/application/o/token/')
+    OIDC_OP_USER_ENDPOINT = os.environ.get('OIDC_OP_USER_ENDPOINT', 'https://auth.castertr0y357.net/application/o/userinfo/')
+    OIDC_OP_JWKS_ENDPOINT = os.environ.get('OIDC_OP_JWKS_ENDPOINT', 'https://auth.castertr0y357.net/application/o/beveragelab/jwks/')
+    OIDC_OP_LOGOUT_ENDPOINT = os.environ.get('OIDC_OP_LOGOUT_ENDPOINT', 'https://auth.castertr0y357.net/application/o/beveragelab/end-session/')
+    OIDC_RP_SIGN_ALGO = 'RS256'
+    OIDC_RP_SCOPES = 'openid email profile'
+    LOGIN_URL = 'oidc_authentication_init'
+else:
+    AUTHENTICATION_BACKENDS = [
+        'django.contrib.auth.backends.ModelBackend',
+    ]
 
 # Speed up password hashing in tests to optimize execution times
 if 'test' in sys.argv or any('test' in arg for arg in sys.argv):

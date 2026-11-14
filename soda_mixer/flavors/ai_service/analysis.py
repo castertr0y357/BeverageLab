@@ -73,10 +73,10 @@ class AIAnalysisMixin:
             - base_suitability (how well it serves as a dominant, high-volume base ingredient, from 1.0 to 5.0)
             - accent_suitability (how well it serves as a low-volume accent / high-impact nuance, from 1.0 to 5.0)
             - category (must be one of: 'citrus', 'berry', 'tropical', 'herbal', 'spice', 'sweet', 'sour', 'artificial', 'coffee')
-            - ingredient_type (must be one of: 'SODA_SYRUP', 'COFFEE_BEAN', 'DAIRY', 'ADDITIVE', 'OTHER')
-            - is_ready_to_drink (boolean, true if it is a ready-to-drink liquid like juice, milk, tea, or soda base; false for concentrated syrups, beans, or powders)
-            - is_dry (boolean, true if it is a dry/powdered ingredient like sugar, powder, coffee beans; false for liquid ingredients like syrups, juice, milk, water)
+            - physical_state (must be one of: 'LIQUID', 'SYRUP', 'SAUCE', 'POWDER', 'SOLID_EXTRACTABLE')
+            - mixology_function (must be one of: 'VOLUME_BASE', 'FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH')
             - compatible_systems (comma-separated list of compatible systems from: 'SODA', 'COFFEE', 'SLUSHIE')
+            - description (a concise 1-2 sentence sensory description of this ingredient)
             - ai_notes (a short paragraph of relevant notes about this ingredient's flavor profile, pairings, and mixology recommendations)
             - roast_level (string, 'LIGHT', 'MEDIUM', 'DARK', or null if not a coffee bean)
             - is_decaf (boolean, true if decaf coffee, false otherwise)
@@ -86,7 +86,7 @@ class AIAnalysisMixin:
             - flavor_notes (string, comma-separated flavor descriptors e.g. 'herbal, earthy, chocolate, nutty')
             
             OUTPUT FORMAT: A raw JSON array of objects. [NO MARKDOWN] [NO PREAMBLE].
-            Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "ingredient_type": "SODA_SYRUP", "is_ready_to_drink": false, "is_dry": false, "compatible_systems": "SODA,SLUSHIE", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness.", "roast_level": null, "is_decaf": false, "body_intensity": 3, "acidity_score": 3, "bitterness_score": 3, "flavor_notes": "citrus, sweet" }}]
+            Example: [{{ "name": "Lemon", "intensity": 4.5, "sweetness": 2.0, "acidity": 5.0, "bitterness": 1.5, "complexity": 1.5, "base_suitability": 4.5, "accent_suitability": 2.0, "category": "citrus", "physical_state": "SYRUP", "mixology_function": "FLAVORING", "compatible_systems": "SODA,SLUSHIE", "description": "A bright, tart citrus syrup.", "ai_notes": "Bright, tart citrus that cuts through heavy syrups and adds freshness.", "roast_level": null, "is_decaf": false, "body_intensity": 3, "acidity_score": 3, "bitterness_score": 3, "flavor_notes": "citrus, sweet" }}]
             """
             response = cls.chat(prompt)
             return cls._extract_json(response)
