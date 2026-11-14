@@ -468,6 +468,7 @@ class BeverageLabAIProfileCompatibilityTest(TestCase):
             name="Spiced Brown Sugar Test",
             brand="Monin",
             category="sweet",
+            mixology_function="SWEETENER",
             is_in_inventory=True
         )
         context = AIAssistant.get_static_ingredients_context()
