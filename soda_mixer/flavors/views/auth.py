@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def login_view(request: HttpRequest) -> HttpResponse:
-    """Render the dedicated laboratory access gate."""
+    """Render the dedicated laboratory access gate or redirect to Authentik."""
+    from django.conf import settings
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect('dashboard')
+    if getattr(settings, 'OIDC_ENABLED', False):
+        return redirect('oidc_authentication_init')
     return render(request, 'flavors/login.html')
 
 
@@ -22,6 +25,12 @@ def login_view(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["POST"])
 def login_api(request: HttpRequest) -> JsonResponse:
     """AJAX login endpoint for the laboratory."""
+    from django.conf import settings
+    if getattr(settings, 'OIDC_ENABLED', False):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Password login is disabled. Please authenticate via Authentik SSO.'},
+            status=403
+        )
     try:
         data = json.loads(request.body)
         username = data.get('username')

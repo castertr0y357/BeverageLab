@@ -17,6 +17,7 @@ class LaboratoryAccessMiddleware:
         self.whitelist = [
             reverse('login'),
             reverse('login_api'),
+            '/oidc/',
             '/admin/',
             '/static/',
             '/media/',
