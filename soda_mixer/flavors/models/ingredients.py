@@ -285,52 +285,6 @@ class Ingredient(SoftDeleteModel):
             return 'Additive (Syrup, Sugar, Honey, etc.)'
         return 'Other'
 
-    def save(self, *args, **kwargs):
-        # Auto-populate physical_state and mixology_function based on old fields
-        # if they are left at defaults (SYRUP and FLAVORING)
-        if self.physical_state == 'SYRUP' and self.mixology_function == 'FLAVORING':
-            name_lower = self.name.lower()
-            if self.ingredient_type == 'COFFEE_BEAN':
-                self.physical_state = 'SOLID_EXTRACTABLE'
-                self.mixology_function = 'FLAVORING'
-            elif self.ingredient_type == 'DAIRY':
-                if 'cream' in name_lower or 'half' in name_lower or 'whipped' in name_lower:
-                    self.physical_state = 'SAUCE'
-                    self.mixology_function = 'TEXTURIZER'
-                else:
-                    self.physical_state = 'LIQUID'
-                    self.mixology_function = 'VOLUME_BASE'
-            elif self.is_ready_to_drink:
-                self.physical_state = 'LIQUID'
-                self.mixology_function = 'VOLUME_BASE'
-            elif self.is_dry:
-                self.physical_state = 'POWDER'
-                if any(x in name_lower for x in ['sugar', 'sweetener', 'stevia', 'splenda', 'honey powder', 'erythritol']):
-                    self.mixology_function = 'SWEETENER'
-                elif any(x in name_lower for x in ['cinnamon', 'nutmeg', 'dust', 'powder', 'cocoa', 'matcha']):
-                    self.mixology_function = 'GARNISH'
-                else:
-                    self.mixology_function = 'FLAVORING'
-            else:
-                # Additive or other
-                if any(x in name_lower for x in ['honey', 'agave', 'maple', 'caramel', 'chocolate', 'fudge', 'sauce', 'puree']):
-                    self.physical_state = 'SAUCE'
-                    if any(x in name_lower for x in ['honey', 'agave', 'maple']):
-                        self.mixology_function = 'SWEETENER'
-                    else:
-                        self.mixology_function = 'FLAVORING'
-                elif any(x in name_lower for x in ['sugar', 'simple syrup', 'syrup sugar']):
-                    self.physical_state = 'SYRUP'
-                    self.mixology_function = 'SWEETENER'
-                elif any(x in name_lower for x in ['syrup', 'monin', 'torani', 'extract', 'bitters']):
-                    self.physical_state = 'SYRUP'
-                    self.mixology_function = 'FLAVORING'
-                elif any(x in name_lower for x in ['water', 'juice', 'club soda', 'soda water', 'tonic']):
-                    self.physical_state = 'LIQUID'
-                    self.mixology_function = 'VOLUME_BASE'
-                    
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return self.name
 
