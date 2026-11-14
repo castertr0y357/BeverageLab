@@ -1,4 +1,38 @@
 // Toggle Coffee-Specific Fields Function
+    function syncSugarHidden(prefix) {
+        const displayEl = document.getElementById(prefix + 'SugarDisplay');
+        const servingEl = document.getElementById(prefix + 'SugarServing');
+        const hiddenEl = document.getElementById(prefix + 'SugarGrams');
+        if (!displayEl || !servingEl || !hiddenEl) return;
+        const val = parseFloat(displayEl.value);
+        const oz = parseFloat(servingEl.value) || 1;
+        hiddenEl.value = (!isNaN(val) && displayEl.value.trim() !== '') ? (val / oz).toFixed(2) : '';
+    }
+
+    function setSugarFromCanonical(prefix, per30mlVal, mixologyFunction) {
+        const displayEl = document.getElementById(prefix + 'SugarDisplay');
+        const servingEl = document.getElementById(prefix + 'SugarServing');
+        const hiddenEl = document.getElementById(prefix + 'SugarGrams');
+        if (!displayEl || !servingEl || !hiddenEl) return;
+        const oz = (String(mixologyFunction).toUpperCase() === 'VOLUME_BASE') ? '8' : '1';
+        servingEl.value = oz;
+        const parsed = parseFloat(per30mlVal);
+        if (!isNaN(parsed) && String(per30mlVal).trim() !== '') {
+            hiddenEl.value = parsed.toFixed(2);
+            displayEl.value = (parsed * parseFloat(oz)).toFixed(1);
+        } else {
+            hiddenEl.value = '';
+            displayEl.value = '';
+        }
+    }
+
+    ['add', 'edit'].forEach(prefix => {
+        const displayEl = document.getElementById(prefix + 'SugarDisplay');
+        const servingEl = document.getElementById(prefix + 'SugarServing');
+        if (displayEl) displayEl.addEventListener('input', () => syncSugarHidden(prefix));
+        if (servingEl) servingEl.addEventListener('change', () => syncSugarHidden(prefix));
+    });
+
     function toggleCoffeeFields(prefix) {
         const stateSelect = document.getElementById(prefix + 'PhysicalState');
         const coffeeFields = document.getElementById(prefix + 'CoffeeFields');
@@ -38,7 +72,8 @@
                 document.getElementById('editCpx').value = d.complexity;
                 document.getElementById('editBaseSuit').value = d.baseSuitability;
                 document.getElementById('editAccentSuit').value = d.accentSuitability;
-                document.getElementById('editSugarGrams').value = d.sugarGramsPer30ml || '';
+                const rawSugar = d['sugarGramsPer-30ml'] ?? d.sugarGramsPer30ml ?? '';
+                setSugarFromCanonical('edit', rawSugar, d.mixologyFunction || 'FLAVORING');
                 document.getElementById('editDesc').value = d.description;
                 document.getElementById('editAINotes').value = d.aiNotes || '';
                 document.getElementById('editFavorite').checked = d.favorite === 'true';
@@ -183,6 +218,9 @@
 
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
+        btn.style.opacity = '0.85';
+        btn.style.color = '#ffffff';
+        btn.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyzing...';
 
         try {
@@ -231,21 +269,21 @@
 
                 const categoryEl = document.getElementById(prefix + 'Category');
                 if (categoryEl && profile.category) {
-                    categoryEl.value = profile.category;
+                    categoryEl.value = String(profile.category).trim().toLowerCase();
                     categoryEl.classList.add('is-valid');
                     setTimeout(() => categoryEl.classList.remove('is-valid'), 2000);
                 }
 
                 const physicalStateEl = document.getElementById(prefix + 'PhysicalState');
                 if (physicalStateEl && profile.physical_state) {
-                    physicalStateEl.value = profile.physical_state;
+                    physicalStateEl.value = String(profile.physical_state).trim().toUpperCase();
                     physicalStateEl.classList.add('is-valid');
                     setTimeout(() => physicalStateEl.classList.remove('is-valid'), 2000);
                 }
 
                 const mixologyFunctionEl = document.getElementById(prefix + 'MixologyFunction');
                 if (mixologyFunctionEl && profile.mixology_function) {
-                    mixologyFunctionEl.value = profile.mixology_function;
+                    mixologyFunctionEl.value = String(profile.mixology_function).trim().toUpperCase();
                     mixologyFunctionEl.classList.add('is-valid');
                     setTimeout(() => mixologyFunctionEl.classList.remove('is-valid'), 2000);
                     toggleCoffeeFields(prefix);
@@ -305,6 +343,12 @@
                     if (slushieChk) slushieChk.checked = systems.includes('SLUSHIE');
                 }
 
+                if (descInput && !descInput.value.trim() && profile.description) {
+                    descInput.value = profile.description;
+                    descInput.classList.add('is-valid');
+                    setTimeout(() => descInput.classList.remove('is-valid'), 2000);
+                }
+
                 const aiNotesEl = document.getElementById(prefix + 'AINotes');
                 if (aiNotesEl && profile.ai_notes) {
                     aiNotesEl.value = profile.ai_notes;
@@ -325,6 +369,9 @@
         } finally {
             setTimeout(() => {
                 btn.disabled = false;
+                btn.style.opacity = '';
+                btn.style.color = '';
+                btn.style.backgroundColor = '';
                 btn.innerHTML = originalHtml;
                 btn.classList.remove('btn-success');
                 btn.classList.add('btn-outline-experimental');

@@ -80,6 +80,7 @@ class AIPromptsMixin:
         "physical_state": string (must be one of: 'LIQUID', 'SYRUP', 'SAUCE', 'POWDER', 'SOLID_EXTRACTABLE'),
         "mixology_function": string (must be one of: 'VOLUME_BASE', 'FLAVORING', 'SWEETENER', 'TEXTURIZER', 'GARNISH'),
         "compatible_systems": string (comma-separated list of systems, e.g., 'SODA,SLUSHIE' or 'COFFEE'),
+        "description": string (concise 1-2 sentence sensory description),
         "ai_notes": string,
         "roast_level": string (must be one of: 'LIGHT', 'MEDIUM', 'DARK', or null if not a coffee bean),
         "is_decaf": boolean,

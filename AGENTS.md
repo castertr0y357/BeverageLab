@@ -1,21 +1,20 @@
-# BeverageLab Rules & Skills
+# Global Project Rules & Production Standards
 
-This file defines the rules and skills for the BeverageLab workspace.
+This file defines the template structure for local workspace rules and skills across projects.
 
 ## 🚀 Post-Change Verification Protocol
-Run the project verification command when making significant changes to check for regressions, but avoid running it excessively to conserve quota.
+You **MUST** run the project verification command after every code change to guarantee stability and prevent regressions.
 
 ### Rebuild and Verify Command
 Run the following command from the workspace root:
-```powershell
-nerdctl compose exec -T web python manage.py test; nerdctl compose down; nerdctl compose up -d --build
+```bash
+nerdctl compose exec web python manage.py test && nerdctl compose exec web python .gemini/scripts/smoke_test.py
 ```
 
 > [!IMPORTANT]
-> 1. Run verification before committing when making significant changes, but do not overuse it.
-> 2. Update the [status.md](file:///./status.md) file after each task to reflect the current status.
-> 3. Generate a git commit with an accurate, descriptive commit message representing the changes (only if a Git repository is initialized in the workspace).
-> 4. The user will handle all visual inspection. Do NOT run automated browser subagents or screenshot-based tools for user interface layout verification.
+> 1. Never skip verification before committing. The verification step **MUST** execute all unit and integration test suites.
+> 2. You **MUST** update the [status.md](file:///./status.md) file after each task to reflect the current status of features, completed tasks, and architectural changes.
+> 3. You **MUST** generate a git commit with an accurate, descriptive commit message representing the changes after every successful execution (only if a Git repository is initialized in the workspace; skip this step if Git is not initialized).
 
 ## 🧪 Automated Testing & Bug Prevention
 To ensure that projects are robust enough to share with others, you must establish and maintain strict testing habits:
@@ -58,13 +57,14 @@ To ensure that projects are robust enough to share with others, you must establi
     - If codebase context reveals conflicting patterns of doing the same thing, halt and present the choice of patterns to the user with pros/cons instead of choosing one arbitrarily.
     - For complex logic, endpoints, or data models, propose the function/API signatures, schemas, or interface designs to the user first. Once approved, proceed to full implementation.
     - Reference the active document and cursor position provided in metadata if relevant; if they seem related but ambiguous, ask for confirmation.
-*   **Ingredient Classification Reviews & Coffee Chemistry Integrity**: When working with ingredient metadata or classifications (e.g. coffee modifiers, soda syrups), the agent must review them against practical real-world usage:
-    - Dairy and Plant Milks (`DAIRY` type) should be reserved for high-volume cup fillers (e.g. Whole Milk, Oat Milk, Almond Milk).
-    - Rich creamers (e.g., Heavy Cream, half-and-half) or thick sweet syrups (e.g. chocolate syrup, honey, maple syrup, sugar) must be classified as `ADDITIVE` to prevent them from auto-scaling to fill the remaining cup volume (which would ruin the drink).
-    - Helping Non-Coffee Drinkers: Since the user might not drink coffee or be familiar with standard beverage chemistry, the agent **must** actively analyze and push back on any proposed classifications or default quantities that do not make conceptual sense (e.g. treating heavy cream or a sweet syrup as a volume-filling base, or using dry weight grams for liquid additives). Explain the chemical/mixology rationale and suggest a realistic configuration instead of blindly implementing it.
 *   **Framework & Architecture Decisions**: When introducing new frameworks, major dependencies, or architectural shifts, present 2-3 viable options detailing the pros, cons, and trade-offs of each, and wait for user approval before executing.
 *   **Separation of Infrastructure and Application Settings**: Keep a clear separation between infrastructure settings and application preferences. Settings required to run the application process and container (such as database URLs, ports, volume mounts, and path locations) must live in `.env` or system environment configurations. Conversely, application-level configurations and feature toggles (such as UI preferences, AI model configurations, and functional toggles) must live within the application's settings dashboard/database rather than environment files.
 *   **Modular Architecture & Code Separation**: Avoid monolithic files. Keep files modular by separating logic into distinct files and sub-modules. Limit file sizes (ideally under 500 lines) and function/method complexity. Extend base objects or classes by importing them locally and building extensions in separate files rather than piling all behavior into a single base definition file.
+    - **Package-First Structure (Django Standard)**: Organize apps using Python packages (directories with `__init__.py` and focused submodules such as `models/`, `views/`, `forms/`, `urls/`, `services/`, `selectors/`, `mixins/`, and `tests/`) rather than cramming everything into single `models.py`, `views.py`, or `tests.py` mega-files. Mirror the app's package layout inside `tests/` (e.g., `tests/test_models/`, `tests/test_views/`).
+    - **Class-Based Views & Mixins**: Prefer Django Class-Based Views (CBVs) over function-based views. Extract shared view, permission, ownership, and model behaviors into reusable mixins (`mixins/`) rather than duplicating logic.
+    - **Service / Selector Layer & Custom QuerySets**: Keep business logic and complex queries out of both views and models. Place mutations/business logic in `services/` and read/query logic in `selectors/`, and encapsulate common filters (such as `active()` for `deleted_at IS NULL` or `for_user(user)`) in custom `QuerySet` / `Manager` classes.
+    - **Split Settings Package**: Use a `settings/` package (`base.py`, `local.py`, `production.py`, `test.py`) instead of a single monolithic `settings.py`.
+    - **Reusable Templates & Page-Scoped Assets**: All page templates must inherit from a `base.html` template, and repeated UI blocks (cards, modals, forms, tables) must be extracted into reusable `partials/` (`{% include %}`) or custom template tags. Maintain baseline CSS and JS templates/modules for shared functionality, and only create page-specific CSS or JS files when a page has unique elements. Namespace app templates and static assets under `templates/<app_name>/` and `static/<app_name>/` (`css/`, `js/`).
 *   **Database Relationships & Indexing**: Every database foreign key column must have a database index defined. All database relationships must explicitly define their deletion behavior (such as `ON DELETE CASCADE` or `ON DELETE SET NULL`) to prevent slow query performance and orphaned data.
 *   **Asynchronous Workflows & Dynamic UI Updates**:
     - **Heavy Task Offloading**: Keep the HTTP request-response cycle under 500ms. Offload heavy processing (e.g., file generation, email dispatch, slow external API queries) to background queues/workers, immediately returning a `202 Accepted` status and a `task_id` to the client.
@@ -75,7 +75,7 @@ To ensure that projects are robust enough to share with others, you must establi
     - **Task ID Security**: Use cryptographically secure, non-predictable UUIDs for all `task_id` endpoints. Never expose raw auto-incrementing integers or predictable strings as task identifiers to prevent unauthorized polling or metadata exposure.
     - **Queue Throttling & Rate-Limiting**: Enforce rate-limiting on task submission endpoints to prevent queue flooding and worker process starvation (Denial of Service).
     - **Worker Input Sanitization**: Treat all arguments received from serialized task queue payloads as untrusted inputs. Re-verify access control and validate/sanitize inputs in the worker execution scope to prevent local command/query injections.
-*   **Soft Deletes with Retention Windows**: Avoid hard deleting critical user data immediately on request. Flag records with a `deleted_at` timestamp and retain them for a recovery window (e.g., 30 days) to allow restoration before background tasks permanently prune them. Provide users a clear option to override the queue and immediately hard-delete items to free up storage space. To prevent logic bypass vulnerabilities, the application must explicitly filter all standard select/join queries to only include records where `deleted_at IS NULL`, verifying that soft-deleted entities are not inadvertently processed, queried, or authenticated.
+*   **Soft Deletes with Retention Windows**: Avoid hard deleting critical user data immediately on request. Flag records with a `deleted_at` timestamp and retain them for a recovery window (e.g., 30 days) to allow restoration before background tasks permanently prune them. For self-hosted systems, provide a secure, authenticated option to immediately purge/hard-delete records to reclaim disk space. To prevent logic bypass vulnerabilities, the application must explicitly filter all standard select/join queries to only include records where `deleted_at IS NULL`, verifying that soft-deleted entities are not inadvertently processed, queried, or authenticated.
 
 ### 3. Code Quality & Structure
 *   **Imports**: Write all imports at the top of the file. No lazy imports inside functions or methods unless absolutely required for dynamic loading or avoiding circular dependencies (documented with clear comments). Order imports logically (standard library, third-party libraries, local imports).
@@ -83,7 +83,7 @@ To ensure that projects are robust enough to share with others, you must establi
 *   **No Code Stubs**: Never write code stubs, temporary `TODO` comments, or truncated snippets (e.g., `// ... rest of code remains the same`). Code edits must always be fully complete and ready to run.
 *   **Dependency & Supply Chain Auditing**: Every project verification cycle must include automated dependency auditing checks (e.g., `npm audit`, `pip-audit`, or `cargo audit`) to detect known vulnerabilities (CVEs) in third-party libraries. All dependencies must be pinned to exact versions or restricted using lockfiles to prevent unverified automatic updates of transient dependencies.
 *   **Living Rules Document (AGENTS.md)**: Proactively update the project's `AGENTS.md` rules file whenever repository-specific findings, quirks, or hidden behaviors are discovered during tasks. Treating `AGENTS.md` as a living documentation file ensures subsequent agent sessions build upon shared repository context without losing history.
-*   **Multi-LLM Rules Synchronization (Multi-Format Rules)**: To ensure that project rules, verification commands, and quality standards are respected by different LLM assistants (such as Gemini, Claude, and Windsurf), always mirror and synchronize these project rules across the formats expected by each platform (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`). Whenever you update the project's rules or discover repository-specific behavior, make sure to propagate those changes to all of these formats to maintain alignment.
+*   **Multi-LLM Rules Synchronization (Multi-Format Rules)**: To ensure that project rules, verification commands, and quality standards are respected by different LLM assistants (such as Gemini, Claude, Cursor, and Windsurf), always mirror and synchronize these project rules across the formats expected by each platform (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`). Whenever you update the project's rules or discover repository-specific behavior, make sure to propagate those changes to all of these formats to maintain alignment.
 *   **Automatic Workspace Rules Synchronization**: At the start of every session, check if the local rules files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`) exist and match the latest global template `C:\Users\caste\.gemini\project.md`. If they are out of sync, outdated, or missing, immediately perform a synchronization cycle to update them, ensuring that the latest global standards are consistently applied across all projects without manual user intervention.
 
 ### 4. UI/UX & Aesthetics

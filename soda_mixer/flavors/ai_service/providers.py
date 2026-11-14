@@ -217,7 +217,7 @@ class AIProvidersMixin:
                 is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
                 is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
                 is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-                is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+                is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
                 enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
                 if is_single_quick_cache_request:
                     data["response_format"] = {
@@ -305,7 +305,7 @@ class AIProvidersMixin:
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
             is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
             is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
             enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
             if is_single_quick_cache_request:
                 data["format"] = AIPromptsMixin.get_single_quick_drink_json_schema(enable_thinking)
@@ -387,7 +387,7 @@ class AIProvidersMixin:
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
             is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
             is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
             enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
@@ -454,7 +454,7 @@ class AIProvidersMixin:
                 is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
                 is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
                 is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-                is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+                is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
                 enable_thinking = getattr(provider, 'enable_thinking', False) and ("o1" in model_name.lower() or "o3" in model_name.lower())
                 if is_single_quick_cache_request:
                     data["response_format"] = {
@@ -546,7 +546,7 @@ class AIProvidersMixin:
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
             is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
             is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
             enable_thinking = getattr(provider, 'enable_thinking', False) and ("think" in model_name.lower() or "deepseek" in model_name.lower() or "r1" in model_name.lower())
             if is_single_quick_cache_request:
                 data["format"] = AIPromptsMixin.get_single_quick_drink_json_schema(enable_thinking)
@@ -635,7 +635,7 @@ class AIProvidersMixin:
             is_surprise_request = any(keyword in user_prompt for keyword in ["[AUTONOMOUS SYNTHESIS REQUEST]"])
             is_quick_drinks_request = any(keyword in user_prompt for keyword in ["[QUICK DRINKS REQUEST]"])
             is_vibe_request = any(keyword in user_prompt for keyword in ["[VIBE DRINKS REQUEST]"])
-            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "[BATCH CHEMICAL ANALYSIS]", "RAW JSON", "Return ONLY a JSON object"]) and not is_single_quick_cache_request
+            is_json_request = any(keyword in user_prompt for keyword in ["[STRUCTURED DATA REQUEST]", "RAW JSON"]) and not is_single_quick_cache_request and not ("Analyze this ingredient:" in user_prompt or "[BATCH CHEMICAL ANALYSIS]" in user_prompt)
             enable_thinking = getattr(provider, 'enable_thinking', False) and "thinking" in model.lower()
             
             generation_config = {}
