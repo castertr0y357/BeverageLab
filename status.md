@@ -1,6 +1,14 @@
 # Project Status - BeverageLab
 
 ## 📋 Todo List
+- [x] Implemented Targeted Quick Drink Cache Invalidation on Ingredient Category & Inventory Changes:
+  - **Signal & Service (`signals.py`, `quick_cache_service.py`)**:
+    - Added `pre_save` (`capture_ingredient_previous_state`) and `post_save` (`invalidate_quick_cache_on_ingredient_save`) receivers on `Ingredient`.
+    - When an ingredient's `category` changes, `invalidate_quick_cache_for_ingredient_change()` deletes all `CachedQuickDrink` entries referencing that ingredient (preventing stale category placement) and prunes the 2 oldest cached drinks in the new category to open slots for regeneration.
+    - When a new `is_in_inventory=True` ingredient is added or restocked, it prunes the 3 oldest cached drinks in that ingredient's category so the next replenishment naturally weaves the new flavor into the pool.
+  - **Testing & Verification**:
+    - Added unit tests `test_targeted_invalidation_on_ingredient_category_change` and `test_targeted_invalidation_on_new_in_stock_ingredient` in `test_quick_drink_cache.py`.
+    - Verified all 158 automated tests pass with zero failures.
 - [x] Verified Nightly Seasonal/Holiday Cache Replenishment & Clarified Vault Inventory Capacity:
   - **Seasonal & Holiday Cache Verification**:
     - Confirmed that replenish_quick_drink_cache() in soda_mixer/flavors/quick_cache_service.py automatically queries all active holiday themes (HolidayTheme.get_active_themes()) and appends holiday buckets across all 3 drink labs (SODA, SLUSHIE, COFFEE) into the replenishment queue.

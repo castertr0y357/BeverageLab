@@ -569,3 +569,56 @@ class QuickDrinkCacheAndUniquenessTests(TestCase):
         self.assertEqual(del_resp.status_code, 200)
         self.assertFalse(HolidayTheme.objects.filter(uuid=h_uuid).exists())
 
+
+
+    def test_targeted_invalidation_on_ingredient_category_change(self) -> None:
+        """Changing an ingredient's category removes cached drinks using it and frees 2 slots in the new category."""
+        ing_a = Ingredient.objects.create(name="Spiced Syrup A", category="sweet", is_in_inventory=True)
+        ing_b = Ingredient.objects.create(name="Spice Base B", category="spice", is_in_inventory=True)
+
+        # Cached drink using ing_a in 'sweet'
+        cqd_a = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='sweet', ingredient_count=2,
+            name='Sweet Spiced Fizz', flavor_signature='spiced syrup a::vanilla',
+            ingredients_json=[{'id': ing_a.id, 'name': ing_a.name}]
+        )
+        # 3 cached drinks in 'spice'
+        cqd_s1 = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='spice', ingredient_count=2,
+            name='Spice 1', flavor_signature='spice1', ingredients_json=[{'id': ing_b.id, 'name': ing_b.name}]
+        )
+        cqd_s2 = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='spice', ingredient_count=2,
+            name='Spice 2', flavor_signature='spice2', ingredients_json=[{'id': ing_b.id, 'name': ing_b.name}]
+        )
+        cqd_s3 = CachedQuickDrink.objects.create(
+            drink_type='SODA', mode='experimental', profile='spice', ingredient_count=2,
+            name='Spice 3', flavor_signature='spice3', ingredients_json=[{'id': ing_b.id, 'name': ing_b.name}]
+        )
+
+        # Change ing_a category from 'sweet' -> 'spice'
+        ing_a.category = 'spice'
+        ing_a.save()
+
+        self.assertFalse(CachedQuickDrink.objects.filter(id=cqd_a.id).exists())
+        # 2 oldest in 'spice' should be pruned, leaving 1
+        self.assertEqual(CachedQuickDrink.objects.filter(profile='spice').count(), 1)
+        self.assertTrue(CachedQuickDrink.objects.filter(id=cqd_s3.id).exists())
+
+    def test_targeted_invalidation_on_new_in_stock_ingredient(self) -> None:
+        """Adding a new in-stock ingredient prunes up to 3 oldest cached drinks in its category."""
+        existing = Ingredient.objects.create(name="Old Berry", category="berry", is_in_inventory=True)
+        for i in range(4):
+            CachedQuickDrink.objects.create(
+                drink_type='SODA', mode='experimental', profile='berry', ingredient_count=2,
+                name=f'Berry {i}', flavor_signature=f'berry_{i}',
+                ingredients_json=[{'id': existing.id, 'name': existing.name}]
+            )
+
+        self.assertEqual(CachedQuickDrink.objects.filter(profile='berry').count(), 4)
+
+        # Add a new in-stock berry ingredient
+        Ingredient.objects.create(name="Fresh Boysenberry", category="berry", is_in_inventory=True)
+
+        # 3 oldest pruned, 1 remains
+        self.assertEqual(CachedQuickDrink.objects.filter(profile='berry').count(), 1)

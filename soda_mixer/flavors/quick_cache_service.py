@@ -1049,3 +1049,63 @@ def draw_quick_drinks(
         'cycle_wrapped': cycle_wrapped,
         'needs_live_generation': False,
     }
+
+
+
+def invalidate_quick_cache_for_ingredient_change(
+    ingredient_id: int,
+    old_category: Optional[str] = None,
+    new_category: Optional[str] = None,
+    is_new_or_restocked: bool = False,
+) -> int:
+    """
+    Perform targeted invalidation of CachedQuickDrink entries when an ingredient
+    changes category or is newly added/restocked into inventory.
+    Returns the number of deleted CachedQuickDrink rows.
+    """
+    deleted_count = 0
+    category_changed = (
+        old_category is not None
+        and new_category is not None
+        and old_category.strip().lower() != new_category.strip().lower()
+    )
+
+    if category_changed:
+        # Remove cached drinks that directly reference this ingredient so they don't remain stuck in the old category
+        ids_to_delete = []
+        for cqd in CachedQuickDrink.objects.all().only('id', 'ingredients_json'):
+            ings = cqd.ingredients_json or []
+            if any(int(i.get('id', 0)) == ingredient_id for i in ings if i.get('id')):
+                ids_to_delete.append(cqd.id)
+        if ids_to_delete:
+            count, _ = CachedQuickDrink.objects.filter(id__in=ids_to_delete).delete()
+            deleted_count += count
+
+        # Also free up 2 slots in the new category so upcoming replenishment can include this ingredient
+        if new_category.strip():
+            oldest_new_cat_ids = list(
+                CachedQuickDrink.objects.filter(profile__iexact=new_category.strip())
+                .order_by('created_at')
+                .values_list('id', flat=True)[:2]
+            )
+            if oldest_new_cat_ids:
+                count, _ = CachedQuickDrink.objects.filter(id__in=oldest_new_cat_ids).delete()
+                deleted_count += count
+
+    elif is_new_or_restocked and new_category and new_category.strip():
+        # Free up 3 oldest slots in this category so the next replenishment weaves the new flavor in
+        oldest_ids = list(
+            CachedQuickDrink.objects.filter(profile__iexact=new_category.strip())
+            .order_by('created_at')
+            .values_list('id', flat=True)[:3]
+        )
+        if oldest_ids:
+            count, _ = CachedQuickDrink.objects.filter(id__in=oldest_ids).delete()
+            deleted_count += count
+
+    if deleted_count > 0:
+        logger.info(
+            f"QuickCache - Info - Targeted invalidation removed {deleted_count} cached drink(s) "
+            f"for ingredient ID {ingredient_id} (old_cat={old_category}, new_cat={new_category}, new_or_restocked={is_new_or_restocked})."
+        )
+    return deleted_count
